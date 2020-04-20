@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <endian.h>
 
 // handshake protocol options
 enum proto_options { VERSION = 0, MINIMUM_VERSION, SWARM_ID, CONTENT_PROT_METHOD, MERKLE_HASH_FUNC, LIVE_SIGNATURE_ALG, CHUNK_ADDR_METHOD,  LIVE_DISC_WIND, 
@@ -49,7 +50,7 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 		*d++ = VERSION;
 		*d++ = 1;
 	} else {
-		printf("no version specfified - it's obligatory!\n");
+		printf("no version specified - it's obligatory!\n");
 		return -1;
 	}
 	
@@ -58,14 +59,13 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 		*d++ = MINIMUM_VERSION;
 		*d++ = 1;
 	} else {
-		printf("no minimum_version specfified - it's obligatory!\n");
+		printf("no minimum_version specified - it's obligatory!\n");
 		return -1;
 	}
 	
 	if (pos->opt_map & (1 << SWARM_ID)) {					// rfc - 7.4
 		*d++ = SWARM_ID;
-#warning FIXME - przekonwertowac na bigendian
-		*(u16 *)d = pos->swarm_id_len & 0xffff;
+		*(u16 *)d = htobe16(pos->swarm_id_len & 0xffff);
 		d += sizeof(pos->swarm_id_len);
 		memcpy(d, pos->swarm_id, pos->swarm_id_len);
 		d += pos->swarm_id_len;
@@ -75,7 +75,7 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 		*d++ = CONTENT_PROT_METHOD;
 		*d++ = pos->content_prot_method & 0xff;
 	} else {
-		printf("no content_integrity_protection_method specfified - it's obligatory!\n");
+		printf("no content_integrity_protection_method specified - it's obligatory!\n");
 		return -1;
 	} 
 	
@@ -94,23 +94,21 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 		*d++ = CHUNK_ADDR_METHOD;
 		*d++ = pos->chunk_addr_method & 0xff;
 	} else {
-		printf("no chunk_addr_method specfified - it's obligatory!\n");
+		printf("no chunk_addr_method specified - it's obligatory!\n");
 		return -1;
 	} 
  
 	if (pos->opt_map & (1 << LIVE_DISC_WIND)) {			// rfc - 7.9
 		*d++ = LIVE_DISC_WIND;
 		if ((pos->chunk_addr_method == 0) || (pos->chunk_addr_method == 2)) {		// table 6 - czy to 32-bitowe adresy?
-#warning FIXME - przekonwertowac na bigendian
-			memcpy(d, pos->live_disc_wind, 4);			// albo 4 bajty (32bity) - to zalezy od chunk addressing method
-			d += 4;
+			*(u32 *)d = htobe32(*(u32 *)pos->live_disc_wind);
+			d += sizeof(u32);
 		} else {
-#warning FIXME - przekonwertowac na bigendian
-			memcpy(d, pos->live_disc_wind, 8);			// albo 4 bajty (32bity) - to zalezy od chunk addressing method
-			d += 8;
+			*(u64 *)d = htobe64(*(u64 *)pos->live_disc_wind);
+			d += sizeof(u64);
 		}
 	} else {
-		printf("no chunk_addr_method specfified - it's obligatory!\n");
+		printf("no chunk_addr_method specified - it's obligatory!\n");
 		return -1;
 	} 
 	
@@ -123,9 +121,8 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 	} 
 	
 	if (pos->opt_map & (1 << CHUNK_SIZE)) {			// rfc - 7.11
-#warning FIXME - przekonwertowac na bigendian
 		*d++ = CHUNK_SIZE;
-		*(u32 *)d = (u32)(pos->chunk_size & 0xffffffff);
+		*(u32 *)d = htobe32((u32)(pos->chunk_size & 0xffffffff));
 		d += sizeof(pos->chunk_size);
 	} else {
 		printf("no chunk_size specified - it's obligatory!\n");
@@ -172,7 +169,7 @@ void dump_options (char *ptr)
 	
 	if (*d == SWARM_ID) {
 		d++;
-		swarm_len = *((u16 *)d) & 0xffff;
+		swarm_len = be16toh(*((u16 *)d) & 0xffff);
 		d += 2;
 		printf("swarm_id[%u]: %s\n", swarm_len, d);
 		d += swarm_len;
@@ -233,10 +230,10 @@ void dump_options (char *ptr)
 		printf("Live Discard Window: ");
 		switch (chunk_addr_method) {
 			case 0:
-			case 2:	ldw32 =  *(u32 *)d; printf("32bit: %#x\n", ldw32); d += sizeof(u32); break;
+			case 2:	ldw32 =  be32toh(*(u32 *)d); printf("32bit: %#x\n", ldw32); d += sizeof(u32); break;
 			case 1:
 			case 3:
-			case 4:	ldw64 =  *(u64 *)d; printf("64bit: %#x\n", ldw64); d += sizeof(u64); break;
+			case 4:	ldw64 =  be64toh(*(u64 *)d); printf("64bit: %#x\n", ldw64); d += sizeof(u64); break;
 			default: printf("Error\n");
 		}
 	}
@@ -254,7 +251,7 @@ void dump_options (char *ptr)
 	
 	if (*d == CHUNK_SIZE) {
 		d++;
-		printf("Chunk size: %u\n", *(u32 *)d);
+		printf("Chunk size: %u\n", be32toh(*(u32 *)d));
 		d += sizeof(u32);
 	}
 	
