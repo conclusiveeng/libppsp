@@ -207,6 +207,42 @@ int make_handshake_response (char *ptr, u32 dest_chan_id, u32 src_chan_id, char 
 
 
 
+int make_request (char *ptr, u32 dest_chan_id, u32 start_chunk, u32 end_chunk)
+{
+	char *d;
+	int ret, len;
+
+	d = ptr;
+	
+	*(u32 *)d = htobe32(dest_chan_id);
+	d += sizeof(u32);
+	
+	*d = REQUEST;
+	d++;
+	
+	*(u32 *)d = htobe32(start_chunk);
+	d += sizeof(u32);
+
+	*(u32 *)d = htobe32(end_chunk);
+	d += sizeof(u32);
+
+	*d = PEX_REQ;
+	d++;
+	
+	ret = d - ptr;
+	printf("%s: returning %u bytes\n", __FUNCTION__, ret);
+	
+	return ret;
+}
+
+
+
+
+
+
+
+
+
 
 
 
@@ -346,7 +382,7 @@ int dump_handshake_request (char *ptr, int req_len)
 	
 	d = ptr;
 	
-	dest_chan_id = be32toh(*d);
+	dest_chan_id = be32toh(*(u32 *)d);
 	printf("Destination Channel ID: %#x\n", dest_chan_id);
 	d += sizeof(u32);
 
@@ -420,6 +456,52 @@ int dump_handshake_response (char *ptr, int resp_len)
 
 
 
+int dump_request (char *ptr, int req_len)
+{
+	char *d;
+	int ret;
+	u32 dest_chan_id;
+	u32 start_chunk, end_chunk;
+	
+	d = ptr;
+
+	dest_chan_id = be32toh(*(u32 *)d);
+	printf("Destination Channel ID: %#x\n", dest_chan_id);
+	d += sizeof(u32);
+
+	
+	if (*d == REQUEST) {
+		printf("ok, REQUEST header\n");
+	} else {
+		printf("error, should be REQUEST header but is: %u\n", *d);
+		return -1;
+	}
+	d++;
+
+	start_chunk = be32toh(*(u32 *)d);
+	d += sizeof(u32);
+	printf("start chunk: %u\n", start_chunk);
+	
+	end_chunk = be32toh(*(u32 *)d);
+	d += sizeof(u32);
+	printf("end chunk: %u\n", end_chunk);
+	
+	
+	
+	// tutaj obsluga pozostalych komunikatow - jak np. PEX_REQ
+	if (d - ptr < req_len) {
+		printf("here do in the future maintenance of rest of messages: %u bytes left\n" ,req_len - (d - ptr));
+	}
+	
+	
+	
+	
+	ret = d - ptr;
+	printf("%s returning: %u bytes\n", __FUNCTION__, ret);
+
+	return ret;
+}
+
 
 
 
@@ -432,8 +514,8 @@ void proto_test (void)
 	struct proto_opt_str pos;
 	char swarm_id[] = "swarm_id";
 	char opts[128];			// bufor na zakodowane opcje
-	char handshake_req[256], handshake_resp[256];
-	int opts_len, h_req_len, h_resp_len;
+	char handshake_req[256], handshake_resp[256], request[256];
+	int opts_len, h_req_len, h_resp_len, h_req;
 	
 	memset(&pos, 0, sizeof(struct proto_opt_str));
 	memset(&opts, 0, sizeof(opts));
@@ -471,16 +553,21 @@ void proto_test (void)
 	opts_len = make_handshake_options(opts, &pos);
 //	dump_options(opts);
 
+	printf("\n\ninitial handshake:\n");
 	// make initial HANDSHAKE request - serialize dest chan id, src chan id and protocol options
 	h_req_len = make_handshake_request(handshake_req, 0, 0xfeedbabe, opts, opts_len);
 	dump_handshake_request(handshake_req, h_req_len);
 	
 	
-	printf("\n\nresponse:\n");
+	printf("\n\nresponse handshake:\n");
 	// make response HANDSHAKE with 0-10 chunks available
-	h_resp_len = make_handshake_response(handshake_resp, 0, 0xfeedbabe, opts, opts_len, 0, 10);		// tu poprawic channel id
-
+	h_resp_len = make_handshake_response(handshake_resp, 0, 0xfeedbabe, opts, opts_len, 0, 10);		// tu poprawic channel id, czy potrzebny tu jest source channel id?
 	dump_handshake_response(handshake_resp, h_resp_len);
+	
+	printf("\n\nrequest:\n");
+	h_req = make_request(request, 0xfeedbabe, 0, 10);
+	dump_request(request, h_req);
+	
 	
 }
 
