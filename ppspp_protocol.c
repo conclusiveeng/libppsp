@@ -2,6 +2,10 @@
 #include <string.h>
 #include <endian.h>
 
+#include "net.h"
+#include "types.h"
+#include "ppspp_protocol.h"
+
 // handshake protocol options
 enum proto_options { VERSION = 0, MINIMUM_VERSION, SWARM_ID, CONTENT_PROT_METHOD, MERKLE_HASH_FUNC, LIVE_SIGNATURE_ALG, CHUNK_ADDR_METHOD,  LIVE_DISC_WIND, 
 	SUPPORTED_MSGS, CHUNK_SIZE, END_OPTION = 255 };
@@ -9,31 +13,6 @@ enum proto_options { VERSION = 0, MINIMUM_VERSION, SWARM_ID, CONTENT_PROT_METHOD
 enum message { HANDSHAKE = 0, DATA, ACK, HAVE, INTEGRITY, PEX_RESV4, PEX_REQ, SIGNED_INTEGRITY, REQUEST, CANCEL, CHOKE, UNCHOKE, PEX_RESV6, PEX_RESCERT };
 	
 	
-	
-	
-typedef unsigned char u8;
-typedef unsigned short int u16;
-typedef unsigned int u32;
-typedef unsigned long int  u64;
-
-
-
-struct proto_opt_str {
-	u8 version;
-	u8 minimum_version;
-	u16 swarm_id_len;
-	u8 *swarm_id;
-	u8 content_prot_method;
-	u8 merkle_hash_func;
-	u8 live_signature_alg;
-	u8 chunk_addr_method;
-	u8 live_disc_wind[8];
-	u8 supported_msgs_len;
-	u8 supported_msgs[256];
-	u32 chunk_size;
-
-	u32 opt_map;				// mapa bitowa - ktore z powyzszych pol maja jakies dane
-};	
 
 
 
@@ -509,7 +488,7 @@ int dump_request (char *ptr, int req_len)
 
 
 
-void proto_test (void)
+void proto_test (int sender)
 {
 	struct proto_opt_str pos;
 	char swarm_id[] = "swarm_id";
@@ -568,7 +547,10 @@ void proto_test (void)
 	h_req = make_request(request, 0xfeedbabe, 0, 10);
 	dump_request(request, h_req);
 	
-	
+	if (sender)
+		net_sender(handshake_resp, h_resp_len);					// uruchom serwer udostepniajacy plik
+	else 
+		net_receiver(handshake_req, h_req_len, request, h_req);					// uruchom klienta odbierajacego plik
 }
 
 

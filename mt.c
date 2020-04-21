@@ -9,6 +9,8 @@
 
 #include "sha1.h"
 #include "ppspp_protocol.h"
+#include "net.h"
+
 
 #define DEBUG 0
 
@@ -806,18 +808,20 @@ int main (int argc, char *argv[])
 	
 	chunk_size = 1024;
 	fname = NULL;
-	while ((opt = getopt(argc, argv, "s:f:")) != -1) {
+	while ((opt = getopt(argc, argv, "f:s:")) != -1) {
 		switch (opt) {
-			case 's':				// chunk size [bytes]
-				chunk_size = atoi(optarg);
-				break;
 			case 'f':				// filename
 				fname = optarg;
 				break;
+			case 's':				// chunk size [bytes]
+				chunk_size = atoi(optarg);
+				break;
+
 			default:
 				break;
 		}
 	}
+	
 	
 	
 	printf("chunk_size: %u\n", chunk_size);
@@ -1023,11 +1027,16 @@ int main (int argc, char *argv[])
 		
 		update_sha(ret, nl);
 		dump_tree(ret, nl);	
+		
+		proto_test(1);			// 1- oznacza ze to tryb sendera (serwera) - bo tylko serwer ma wstepnie podana nazwe pliku do udostepniania
+	} else {
+		proto_test(0);			// 0 - oznacza ze to tryb receivera (klienta)
+		
 	}
 
 	
 	
-	proto_test();
+	//proto_test();
 
 	
 	return 0;
