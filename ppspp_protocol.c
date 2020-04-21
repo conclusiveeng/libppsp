@@ -1,12 +1,15 @@
 #include <stdio.h>
 #include <string.h>
-
 #include <endian.h>
 
 // handshake protocol options
 enum proto_options { VERSION = 0, MINIMUM_VERSION, SWARM_ID, CONTENT_PROT_METHOD, MERKLE_HASH_FUNC, LIVE_SIGNATURE_ALG, CHUNK_ADDR_METHOD,  LIVE_DISC_WIND, 
 	SUPPORTED_MSGS, CHUNK_SIZE, END_OPTION = 255 };
 
+enum message { HANDSHAKE = 0, DATA, ACK, HAVE, INTEGRITY, PEX_RESV4, PEX_REQ, SIGNED_INTEGRITY, REQUEST, CANCEL, CHOKE, UNCHOKE, PEX_RESV6, PEX_RESCERT };
+	
+	
+	
 	
 typedef unsigned char u8;
 typedef unsigned short int u16;
@@ -36,7 +39,7 @@ struct proto_opt_str {
 
 
 
-	
+// procedura serializujaca opcje dla handshake'ingu
 // przekazany tutaj ptr - musi wskazywac na zaallokowany obszar pamieci o wystraczajacej wielkosci zeby pomiescic wszystkie dane
 // pos - wskaznik do struktury na podstawie ktorej bedzie tworzona lista opcji 
 int make_handshake_options (char *ptr, struct proto_opt_str *pos)
@@ -129,7 +132,7 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 		return -1;
 	} 
 
-	*d++ = END_OPTION;				// zakoncz liste opjci znacznikiem 255
+	*d++ = END_OPTION;				// zakoncz liste opcji znacznikiem 255
 	
 
 	ret = d - ptr;
@@ -140,11 +143,74 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 }
 
 
+// proc serializujaca poszczegolne bajty requestu HANDSHAKE
+int make_handshake_request (char *ptr, u32 dest_chan_id, u32 src_chan_id, char *opts, int opt_len)
+{
+	char *d;
+	int ret;
+	
+	d = ptr;
+	
+	*(u32 *)d = htobe32(dest_chan_id);
+	d += sizeof(u32);
+
+	*d = HANDSHAKE;
+	d++;
+
+	*(u32 *)d = htobe32(src_chan_id);
+	d += sizeof(u32);
+	
+	memcpy(d, opts, opt_len);
+	d += opt_len;
+	
+	ret = d - ptr;
+	printf("%s: returning %u bytes\n", __FUNCTION__, ret);
+	
+	return ret;
+}
 
 
 
 
-void dump_options (char *ptr)
+// proc serializujaca poszczegolne bajty odpowiedzi HANDSHAKE
+int make_handshake_response (char *ptr, u32 dest_chan_id, u32 src_chan_id, char *opts, int opt_len, u32 start_chunk, u32 end_chunk)
+{
+	char *d;
+	int ret, len;
+
+	// serialize HANDSHAKE header and options
+	len = make_handshake_request(ptr, dest_chan_id, src_chan_id, opts, opt_len);
+
+	d = ptr + len;
+	
+	// add HAVE header + data
+	
+	*d = HAVE;
+	d++;
+	
+	*(u32 *)d = htobe32(start_chunk);
+	d += sizeof(u32);
+
+	*(u32 *)d = htobe32(end_chunk);
+	d += sizeof(u32);
+	
+	
+	
+	ret = d - ptr;
+	printf("%s: returning %u bytes\n", __FUNCTION__, ret);
+	
+	
+	
+	return ret;
+}
+
+
+
+
+
+
+
+int dump_options (char *ptr)
 {
 	char *d;
 	int swarm_len, x;
@@ -152,6 +218,7 @@ void dump_options (char *ptr)
 	u32 ldw32;
 	u64 ldw64;
 	u8 supported_msgs_len;
+	int ret;
 	
 	d = ptr;
 	
@@ -204,7 +271,7 @@ void dump_options (char *ptr)
 	
 	if (*d == LIVE_SIGNATURE_ALG) {
 		d++;
-		printf("Live Signture Algorithm: %u\n", *d);
+		printf("Live Signature Algorithm: %u\n", *d);
 		d++;
 	}
 	
@@ -262,7 +329,96 @@ void dump_options (char *ptr)
 	
 
 	printf("parsed: %u bytes\n", d - ptr);
+	
+	ret = d - ptr;
+	return ret;
 }
+
+
+
+
+
+int dump_handshake_request (char *ptr, int req_len)
+{
+	char *d;
+	u32 dest_chan_id, src_chan_id;
+	int ret, opt_len;
+	
+	d = ptr;
+	
+	dest_chan_id = be32toh(*d);
+	printf("Destination Channel ID: %#x\n", dest_chan_id);
+	d += sizeof(u32);
+
+	if (*d == HANDSHAKE) {
+		printf("ok, HANDSHAKE req\n");
+	} else {
+		printf("error - should be HANDSHAKE req (0) but is: %u\n", *d);
+	}
+	d++;
+	
+	src_chan_id = be32toh(*(u32 *)d);
+	printf("Destination Channel ID: %#x\n", src_chan_id);
+	d += sizeof(u32);
+	
+	// tutaj od wskaznika 'd' znajduja sie opcje - zdumpuj je
+	printf("\n");
+	
+	opt_len = dump_options(d);
+	
+	ret = d + opt_len - ptr;
+	printf("%s returning: %u bytes\n", __FUNCTION__, ret);
+
+	return ret;
+}
+
+
+
+
+
+
+int dump_handshake_response (char *ptr, int resp_len)
+{
+	char *d;
+	int req_len, x;
+	int ret;
+	u32 start_chunk, end_chunk;
+	
+	// dump HANDSHAKE header and protocol options 
+	d = ptr;
+	req_len = dump_handshake_request(ptr, resp_len);
+	
+	d += req_len;
+	// dump HAVE header
+	printf("HAVE header:\n");
+	if (*d == HAVE) {
+		printf("ok, HAVE header\n");
+	} else {
+		printf("error, should be HAVE header but is: %u\n", *d);
+		return -1;
+	}
+
+	d++;
+	
+	start_chunk = be32toh(*(u32 *)d);
+	d += sizeof(u32);
+	printf("start chunk: %u\n", start_chunk);
+	
+	end_chunk = be32toh(*(u32 *)d);
+	d += sizeof(u32);
+	printf("end chunk: %u\n", end_chunk);
+	
+	
+	
+	
+	ret = d - ptr;
+	printf("%s returning: %u bytes\n", __FUNCTION__, ret);
+	
+	return ret;
+}
+
+
+
 
 
 
@@ -275,10 +431,17 @@ void proto_test (void)
 {
 	struct proto_opt_str pos;
 	char swarm_id[] = "swarm_id";
-	char opts[1024];			// bufor na zakodowane opcje
+	char opts[128];			// bufor na zakodowane opcje
+	char handshake_req[256], handshake_resp[256];
+	int opts_len, h_req_len, h_resp_len;
 	
 	memset(&pos, 0, sizeof(struct proto_opt_str));
 	memset(&opts, 0, sizeof(opts));
+	memset(&handshake_req, 0, sizeof(handshake_req));
+	memset(&handshake_resp, 0, sizeof(handshake_resp));
+	
+	
+	// prepare structure as a set of parameters to make_handshake_options() proc
 	pos.version = 1;
 	pos.minimum_version = 1;
 	pos.swarm_id_len = strlen(swarm_id);
@@ -286,12 +449,13 @@ void proto_test (void)
 	pos.content_prot_method = 1;			// merkle hash tree
 	pos.merkle_hash_func = 0;			// 0 = sha-1
 	pos.live_signature_alg = 0;			// trzeba wziac jakas wartosc z dnssec
-	pos.chunk_addr_method = 0;			// 0 = 32 bit bins
+	pos.chunk_addr_method = 2;			// 2 = 32 bit chunk ranges
 	*(unsigned int *)pos.live_disc_wind = 0x12345678;		// 32 bitowa wartosc - ale chyba trzbe ja przekodowac? albo raczej w make_handshake_options()
 	pos.supported_msgs_len = 2;			// przykladowo 2 bajty mapy bitowej obslugiwanych komend
 	*(unsigned int *)pos.supported_msgs = 0xffff;			// mapa bitowa: obslugujemy wszystkie komendy rfc
 	pos.chunk_size = 1024;				// domyslnie przymij 1024 bajty rozmiaru chunka 
 	
+	// mark the options we want to pass to make_handshake_options() (which ones are valid)
 	pos.opt_map = 0;
 	pos.opt_map |= (1 << VERSION);
 	pos.opt_map |= (1 << MINIMUM_VERSION);
@@ -304,11 +468,19 @@ void proto_test (void)
 	pos.opt_map |= (1 << SUPPORTED_MSGS);
 	pos.opt_map |= (1 << CHUNK_SIZE);
 	
+	opts_len = make_handshake_options(opts, &pos);
+//	dump_options(opts);
+
+	// make initial HANDSHAKE request - serialize dest chan id, src chan id and protocol options
+	h_req_len = make_handshake_request(handshake_req, 0, 0xfeedbabe, opts, opts_len);
+	dump_handshake_request(handshake_req, h_req_len);
 	
-	make_handshake_options(opts, &pos);
 	
-	dump_options(opts);
-	
+	printf("\n\nresponse:\n");
+	// make response HANDSHAKE with 0-10 chunks available
+	h_resp_len = make_handshake_response(handshake_resp, 0, 0xfeedbabe, opts, opts_len, 0, 10);		// tu poprawic channel id
+
+	dump_handshake_response(handshake_resp, h_resp_len);
 	
 }
 

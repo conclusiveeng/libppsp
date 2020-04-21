@@ -6,18 +6,15 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-//#include "global.h"
-//#include "md5.h"
 
 #include "sha1.h"
-
+#include "ppspp_protocol.h"
 
 #define DEBUG 0
 
 struct chunk {
 	unsigned long int offset;				// offset w pliku w bajtach do poczaktu tego chunka
 	unsigned long int len;					// dlugosc tego chunka
-	//char md5[32];						// to chyba ma miec raczej 16 bajtow, a wogole to chyba md5 ma byc w node
 	char sha[20];
 	struct node *node;
 	enum { CH_EMPTY = 0, CH_ACTIVE } state;
@@ -28,7 +25,6 @@ struct node {
 	int number;					// numer wezla
 	struct node *left, *right, *parent;		// jesli parent == NULL - to jest to korzen drzwea
 	struct chunk *chunk;				// tylko wezly typu liscie maja swoje chunki - figure 2. rfc7574: c0, c1, c2, c3, c4, ...
-	//char md5[16];
 	char sha[20];
 	enum { EMPTY = 0, INITIALIZED, ACTIVE } state;
 #if DEBUG
@@ -733,7 +729,6 @@ void update_sha (struct node *t, int num_chunks)
 	int h, nc, l, si, first_idx, y, s;
 	int left, right, parent;
 	char sha_left[40 + 1], sha_right[40 + 1], concat[80 + 1], sha_parent[40 + 1];
-	//MD5_CTX context;
 	SHA1Context context;
 	unsigned char digest[20 + 1];
 
@@ -756,13 +751,13 @@ void update_sha (struct node *t, int num_chunks)
 			for (y = 0; y < 20; y++)
 				s += sprintf(sha_left + s, "%02x", t[left].sha[y] & 0xff);
 			sha_left[40] = '\0';
-			//printf(" l: %s\n", md5left);
+			//printf(" l: %s\n", sha_left);
 			
 			// wyznacz string sha dla prawego
 			s = 0;
 			for (y = 0; y < 20; y++)
 				s += sprintf(sha_right + s, "%02x", t[right].sha[y] & 0xff);
-			//printf(" r: %s\n", md5right);
+			//printf(" r: %s\n", sha_right);
 			sha_right[40] = '\0';
 			
 			sprintf(concat, "%s%s", sha_left, sha_right);
@@ -776,11 +771,11 @@ void update_sha (struct node *t, int num_chunks)
 			// skopiuj wyliczone sha do rodzica
 			memcpy(t[parent].sha, digest, 20);
 			
-			// wyznacz string md5 dla rodzica
+			// wyznacz string sha dla rodzica
 			s = 0;
 			for (y = 0; y < 20; y++)
 				s += sprintf(sha_parent + s, "%02x", digest[y] & 0xff);
-			//printf(" p: %s\n", md5parent);
+			//printf(" p: %s\n", sha_parent);
 			sha_parent[40] = '\0';
 			
 			t[parent].state = ACTIVE;
