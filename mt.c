@@ -6,39 +6,18 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-
+#include "mt.h"
 #include "sha1.h"
 #include "ppspp_protocol.h"
 #include "net.h"
-
-
-#define DEBUG 0
-
-struct chunk {
-	unsigned long int offset;				// offset w pliku w bajtach do poczaktu tego chunka
-	unsigned long int len;					// dlugosc tego chunka
-	char sha[20];
-	struct node *node;
-	enum { CH_EMPTY = 0, CH_ACTIVE } state;
-};
- 
-
-struct node {
-	int number;					// numer wezla
-	struct node *left, *right, *parent;		// jesli parent == NULL - to jest to korzen drzwea
-	struct chunk *chunk;				// tylko wezly typu liscie maja swoje chunki - figure 2. rfc7574: c0, c1, c2, c3, c4, ...
-	char sha[20];
-	enum { EMPTY = 0, INITIALIZED, ACTIVE } state;
-#if DEBUG
-	int l, si;					// tylko dla debuggingu  weryfikacja poziomu (l: 1...l) na ktorym jest wezel i jego index (si: 0..si-1) na danym poziomie
-#endif	
-};
+#include "peer.h"
 
 
 struct node *tree, *root8, *root16, *root32, *root64;
 struct node **tab_tree8, **tab_tree16, **tab_tree32, **tab_tree64;
 struct chunk *tab_chunk;
 
+struct peer remote_peer;
 
 void interval_min_max (struct node *i, struct node *min, struct node *max);
 void dump_tree (struct node *t, int l);
@@ -1028,9 +1007,31 @@ int main (int argc, char *argv[])
 		update_sha(ret, nl);
 		dump_tree(ret, nl);	
 		
-		proto_test(1);			// 1- oznacza ze to tryb sendera (serwera) - bo tylko serwer ma wstepnie podana nazwe pliku do udostepniania
+		
+		remote_peer.tree = ret;
+		remote_peer.nl = nl;
+		remote_peer.nc = nc;
+		remote_peer.type = SEEDER;
+		remote_peer.handshake_req = NULL;
+		remote_peer.handshake_req_len = 0;
+		remote_peer.handshake_resp = NULL;
+		remote_peer.handshake_resp_len = 0;
+		// peer->requets NULL, reques_len =0 
+		remote_peer.start_chunk = 0;
+		remote_peer.end_chunk = nc - 1;
+		
+		proto_test(&remote_peer);
 	} else {
-		proto_test(0);			// 0 - oznacza ze to tryb receivera (klienta)
+		remote_peer.tree = NULL;
+		remote_peer.nl = 0;
+		remote_peer.nc = 0;
+		remote_peer.type = LEECHER;
+		remote_peer.handshake_req = NULL;
+		remote_peer.handshake_req_len = 0;
+		remote_peer.handshake_resp = NULL;
+		remote_peer.handshake_resp_len = 0;
+		
+		proto_test(&remote_peer);			// 0 - oznacza ze to tryb receivera (klienta)
 		
 	}
 

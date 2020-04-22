@@ -8,8 +8,10 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#include "mt.h"
 #include "net.h"
 #include "ppspp_protocol.h"
+#include "peer.h"
 
 #define BUFSIZE 1024
 #define PORT     6778
@@ -20,8 +22,8 @@
 extern int h_errno;
 
 
-// serwer - udostepnia podany w commad line plik
-int net_sender(char *handshake2, int handshake2_len)
+// serwer - udostepnia podany w command line plik
+int net_seeder(struct peer *peer)
 {
 	int sockfd;
 	int portno;
@@ -56,6 +58,8 @@ int net_sender(char *handshake2, int handshake2_len)
 
 	while (1) {
 		bzero(buf, BUFSIZE);
+		
+		// odbierz HANDSHAKE
 		n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &clientlen);
 		if (n < 0)
 			printf("ERROR in recvfrom");
@@ -71,25 +75,35 @@ int net_sender(char *handshake2, int handshake2_len)
 			printf("ERROR on inet_ntoa\n");
 		printf("server received datagram from %s (%s)\n", hostp->h_name, hostaddrp);
 		printf("server received %d bytes: %s\n", n, buf);
-	
 		// pokaz odebrany 1-szy handshake
-		dump_handshake_request(buf, n);
+		dump_handshake_request(buf, n, peer);
 		
+
 		
-		// odeslij handshake 2/3
-		n = sendto(sockfd, handshake2, handshake2_len, 0, (struct sockaddr *) &clientaddr, clientlen);
+		// odeslij HANDSHAKE 2/3 + HAVE
+//		n = sendto(sockfd, handshake2, handshake2_len, 0, (struct sockaddr *) &clientaddr, clientlen);
+		n = sendto(sockfd, peer->handshake_resp, peer->handshake_resp_len, 0, (struct sockaddr *) &clientaddr, clientlen);
 		if (n < 0)
 			printf("ERROR in sendto");
 		
 		
 		
 		
-		// odbierz request (handshake 3/3)
+		// odbierz REQUEST (handshake 3/3)
 		bzero(buf, BUFSIZE);
 		n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &clientlen);
-		
 		// pokaz odebrany request
 		dump_request(buf, n);
+		
+		
+		// rfc 5.6.2 
+		// wyslij najpierw INTEGRITY z zadanymi hashami (0-6) a dopiero potem DATA - oba komunikaty maga byc w jednym datagramie
+		n = make_integrity(buf, peer);
+		
+		// tu wyslij INTEGRITY z danymi
+		n = sendto(sockfd, buf, n, 0, (struct sockaddr *) &clientaddr, clientlen);
+		printf("INTEGRITY sent: %u\n", n);
+		
 		
 		
 	}
@@ -97,7 +111,7 @@ int net_sender(char *handshake2, int handshake2_len)
 
 
 // klient - odbiorca pliku
-int net_receiver (char *handshake1, int handshake1_len, char *request, int request_len)
+int net_leecher(struct peer *peer)
 {
 	int sockfd;
 	char buffer[BUFSIZE];
@@ -117,20 +131,33 @@ int net_receiver (char *handshake1, int handshake1_len, char *request, int reque
       
 
 	// wyslij handshake inicjujacy (pierwszy z trzech) - czyli probujemy nawiazac polaczenie z serwerem
-	sendto(sockfd, handshake1, handshake1_len, MSG_CONFIRM, (const struct sockaddr *) &servaddr, sizeof(servaddr));
+	sendto(sockfd, peer->handshake_req, peer->handshake_req_len, MSG_CONFIRM, (const struct sockaddr *) &servaddr, sizeof(servaddr));
+	
 	printf("initial message 1/3 sent\n");
          
 	// odbierz odpowiedz serwera (handshake2)
 	n = recvfrom(sockfd, (char *)buffer, BUFSIZE, MSG_WAITALL, (struct sockaddr *) &servaddr, &len);
 	buffer[n] = '\0';
 	printf("server replied with %u bytes\n", n);
-	dump_handshake_response(buffer, n);
+	dump_handshake_response(buffer, n, peer);
 
+	
+	// uwtorz tutaj REQUEST zamiast tego samego wywolania w proto_test()
+
+	peer->request_len = make_request(peer->request, 0xfeedbabe, peer->start_chunk, peer->end_chunk);
+	//printf("szybki dump:\n");
+	//dump_request(peer->request, peer->request_len);
+	
+	
 	// wyslij requesta o dane pliku
-	sendto(sockfd, request, request_len, MSG_CONFIRM, (const struct sockaddr *) &servaddr, sizeof(servaddr));
+	sendto(sockfd, peer->request, peer->request_len, MSG_CONFIRM, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 	printf("request message 3/3 sent\n");
 	
 	
+	// odbierz INTEGRITY z seedera
+	n = recvfrom(sockfd, (char *)buffer, BUFSIZE, MSG_WAITALL, (struct sockaddr *) &servaddr, &len);
+	printf("server sent INTEGRITY: %u\n", n);
+	dump_integrity(buffer, n, peer);
 	
 	
 	

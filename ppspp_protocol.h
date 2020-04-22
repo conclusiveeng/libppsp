@@ -3,6 +3,8 @@
 #define _PPSPP_PROTOCOL_H_
 
 #include "types.h"
+#include "mt.h"
+#include "peer.h"
 
 struct proto_opt_str {
 	u8 version;
@@ -28,13 +30,16 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos);
 int make_handshake_request (char *ptr, u32 dest_chan_id, u32 src_chan_id, char *opts, int opt_len);
 int make_handshake_response (char *ptr, u32 dest_chan_id, u32 src_chan_id, char *opts, int opt_len, u32 start_chunk, u32 end_chunk);
 int make_request (char *ptr, u32 dest_chan_id, u32 start_chunk, u32 end_chunk);
+int make_integrity (char *ptr, struct peer *);
+
 int dump_options (char *ptr);
-int dump_handshake_request (char *ptr, int req_len);
-int dump_handshake_response (char *ptr, int resp_len);
+int dump_handshake_request (char *ptr, int req_len, struct peer *);
+int dump_handshake_response (char *ptr, int resp_len, struct peer *);
 int dump_request (char *ptr, int req_len);
+int dump_integrity (char *ptr, int req_len, struct peer *);
 
-void proto_test (int);
-
+//void proto_test (int, u32, struct node *);
+void proto_test (struct peer *peer);
 
 
 

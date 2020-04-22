@@ -201,7 +201,6 @@ int make_request (char *ptr, u32 dest_chan_id, u32 start_chunk, u32 end_chunk)
 	
 	*(u32 *)d = htobe32(start_chunk);
 	d += sizeof(u32);
-
 	*(u32 *)d = htobe32(end_chunk);
 	d += sizeof(u32);
 
@@ -216,7 +215,39 @@ int make_request (char *ptr, u32 dest_chan_id, u32 start_chunk, u32 end_chunk)
 
 
 
+int make_integrity (char *ptr, struct peer *peer)
+{
+	char *d;
+	int x, y, ret;
+	
+	d = ptr;
 
+	// to pobrac ze struct peer
+	*(u32 *)d = htobe32(peer->dest_chan_id);
+	d += sizeof(u32);
+
+
+	*d = INTEGRITY;
+	d++;
+	
+	*(u32 *)d = htobe32(peer->start_chunk);
+	d += sizeof(u32);
+	*(u32 *)d = htobe32(peer->end_chunk);
+	d += sizeof(u32);
+	
+	y = 0;
+	for (x = peer->start_chunk; x <= peer->end_chunk; x++) {
+		memcpy(d, peer->tree[2 * x].sha, 20);
+		printf("copying chunk: %u\n", x);
+		y++;
+		d += 20;
+	}
+	
+	ret = d - ptr;
+	printf("%s: returning %u bytes\n", __FUNCTION__, ret);
+	
+	return ret;
+}
 
 
 
@@ -352,8 +383,8 @@ int dump_options (char *ptr)
 
 
 
-
-int dump_handshake_request (char *ptr, int req_len)
+// seeder to wywoluje zeby odebrac dane od leechera
+int dump_handshake_request (char *ptr, int req_len, struct peer *peer)
 {
 	char *d;
 	u32 dest_chan_id, src_chan_id;
@@ -391,8 +422,8 @@ int dump_handshake_request (char *ptr, int req_len)
 
 
 
-
-int dump_handshake_response (char *ptr, int resp_len)
+// leecher to wywoluje
+int dump_handshake_response (char *ptr, int resp_len, struct peer *peer)
 {
 	char *d;
 	int req_len, x;
@@ -401,7 +432,7 @@ int dump_handshake_response (char *ptr, int resp_len)
 	
 	// dump HANDSHAKE header and protocol options 
 	d = ptr;
-	req_len = dump_handshake_request(ptr, resp_len);
+	req_len = dump_handshake_request(ptr, resp_len, peer);
 	
 	d += req_len;
 	// dump HAVE header
@@ -417,10 +448,12 @@ int dump_handshake_response (char *ptr, int resp_len)
 	
 	start_chunk = be32toh(*(u32 *)d);
 	d += sizeof(u32);
+	peer->start_chunk = start_chunk;
 	printf("start chunk: %u\n", start_chunk);
 	
 	end_chunk = be32toh(*(u32 *)d);
 	d += sizeof(u32);
+	peer->end_chunk = end_chunk;
 	printf("end chunk: %u\n", end_chunk);
 	
 	
@@ -485,16 +518,61 @@ int dump_request (char *ptr, int req_len)
 
 
 
+int dump_integrity (char *ptr, int req_len, struct peer *peer)
+{
+	char *d;
+	int ret;
+	u32 dest_chan_id, start_chunk, end_chunk;
+	
+	d = ptr;
+
+	dest_chan_id = be32toh(*(u32 *)d);
+	printf("Destination Channel ID: %#x\n", dest_chan_id);
+	d += sizeof(u32);
+
+	if (*d == INTEGRITY) {
+		printf("ok, INTEGRITY header\n");
+	} else {
+		printf("error, should be INTEGRITY header but is: %u\n", *d);
+		return -1;
+	}
+	d++;
+	
+	start_chunk = be32toh(*(u32 *)d);
+	d += sizeof(u32);
+	printf("start chunk: %u\n", start_chunk);
+	
+	end_chunk = be32toh(*(u32 *)d);
+	d += sizeof(u32);
+	printf("end chunk: %u\n", end_chunk);
+	
+	
+	
+	
+	
+	
+	
+	printf("pozostalo: %u bajtow, czyli %u hashy\n", req_len - (d - ptr), (req_len - (d - ptr)) / 20);
+#warning FIXME don't count number of hashes in such a way
+	// a moze nie wyliczac tego - bo zaraz za INTEGRITY moglby byc inny komunikat - i wtedy dane z tego komunikatu byly doliczone do ilosci hashy?
+	// trzeba gdzies przechowywac numery zadanych przez nas hashy
+	
+	
+}
 
 
 
-void proto_test (int sender)
+
+
+//void proto_test (int sender, u32 num_chunks, struct node *t)
+void proto_test (struct peer *peer)
 {
 	struct proto_opt_str pos;
 	char swarm_id[] = "swarm_id";
 	char opts[128];			// bufor na zakodowane opcje
 	char handshake_req[256], handshake_resp[256], request[256];
-	int opts_len, h_req_len, h_resp_len, h_req;
+	int opts_len, h_req_len, h_resp_len, req_len;
+	u32 num_chunks; ///  do usuniecia - jak tylko bedzie pobieranie danych z handshake+have 
 	
 	memset(&pos, 0, sizeof(struct proto_opt_str));
 	memset(&opts, 0, sizeof(opts));
@@ -528,29 +606,51 @@ void proto_test (int sender)
 	pos.opt_map |= (1 << LIVE_DISC_WIND);
 	pos.opt_map |= (1 << SUPPORTED_MSGS);
 	pos.opt_map |= (1 << CHUNK_SIZE);
-	
+
+
+	// to dla leechera
 	opts_len = make_handshake_options(opts, &pos);
 //	dump_options(opts);
-
 	printf("\n\ninitial handshake:\n");
 	// make initial HANDSHAKE request - serialize dest chan id, src chan id and protocol options
 	h_req_len = make_handshake_request(handshake_req, 0, 0xfeedbabe, opts, opts_len);
-	dump_handshake_request(handshake_req, h_req_len);
+	dump_handshake_request(handshake_req, h_req_len, peer);
 	
-	
+
+	// to dla seedera
 	printf("\n\nresponse handshake:\n");
 	// make response HANDSHAKE with 0-10 chunks available
-	h_resp_len = make_handshake_response(handshake_resp, 0, 0xfeedbabe, opts, opts_len, 0, 10);		// tu poprawic channel id, czy potrzebny tu jest source channel id?
-	dump_handshake_response(handshake_resp, h_resp_len);
-	
+	printf("+++++++start: %u  end: %u\n", peer->start_chunk, peer->end_chunk);
+	h_resp_len = make_handshake_response(handshake_resp, 0, 0xfeedbabe, opts, opts_len, peer->start_chunk, peer->end_chunk);		// tu poprawic channel id, czy potrzebny tu jest source channel id?
+	dump_handshake_response(handshake_resp, h_resp_len, peer);
+
+
+	// ponizsze przeniesione do net_leecher - bo to tam ma byc
+	/*
+	// to dla leechera
 	printf("\n\nrequest:\n");
-	h_req = make_request(request, 0xfeedbabe, 0, 10);
-	dump_request(request, h_req);
+	num_chunks = 7; 
+#warning FIXME num_chunks should be get from seeder - seeder sends HAVE where those data are embedded
+	printf("------------num_chunks: %u\n", num_chunks);
+	req_len = make_request(request, 0xfeedbabe, 0, num_chunks - 1);
+	dump_request(request, req_len);
+	*/
 	
-	if (sender)
-		net_sender(handshake_resp, h_resp_len);					// uruchom serwer udostepniajacy plik
-	else 
-		net_receiver(handshake_req, h_req_len, request, h_req);					// uruchom klienta odbierajacego plik
+	
+	if (peer->type == SEEDER) {
+		// uzupelnij pola struktury peer - od zera sa one ustawiane w mt.c::main()
+		peer->handshake_resp = handshake_resp;
+		peer->handshake_resp_len = h_resp_len;
+//		net_seeder(handshake_resp, h_resp_len, peer->tree);					// uruchom serwer udostepniajacy plik
+		net_seeder(peer);					// uruchom serwer udostepniajacy plik
+	} else {
+		peer->handshake_req = handshake_req;
+		peer->handshake_req_len = h_req_len;
+		peer->request = request;
+		peer->request_len = req_len;
+//		net_leecher(handshake_req, h_req_len, request, h_req);					// uruchom klienta odbierajacego plik
+		net_leecher(peer);					// uruchom klienta odbierajacego plik
+	}
 }
 
 
