@@ -12,12 +12,17 @@
 #include "net.h"
 #include "peer.h"
 
+extern char *optarg;
+extern int optind, opterr, optopt;
+
+
 
 struct node *tree, *root8, *root16, *root32, *root64;
 struct node **tab_tree8, **tab_tree16, **tab_tree32, **tab_tree64;
 struct chunk *tab_chunk;
 
 struct peer remote_peer;
+struct req req;
 
 void interval_min_max (struct node *i, struct node *min, struct node *max);
 void dump_tree (struct node *t, int l);
@@ -55,7 +60,7 @@ struct chunk *alloc_init_chunk(void)
 	return c;
 }
 
-// zwraca rzad wielksoci binarnej
+// zwraca rzad wielkosci binarnej
 int order2 (unsigned int val)
 {
 	int b, o, bits;
@@ -138,6 +143,8 @@ void traverse_ex3 (struct node *t)
 
 
 // tymczasowo nie uzywana jest *a[]
+// proc zwraca returnem wskaznik na root node'a
+// a w parametrze **ret - wskaznik na nowo utworzone drzewko - 0-wy index liscia
 struct node * build_tree (struct chunk *a[], int num_chunks, struct node **ret)
 {
 	int x, l, s, si, h, first_idx, nc;
@@ -779,7 +786,7 @@ int main (int argc, char *argv[])
 	char *fname;
 	struct stat stat;
 	SHA1Context context;
-	unsigned char digest[16];
+	unsigned char digest[20];
 	unsigned int rd;
 	char *buf;
 	int opt, chunk_size;
@@ -1019,9 +1026,11 @@ int main (int argc, char *argv[])
 		// peer->requets NULL, reques_len =0 
 		remote_peer.start_chunk = 0;
 		remote_peer.end_chunk = nc - 1;
+		remote_peer.chunk_size = chunk_size;
 		
-		proto_test(&remote_peer);
-	} else {
+		req.fname = fname;
+		proto_test(&remote_peer, &req);
+	} else { // leecher
 		remote_peer.tree = NULL;
 		remote_peer.nl = 0;
 		remote_peer.nc = 0;
@@ -1030,15 +1039,16 @@ int main (int argc, char *argv[])
 		remote_peer.handshake_req_len = 0;
 		remote_peer.handshake_resp = NULL;
 		remote_peer.handshake_resp_len = 0;
+
+		req.fname = NULL;
 		
-		proto_test(&remote_peer);			// 0 - oznacza ze to tryb receivera (klienta)
+		proto_test(&remote_peer, &req);			// 0 - oznacza ze to tryb receivera (klienta)
 		
 	}
 
 	
 	
-	//proto_test();
-
+	
 	
 	return 0;
 }

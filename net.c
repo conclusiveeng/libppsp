@@ -7,23 +7,30 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "mt.h"
 #include "net.h"
 #include "ppspp_protocol.h"
 #include "peer.h"
+#include "sha1.h"
 
-#define BUFSIZE 1024
-#define PORT     6778
-
+#define BUFSIZE 1500
+#define PORT    6778
 #define IP "127.0.0.1"
 //#define IP "192.168.1.64"
+
+#define FILE_DOWNLOAD "download"
+
 
 extern int h_errno;
 
 
+
 // serwer - udostepnia podany w command line plik
-int net_seeder(struct peer *peer)
+int net_seeder_v2(struct peer *peer, struct req *req)
 {
 	int sockfd;
 	int portno;
@@ -35,10 +42,12 @@ int net_seeder(struct peer *peer)
 	char *hostaddrp;
 	int optval;
 	int n;
+	char *data_payload;
+	u32 data_payload_len, cc;
 
 	portno = PORT;
 
-
+	
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sockfd < 0)
 		printf("ERROR opening socket");
@@ -81,42 +90,81 @@ int net_seeder(struct peer *peer)
 
 		
 		// odeslij HANDSHAKE 2/3 + HAVE
-//		n = sendto(sockfd, handshake2, handshake2_len, 0, (struct sockaddr *) &clientaddr, clientlen);
 		n = sendto(sockfd, peer->handshake_resp, peer->handshake_resp_len, 0, (struct sockaddr *) &clientaddr, clientlen);
 		if (n < 0)
 			printf("ERROR in sendto");
 		
 		
 		
-		
-		// odbierz REQUEST (handshake 3/3)
-		bzero(buf, BUFSIZE);
-		n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &clientlen);
-		// pokaz odebrany request
-		dump_request(buf, n);
+		data_payload = malloc(peer->chunk_size + 1 + 4 + 4 + 8);	//  chunksize + naglowki data: 1 + 4+ 4+ 8: rfc 8.6.
 		
 		
-		// rfc 5.6.2 
-		// wyslij najpierw INTEGRITY z zadanymi hashami (0-6) a dopiero potem DATA - oba komunikaty maga byc w jednym datagramie
-		n = make_integrity(buf, peer);
+		while (1) {	
+			// odbierz REQUEST (handshake 3/3)
+			bzero(buf, BUFSIZE);
+			n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &clientlen);
+			// pokaz odebrany request
+			dump_request(buf, n, peer);
+			
+			
+			// rfc 5.6.2 
+			// wyslij najpierw INTEGRITY z zadanymi hashami (0-6) a dopiero potem DATA - oba komunikaty maga byc w jednym datagramie
+			n = make_integrity(buf, peer);
+			
+			// tu wyslij INTEGRITY z danymi
+			n = sendto(sockfd, buf, n, 0, (struct sockaddr *) &clientaddr, clientlen);
+			printf("INTEGRITY sent: %u\n", n);
+
+			
+			// utworz pakiet DATA z danymi chunka o numerze req->curr_chunk
+			
+			//req->curr_chunk = peer->start_chunk;
+			
+			for (cc = peer->start_chunk; cc <= peer->end_chunk; cc++) {
+				req->curr_chunk = cc;
+				data_payload_len = make_data(data_payload, peer, req);
+				
+				// teraz wyslij osobny datagram z DATA 0
+				n = sendto(sockfd, data_payload, data_payload_len, 0, (struct sockaddr *) &clientaddr, clientlen);
+				printf("DATA[%u] sent: %d (status: %d %s)\n", cc, n, errno, strerror(errno));
+				
+					
+				// odbierz ACK
+				bzero(buf, BUFSIZE);
+				n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &clientlen);
+				// pokaz odebrany ACK
+				dump_ack(buf, n, peer);
+			}
+		}
 		
-		// tu wyslij INTEGRITY z danymi
-		n = sendto(sockfd, buf, n, 0, (struct sockaddr *) &clientaddr, clientlen);
-		printf("INTEGRITY sent: %u\n", n);
 		
-		
+		free(data_payload);
 		
 	}
 }
 
 
+
+
+
+
+
 // klient - odbiorca pliku
-int net_leecher(struct peer *peer)
+int net_leecher_v2(struct peer *peer, struct req *req)
 {
 	int sockfd;
 	char buffer[BUFSIZE];
 	struct sockaddr_in servaddr;
-	int n, len;
+	int n, len, x, s, y, fd, z, nr;
+	char *data_buffer;
+	u32 data_buffer_len;
+	SHA1Context context;
+	unsigned char digest[20], sha_buf[40 + 1];
+	u8 cmp;
+	u32 ack_len, cc;
+	u32 num_series, hashes_per_mtu, rest, begin, end;
+	
+	len = sizeof(servaddr);
     
 	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 		perror("socket creation failed");
@@ -131,38 +179,196 @@ int net_leecher(struct peer *peer)
       
 
 	// wyslij handshake inicjujacy (pierwszy z trzech) - czyli probujemy nawiazac polaczenie z serwerem
-	sendto(sockfd, peer->handshake_req, peer->handshake_req_len, MSG_CONFIRM, (const struct sockaddr *) &servaddr, sizeof(servaddr));
-	
+	n = sendto(sockfd, peer->handshake_req, peer->handshake_req_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
+	if (n < 0) {
+		printf("error sending handhsake: %d\n", n);
+		return -1;
+	}
 	printf("initial message 1/3 sent\n");
          
-	// odbierz odpowiedz serwera (handshake2)
-	n = recvfrom(sockfd, (char *)buffer, BUFSIZE, MSG_WAITALL, (struct sockaddr *) &servaddr, &len);
+	// odbierz odpowiedz serwera (handshake2) + have?
+	n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
 	buffer[n] = '\0';
 	printf("server replied with %u bytes\n", n);
-	dump_handshake_response(buffer, n, peer);
+	dump_handshake_have(buffer, n, peer);
 
 	
-	// uwtorz tutaj REQUEST zamiast tego samego wywolania w proto_test()
+	
+	// oblicz ile bedzie serii i ile chunkow w jednej serii
+	// ponizsza wielkosc 1500 (mtu) - moznaby sprametryzowac - np. z poziomu command line
+	hashes_per_mtu = (1500 - (1 + 4 + 4 + 8 + 4))/20;		// 1+4+4+8+4: naglowek, 20-wielksoc pojedynczego hasha SHA-1
+	printf("hashes_per_mtu: %u ---------------\n", hashes_per_mtu);		// ile SHA-1 chunkow zmiesci sie w jednum MTU
+	
+	num_series = peer->nc / hashes_per_mtu;
+	rest = peer->nc % hashes_per_mtu;
+	printf("nc: %u   num_series: %u   rest: %u\n", peer->nc, num_series, rest);
+	
 
-	peer->request_len = make_request(peer->request, 0xfeedbabe, peer->start_chunk, peer->end_chunk);
-	//printf("szybki dump:\n");
-	//dump_request(peer->request, peer->request_len);
+	// tu chyba trzeba utworzyc drzewko o ilosci lisci peer->nl i przekopiowac tam sha z tab chunkow
+	// tymczasowo zamiast pierwszego param jest NULL bo i tak w sumie nie korzystamy z niego w build_tree
+	peer->tree_root = build_tree(NULL, peer->nc, &peer->tree);
+	
+
+	data_buffer_len = peer->chunk_size + 1 + 4 + 4 + 8 + 4;  // naglowek 1+4+4+8: rfc 8.6, +4 - bo channel id jeszcze
+	data_buffer = malloc(data_buffer_len);
+	
+	// posix_fallocate()?
+	
+	unlink(FILE_DOWNLOAD);
+	
+	fd = open(FILE_DOWNLOAD, O_WRONLY | O_CREAT, 0744);
+	if (fd < 0) {
+		printf("error opening file '%s' for writing: %u %s\n", FILE_DOWNLOAD, errno, strerror(errno));
+		return -1;
+	}
+
+
+
+	
+	z = peer->start_chunk;
+//	while (z < peer->nc) {
+	while (z < peer->end_chunk) {
+		
+		printf("-----------z: %u  peer->end_chunk: %u\n", z, peer->end_chunk);
+		begin = z;
+
+		if (z + hashes_per_mtu >= peer->end_chunk)
+			end = peer->end_chunk;
+		else
+			end = z + hashes_per_mtu -1 ;
+
+
+		printf("begin: %u   end: %u\n", begin, end);
+		
+		// utworz tutaj REQUEST zamiast tego samego wywolania w proto_test()
+		//peer->request_len = make_request(peer->request, 0xfeedbabe, peer->start_chunk, peer->end_chunk);
+		peer->request_len = make_request(peer->request, 0xfeedbabe, begin, end);
+		//printf("szybki dump:\n");
+		//dump_request(peer->request, peer->request_len, peer);
+		
+		
+		// wyslij requesta o dane pliku
+		n = sendto(sockfd, peer->request, peer->request_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
+		if (n < 0) {
+			printf("error sending request: %d\n", n);
+			return -1;
+		}
+		printf("request message 3/3 sent\n");
+		
+
+		// odbierz INTEGRITY z seedera
+		n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
+		if (n < 0) {
+			printf("error: recvfrom: %d errno: %d %s\n", n, errno, strerror(errno));
+			printf("	len: %d\n", len);
+			return -1;
+		}
+		printf("server sent INTEGRITY: %d\n", n);
+		dump_integrity(buffer, n, peer);		// tu kopiowane sa dane hashy chunkow do peer->chunk[]
+
+		
+		// skopiuj sha z tablicy chunkow do lisci drzewka
+		for (x = 0; x < peer->nc; x++)
+			memcpy(peer->tree[2 * x].sha, peer->chunk[x].sha, 20);
+		
+		
+		// listuj tablice odebranych teraz chunkow
+		//dump_chunk_tab(peer->chunk, peer->nc);
+
+
+		
+		
+		
+		// odbierz caly zakres chunkow od seedera
+		//for (cc = peer->start_chunk; cc <= peer->end_chunk; cc++) {
+		for (cc = begin; cc <= end; cc++) {
+			req->curr_chunk = cc;
+			
+			// odbierz pakiet danych DATA
+			nr = recvfrom(sockfd, (char *)data_buffer, data_buffer_len, 0, (struct sockaddr *) &servaddr, &len);
+			if (nr < 0) {
+				printf("error: recvfrom: %d errno: %d %s\n", n, errno, strerror(errno));
+				return -1;
+			}
+			//printf("server sent DATA: %d ", nr);
+		
+			// zapisz odebrany chunk na dysku w pliku o nazwie z FILE_DOWNLOAD
+			lseek(fd, cc * peer->chunk_size, SEEK_SET);
+			write(fd, data_buffer + 1 + 4 + 4 + 8 + 4, peer->chunk_size);
+			
+			// oblicz hasha
+			SHA1Reset(&context);
+			SHA1Input(&context, data_buffer + 1 + 4 + 4 + 8 + 4 , peer->chunk_size);		// +1 +4 ...:przeskocz naglowek
+			SHA1Result(&context, digest);
+			
+			// wypisz wyliczonego hasha
+			s = 0;
+			for (y = 0; y < 20; y++)
+				s += sprintf(sha_buf + s, "%02x", digest[y] & 0xff);
+			sha_buf[40] = '\0';
+			//printf(" sha: %s  ", sha_buf);
+
+
+			// porownaj hasha z tym ktory wyslal nam seeder w INTEGRITY
+			cmp = memcmp(peer->chunk[req->curr_chunk].sha, digest , 20);
+			//printf("compare: %u ", cmp);
+			
+			if (cmp != 0) {		// 0= ok, hashe sa zgodne
+				printf("error - hashes are different\n");
+				return -1;
+			}
+
+			
+			// utworz komunikat ACK potwierdzajacy ze dane zostaly odebrane od seedera i hashe sie zgadzaja - czyli akceptujemy ten pakiet danych
+			ack_len = make_ack(buffer, peer, req);
+			
+			// wyslij tego ACK-a
+			n = sendto(sockfd, buffer, ack_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
+			if (n < 0) {
+				printf("error sending request: %d\n", n);
+				return -1;
+			}
+			//printf("ACK[%u] sent\n" ,cc);
+			//printf("server sent DATA: %d  sha: %s  compare: %u  ACK[%u] sent\n", nr, sha_buf, cmp, cc);
+			
+		}
+		
+		z += hashes_per_mtu;
+	}
 	
 	
-	// wyslij requesta o dane pliku
-	sendto(sockfd, peer->request, peer->request_len, MSG_CONFIRM, (const struct sockaddr *) &servaddr, sizeof(servaddr));
-	printf("request message 3/3 sent\n");
 	
-	
-	// odbierz INTEGRITY z seedera
-	n = recvfrom(sockfd, (char *)buffer, BUFSIZE, MSG_WAITALL, (struct sockaddr *) &servaddr, &len);
-	printf("server sent INTEGRITY: %u\n", n);
-	dump_integrity(buffer, n, peer);
-	
-	
-	
+	free(data_buffer);
 	close(sockfd);
+	close(fd);
 	return 0;
 	
 }
+
+
+
+
+
+
+
+
+
+int net_seeder(struct peer *peer, struct req *req)
+{
+//	net_seeder_v1(peer, req);
+	net_seeder_v2(peer, req);
+}
+
+
+
+
+int net_leecher(struct peer *peer, struct req *req)
+{
+//	net_leecher_v1(peer, req);
+	net_leecher_v2(peer, req);
+}
+
+
+
+
 
