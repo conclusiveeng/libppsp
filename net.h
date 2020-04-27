@@ -4,7 +4,9 @@
 #include "mt.h"
 #include "peer.h"
 
-int net_seeder(struct peer *, struct req *);
-int net_leecher(struct peer *, struct req *);
+//int net_seeder(struct peer *, struct req *);
+int net_seeder(struct peer *);
+//int net_leecher(struct peer *, struct req *);
+int net_leecher(struct peer *);
 
 #endif

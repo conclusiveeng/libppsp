@@ -15,14 +15,6 @@
 #include "sha1.h"
 #include "mt.h"
 
-// handshake protocol options
-enum proto_options { VERSION = 0, MINIMUM_VERSION, SWARM_ID, CONTENT_PROT_METHOD, MERKLE_HASH_FUNC, LIVE_SIGNATURE_ALG, CHUNK_ADDR_METHOD,  LIVE_DISC_WIND, 
-	SUPPORTED_MSGS, CHUNK_SIZE, END_OPTION = 255 };
-
-enum message { HANDSHAKE = 0, DATA, ACK, HAVE, INTEGRITY, PEX_RESV4, PEX_REQ, SIGNED_INTEGRITY, REQUEST, CANCEL, CHOKE, UNCHOKE, PEX_RESV6, PEX_RESCERT };
-	
-	
-
 
 
 
@@ -56,7 +48,7 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 	
 	if (pos->opt_map & (1 << SWARM_ID)) {					// rfc - 7.4
 		*d++ = SWARM_ID;
-		*(u16 *)d = htobe16(pos->swarm_id_len & 0xffff);
+		*(uint16_t *)d = htobe16(pos->swarm_id_len & 0xffff);
 		d += sizeof(pos->swarm_id_len);
 		memcpy(d, pos->swarm_id, pos->swarm_id_len);
 		d += pos->swarm_id_len;
@@ -92,11 +84,11 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 	if (pos->opt_map & (1 << LIVE_DISC_WIND)) {			// rfc - 7.9
 		*d++ = LIVE_DISC_WIND;
 		if ((pos->chunk_addr_method == 0) || (pos->chunk_addr_method == 2)) {		// table 6 - czy to 32-bitowe adresy?
-			*(u32 *)d = htobe32(*(u32 *)pos->live_disc_wind);
-			d += sizeof(u32);
+			*(uint32_t *)d = htobe32(*(uint32_t *)pos->live_disc_wind);
+			d += sizeof(uint32_t);
 		} else {
-			*(u64 *)d = htobe64(*(u64 *)pos->live_disc_wind);
-			d += sizeof(u64);
+			*(uint64_t *)d = htobe64(*(uint64_t *)pos->live_disc_wind);
+			d += sizeof(uint64_t);
 		}
 	} else {
 		printf("no chunk_addr_method specified - it's obligatory!\n");
@@ -113,13 +105,53 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 	
 	if (pos->opt_map & (1 << CHUNK_SIZE)) {			// rfc - 7.11
 		*d++ = CHUNK_SIZE;
-		*(u32 *)d = htobe32((u32)(pos->chunk_size & 0xffffffff));
+		*(uint32_t *)d = htobe32((uint32_t)(pos->chunk_size & 0xffffffff));
 		d += sizeof(pos->chunk_size);
 	} else {
 		printf("no chunk_size specified - it's obligatory!\n");
 		return -1;
 	} 
 
+	// uint64_t FILE_SIZE - moje rozszerzenie do protokolu
+	// format: 1 + 8
+	// uint8_t  = FILE_SIZE = 10? w enum
+	// uint64_t = zakodowana w big-endian dlugosc pliku wartosc 64-ro bitowa
+	if (pos->opt_map & (1 << FILE_SIZE)) {			// rfc brak - to moje rozszerzenie do protokolu
+		*d++ = FILE_SIZE;
+		*(uint64_t *)d = htobe64(pos->file_size);
+		d += sizeof(uint64_t);
+	} else {
+		printf("no file_size specified - it's obligatory!\n");
+		return -1;
+	} 
+		
+	
+	
+	// uint64_t FILE_NAME - moje rozszerzenie do protokolu
+	// max dlugosc pliku 255 znakow
+	// format: 1 + 1 + variable
+	// uint8_t = FILE_NAME = 11? w enum
+	// uint8_t = dlugosc nastepujacego zaraz w dalszych bajtach stringa z nazwa pliku
+	// variable - sstring ascii
+	if (pos->opt_map & (1 << FILE_NAME)) {			// rfc brak - to moje rozszerzenie do protokolu
+		*d++ = FILE_NAME;
+		*d++ = pos->file_name_len;
+		memset(d, 0, 255);
+		memcpy(d, pos->file_name, pos->file_name_len);
+//		memcpy(d, pos->file_name, 8);
+		printf("\n\n------------ fname: %s ----- %s  %u -----\n", pos->file_name, d, pos->file_name_len);
+		d += pos->file_name_len;
+	} else {
+		printf("no file_name specified - it's obligatory!\n");
+		return -1;
+	} 
+	
+	
+	
+	
+	
+	
+	
 	*d++ = END_OPTION;				// zakoncz liste opcji znacznikiem 255
 	
 
@@ -132,21 +164,21 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 
 
 // proc serializujaca poszczegolne bajty requestu HANDSHAKE
-int make_handshake_request (char *ptr, u32 dest_chan_id, u32 src_chan_id, char *opts, int opt_len)
+int make_handshake_request (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len)
 {
 	char *d;
 	int ret;
 	
 	d = ptr;
 	
-	*(u32 *)d = htobe32(dest_chan_id);
-	d += sizeof(u32);
+	*(uint32_t *)d = htobe32(dest_chan_id);
+	d += sizeof(uint32_t);
 
 	*d = HANDSHAKE;
 	d++;
 
-	*(u32 *)d = htobe32(src_chan_id);
-	d += sizeof(u32);
+	*(uint32_t *)d = htobe32(src_chan_id);
+	d += sizeof(uint32_t);
 	
 	memcpy(d, opts, opt_len);
 	d += opt_len;
@@ -161,9 +193,9 @@ int make_handshake_request (char *ptr, u32 dest_chan_id, u32 src_chan_id, char *
 
 
 // proc serializujaca poszczegolne bajty odpowiedzi HANDSHAKE
-//int make_handshake_response (char *ptr, u32 dest_chan_id, u32 src_chan_id, char *opts, int opt_len, u32 start_chunk, u32 end_chunk)
-//int make_handshake_have (char *ptr, u32 dest_chan_id, u32 src_chan_id, char *opts, int opt_len, u32 start_chunk, u32 end_chunk)
-int make_handshake_have (char *ptr, u32 dest_chan_id, u32 src_chan_id, char *opts, int opt_len, struct peer *peer)
+//int make_handshake_response (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len, uint32_t start_chunk, uint32_t end_chunk)
+//int make_handshake_have (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len, uint32_t start_chunk, uint32_t end_chunk)
+int make_handshake_have (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len, struct peer *peer)
 {
 	char *d;
 	int ret, len;
@@ -178,13 +210,13 @@ int make_handshake_have (char *ptr, u32 dest_chan_id, u32 src_chan_id, char *opt
 	*d = HAVE;
 	d++;
 	
-//	*(u32 *)d = htobe32(start_chunk);
-	*(u32 *)d = htobe32(peer->start_chunk);
-	d += sizeof(u32);
+//	*(uint32_t *)d = htobe32(start_chunk);
+	*(uint32_t *)d = htobe32(peer->start_chunk);
+	d += sizeof(uint32_t);
 
-//	*(u32 *)d = htobe32(end_chunk);
-	*(u32 *)d = htobe32(peer->end_chunk);
-	d += sizeof(u32);
+//	*(uint32_t *)d = htobe32(end_chunk);
+	*(uint32_t *)d = htobe32(peer->end_chunk);
+	d += sizeof(uint32_t);
 	
 	
 	
@@ -199,23 +231,23 @@ int make_handshake_have (char *ptr, u32 dest_chan_id, u32 src_chan_id, char *opt
 
 
 
-int make_request (char *ptr, u32 dest_chan_id, u32 start_chunk, u32 end_chunk)
+int make_request (char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32_t end_chunk)
 {
 	char *d;
-	int ret, len;
+	int ret;
 
 	d = ptr;
 	
-	*(u32 *)d = htobe32(dest_chan_id);
-	d += sizeof(u32);
+	*(uint32_t *)d = htobe32(dest_chan_id);
+	d += sizeof(uint32_t);
 	
 	*d = REQUEST;
 	d++;
 	
-	*(u32 *)d = htobe32(start_chunk);
-	d += sizeof(u32);
-	*(u32 *)d = htobe32(end_chunk);
-	d += sizeof(u32);
+	*(uint32_t *)d = htobe32(start_chunk);
+	d += sizeof(uint32_t);
+	*(uint32_t *)d = htobe32(end_chunk);
+	d += sizeof(uint32_t);
 
 	*d = PEX_REQ;
 	d++;
@@ -235,17 +267,17 @@ int make_integrity (char *ptr, struct peer *peer)
 	
 	d = ptr;
 
-	*(u32 *)d = htobe32(peer->dest_chan_id);
-	d += sizeof(u32);
+	*(uint32_t *)d = htobe32(peer->dest_chan_id);
+	d += sizeof(uint32_t);
 
 
 	*d = INTEGRITY;
 	d++;
 	
-	*(u32 *)d = htobe32(peer->start_chunk);
-	d += sizeof(u32);
-	*(u32 *)d = htobe32(peer->end_chunk);
-	d += sizeof(u32);
+	*(uint32_t *)d = htobe32(peer->start_chunk);
+	d += sizeof(uint32_t);
+	*(uint32_t *)d = htobe32(peer->end_chunk);
+	d += sizeof(uint32_t);
 	
 	y = 0;
 	for (x = peer->start_chunk; x <= peer->end_chunk; x++) {
@@ -263,43 +295,93 @@ int make_integrity (char *ptr, struct peer *peer)
 
 
 
-
-// wywolywany przez seedera - przygotowanie paczki danych (chunka) do wyslania
-int make_data (char *ptr, struct peer *peer, struct req *req)
+int make_integrity_v3 (char *ptr, struct peer *peer, struct peer *we)
 {
 	char *d;
-	int x, y, ret, fd, l;
-	u64 timestamp;
+	int x, y, ret;
 	
 	d = ptr;
 
-	*(u32 *)d = htobe32(peer->dest_chan_id);
-	d += sizeof(u32);
+	*(uint32_t *)d = htobe32(peer->dest_chan_id);
+	d += sizeof(uint32_t);
 
 
 	*d = INTEGRITY;
 	d++;
 	
-	*(u32 *)d = htobe32(peer->start_chunk);
-	d += sizeof(u32);
-	*(u32 *)d = htobe32(peer->end_chunk);
-	d += sizeof(u32);
+	*(uint32_t *)d = htobe32(peer->start_chunk);
+	d += sizeof(uint32_t);
+	*(uint32_t *)d = htobe32(peer->end_chunk);
+	d += sizeof(uint32_t);
+	
+	printf("  integrity wysylanie: start: %u  end: %u\n", peer->start_chunk, peer->end_chunk);
+	
+	y = 0;
+	for (x = peer->start_chunk; x <= peer->end_chunk; x++) {
+		memcpy(d, we->tree[2 * x].sha, 20);
+		printf("copying chunk: %u\n", x);
+		y++;
+		d += 20;
+	}
+	
+	ret = d - ptr;
+	printf("%s: returning %u bytes\n", __FUNCTION__, ret);
+	
+	return ret;
+}
+
+
+
+
+
+
+
+// wywolywany przez seedera - przygotowanie paczki danych (chunka) do wyslania
+//int make_data (char *ptr, struct peer *peer, struct req *req)
+int make_data (char *ptr, struct peer *peer)
+{
+	char *d;
+	int ret, fd, l;
+	uint64_t timestamp;
+
+/*	
+	if (peer->type == LEECHER)  {
+		printf("ta proc nie powinna byc wywolana przez leechera\n");
+		abort();
+	}
+*/	
+	d = ptr;
+
+	*(uint32_t *)d = htobe32(peer->dest_chan_id);
+	d += sizeof(uint32_t);
+
+
+	*d = DATA;	/// 2020.04.27  - tu wczesniej bylo INTEGRITY a powinno byc DATA
+	d++;
+	
+	*(uint32_t *)d = htobe32(peer->start_chunk);
+	d += sizeof(uint32_t);
+	*(uint32_t *)d = htobe32(peer->end_chunk);
+	d += sizeof(uint32_t);
 
 	timestamp = 0x12345678f11ff00f;		// tymczasowo tylko taki timestamp
-	*(u64 *)d = htobe64(timestamp);
-	d += sizeof(u64);
+//	timestamp = 0x9999999999999999;		// tymczasowo tylko taki timestamp
+	*(uint64_t *)d = htobe64(timestamp);
+	d += sizeof(uint64_t);
 	
-	fd = open(req->fname, O_RDONLY);
+	fd = open(peer->fname, O_RDONLY);
 	if (fd < 0) {
-		printf("error opening file: %s\n", req->fname);
+		printf("error opening file2: %s\n", peer->fname);
 		return -1;
 	}
 
-	lseek(fd, req->curr_chunk * peer->chunk_size, SEEK_SET);
+	lseek(fd, peer->curr_chunk * peer->chunk_size, SEEK_SET);
+	
+//	if (peer->chunk_size != 1024) 		abort();
 	
 	l = read(fd, d, peer->chunk_size);
 	if (l < 0) {
-		printf("error opening file: %s\n", req->fname);
+		printf("error reading file: %s\n", peer->fname);
 		close(fd);
 		return -1;
 	}
@@ -307,8 +389,9 @@ int make_data (char *ptr, struct peer *peer, struct req *req)
 	close(fd);
 
 	if (l != peer->chunk_size) {
-		printf("something wrong with reading file: %s, wanted: %u bytes but read: %u\n", req->fname, peer->chunk_size, l);
+		printf("something wrong with reading file: %s, wanted: %u bytes but read: %u\n", peer->fname, peer->chunk_size, l);
 		//return -1;
+		//abort();
 	}
 	
 	d += l;
@@ -323,31 +406,32 @@ int make_data (char *ptr, struct peer *peer, struct req *req)
 
 
 // wywolywany przez seedera - przygotowanie paczki danych (chunka) do wyslania
-int make_ack (char *ptr, struct peer *peer, struct req *req)
+//int make_ack (char *ptr, struct peer *peer, struct req *req)
+int make_ack (char *ptr, struct peer *peer)
 {
 	char *d;
-	int x, y, ret, fd, l;
-	u64 delay_sample;
-	uint64_t z;
+	int ret;
+	uint64_t delay_sample;
+	//uint64_t z;
 	
 	d = ptr;
 
-	*(u32 *)d = htobe32(peer->dest_chan_id);
-	d += sizeof(u32);
+	*(uint32_t *)d = htobe32(peer->dest_chan_id);
+	d += sizeof(uint32_t);
 
 
 	*d = ACK;
 	d++;
 
 	
-	*(u32 *)d = htobe32(req->curr_chunk);
-	d += sizeof(u32);
-	*(u32 *)d = htobe32(req->curr_chunk);
-	d += sizeof(u32);
+	*(uint32_t *)d = htobe32(peer->curr_chunk);
+	d += sizeof(uint32_t);
+	*(uint32_t *)d = htobe32(peer->curr_chunk);
+	d += sizeof(uint32_t);
 	
 	delay_sample = 0x12345678ABCDEF;		// tymczasowo tylko taki delay sample
-	*(u64 *)d = htobe64(delay_sample);
-	d += sizeof(u64);
+	*(uint64_t *)d = htobe64(delay_sample);
+	d += sizeof(uint64_t);
 	
 	ret = d - ptr;
 	//printf("%s: returning %u bytes\n", __FUNCTION__, ret);
@@ -373,10 +457,10 @@ int dump_options (char *ptr, struct peer *peer)
 {
 	char *d;
 	int swarm_len, x;
-	u8 chunk_addr_method;
-	u32 ldw32;
-	u64 ldw64;
-	u8 supported_msgs_len;
+	uint8_t chunk_addr_method;
+	uint32_t ldw32;
+	uint64_t ldw64;
+	uint8_t supported_msgs_len;
 	int ret;
 	
 	d = ptr;
@@ -395,7 +479,7 @@ int dump_options (char *ptr, struct peer *peer)
 	
 	if (*d == SWARM_ID) {
 		d++;
-		swarm_len = be16toh(*((u16 *)d) & 0xffff);
+		swarm_len = be16toh(*((uint16_t *)d) & 0xffff);
 		d += 2;
 		printf("swarm_id[%u]: %s\n", swarm_len, d);
 		d += swarm_len;
@@ -456,10 +540,10 @@ int dump_options (char *ptr, struct peer *peer)
 		printf("Live Discard Window: ");
 		switch (chunk_addr_method) {
 			case 0:
-			case 2:	ldw32 =  be32toh(*(u32 *)d); printf("32bit: %#x\n", ldw32); d += sizeof(u32); break;
+			case 2:	ldw32 =  be32toh(*(uint32_t *)d); printf("32bit: %#x\n", ldw32); d += sizeof(uint32_t); break;
 			case 1:
 			case 3:
-			case 4:	ldw64 =  be64toh(*(u64 *)d); printf("64bit: %#lx\n", ldw64); d += sizeof(u64); break;
+			case 4:	ldw64 =  be64toh(*(uint64_t *)d); printf("64bit: %#lx\n", ldw64); d += sizeof(uint64_t); break;
 			default: printf("Error\n");
 		}
 	}
@@ -477,20 +561,47 @@ int dump_options (char *ptr, struct peer *peer)
 	
 	if (*d == CHUNK_SIZE) {
 		d++;
-		printf("Chunk size: %u\n", be32toh(*(u32 *)d));
+		printf("Chunk size: %u\n", be32toh(*(uint32_t *)d));
 		if (peer->type == LEECHER) {		// tylko LEECHER ma aktualizowac u siebie chunk_size od seedera a nie na odwrot
-			peer->chunk_size = be32toh(*(u32 *)d);
+			peer->chunk_size = be32toh(*(uint32_t *)d);
 		}
-		d += sizeof(u32);
+		d += sizeof(uint32_t);
 	}
+	
+	if (*d == FILE_SIZE) {
+		d++;
+		printf("File size: %lu\n", be64toh(*(uint64_t *)d));
+		if (peer->type == LEECHER) {		// tylko LEECHER ma aktualizowac u siebie file_size od seedera a nie na odwrot
+			peer->file_size = be64toh(*(uint64_t *)d);
+		}
+		d += sizeof(uint64_t);
+	}
+	
+	if (*d == FILE_NAME) {
+		d++;
+		printf("File name size: %u\n", *d & 0xff);
+		peer->fname_len = *d & 0xff ;
+		d++;
+		if (peer->type == LEECHER || 1) {		// tylko LEECHER ma aktualizowac u siebie file name od seedera a nie na odwrot
+			memcpy(peer->fname, d, peer->fname_len);
+			//peer->fname = d;			// a moze jednak zmienic w peer na tablice zamiast wskaznika?
+			printf("File name: %s\n", peer->fname);
+		}
+		d += peer->fname_len;
+	}
+	
+	
 	
 	if ((*d & 0xff) == END_OPTION) {
 		printf("end option\n");
 		d++;
-	} else printf("error: should be END_OPTION(0xff) but is: %u\n", *d & 0xff);
+	} else {
+		printf("error: should be END_OPTION(0xff) but is: %u\n", *d & 0xff);
+		abort();
+	}
 	
 
-	printf("parsed: %u bytes\n", d - ptr);
+	printf("parsed: %lu bytes\n", d - ptr);
 	
 	ret = d - ptr;
 	return ret;
@@ -503,14 +614,14 @@ int dump_options (char *ptr, struct peer *peer)
 int dump_handshake_request (char *ptr, int req_len, struct peer *peer)
 {
 	char *d;
-	u32 dest_chan_id, src_chan_id;
+	uint32_t dest_chan_id, src_chan_id;
 	int ret, opt_len;
 	
 	d = ptr;
 	
-	dest_chan_id = be32toh(*(u32 *)d);
+	dest_chan_id = be32toh(*(uint32_t *)d);
 	printf("Destination Channel ID: %#x\n", dest_chan_id);
-	d += sizeof(u32);
+	d += sizeof(uint32_t);
 
 	if (*d == HANDSHAKE) {
 		printf("ok, HANDSHAKE req\n");
@@ -519,9 +630,9 @@ int dump_handshake_request (char *ptr, int req_len, struct peer *peer)
 	}
 	d++;
 	
-	src_chan_id = be32toh(*(u32 *)d);
-	printf("Destination Channel ID: %#x\n", src_chan_id);
-	d += sizeof(u32);
+	src_chan_id = be32toh(*(uint32_t *)d);
+	printf("Source Channel ID: %#x\n", src_chan_id);
+	d += sizeof(uint32_t);
 	
 	// tutaj od wskaznika 'd' znajduja sie opcje - zdumpuj je
 	printf("\n");
@@ -543,9 +654,9 @@ int dump_handshake_request (char *ptr, int req_len, struct peer *peer)
 int dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 {
 	char *d;
-	int req_len, x;
+	int req_len;
 	int ret;
-	u32 start_chunk, end_chunk, num_chunks;
+	uint32_t start_chunk, end_chunk, num_chunks;
 	
 	// dump HANDSHAKE header and protocol options 
 	d = ptr;
@@ -563,13 +674,13 @@ int dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 
 	d++;
 	
-	start_chunk = be32toh(*(u32 *)d);
-	d += sizeof(u32);
+	start_chunk = be32toh(*(uint32_t *)d);
+	d += sizeof(uint32_t);
 	peer->start_chunk = start_chunk;
 	printf("start chunk: %u\n", start_chunk);
 	
-	end_chunk = be32toh(*(u32 *)d);
-	d += sizeof(u32);
+	end_chunk = be32toh(*(uint32_t *)d);
+	d += sizeof(uint32_t);
 	peer->end_chunk = end_chunk;
 	printf("end chunk: %u\n", end_chunk);
 	
@@ -582,11 +693,11 @@ int dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 //	peer->nc = end_chunk - start_chunk + 1;
 	peer->nl = 1 << order2(peer->nc);
 	printf("------------------nc: %u nl: %u\n", peer->nc, peer->nl);
+	
 
 	
-#warning FIXME przez tego ifa pojawia sie segv
 	if (peer->chunk == NULL) {
-		peer->chunk = malloc(peer->nl * sizeof(struct chunk));
+		peer->chunk = malloc(peer->nl * sizeof(struct chunk));		// ten malloc jest ok - tzn peer->nl nie jest zerem an
 		memset(peer->chunk, 0, peer->nl * sizeof(struct chunk));
 	} else {
 		printf("error - peer->chunk has already allocated memory, HAVE should be send only once\n");
@@ -606,19 +717,18 @@ int dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 
 
 
-//int dump_request (char *ptr, int req_len)
 int dump_request (char *ptr, int req_len, struct peer *peer)
 {
 	char *d;
 	int ret;
-	u32 dest_chan_id;
-	u32 start_chunk, end_chunk;
+	uint32_t dest_chan_id;
+	uint32_t start_chunk, end_chunk;
 	
 	d = ptr;
 
-	dest_chan_id = be32toh(*(u32 *)d);
+	dest_chan_id = be32toh(*(uint32_t *)d);
 	printf("Destination Channel ID: %#x\n", dest_chan_id);
-	d += sizeof(u32);
+	d += sizeof(uint32_t);
 
 	
 	if (*d == REQUEST) {
@@ -629,24 +739,28 @@ int dump_request (char *ptr, int req_len, struct peer *peer)
 	}
 	d++;
 
-	start_chunk = be32toh(*(u32 *)d);
-	d += sizeof(u32);
-	printf("start chunk: %u\n", start_chunk);
+	start_chunk = be32toh(*(uint32_t *)d);
+	d += sizeof(uint32_t);
+	printf("  start chunk: %u\n", start_chunk);
 	
-	end_chunk = be32toh(*(u32 *)d);
-	d += sizeof(u32);
-	printf("end chunk: %u\n", end_chunk);
+	end_chunk = be32toh(*(uint32_t *)d);
+	d += sizeof(uint32_t);
+	printf("  end chunk: %u\n", end_chunk);
 	
-	if (peer->type == SEEDER) {
-			peer->start_chunk = start_chunk;
-			peer->end_chunk = end_chunk;
+//	if (peer->type == SEEDER) {
+	if (peer->type == LEECHER) {	// peer ma byc leecherem! bo to my jestesmy SEEDEREM - wiec druga strona musi byc leecherem
+		peer->start_chunk = start_chunk;
+		peer->end_chunk = end_chunk;
+	} else {
+		printf("????????\n");
+		abort();
 	}
 	
 	
 	
 	// tutaj obsluga pozostalych komunikatow - jak np. PEX_REQ
 	if (d - ptr < req_len) {
-		printf("here do in the future maintenance of rest of messages: %u bytes left\n" ,req_len - (d - ptr));
+		printf("  here do in the future maintenance of rest of messages: %lu bytes left\n" ,req_len - (d - ptr));
 	}
 	
 	
@@ -665,14 +779,15 @@ int dump_request (char *ptr, int req_len, struct peer *peer)
 int dump_integrity (char *ptr, int req_len, struct peer *peer)
 {
 	char *d;
-	int ret, x;
-	u32 dest_chan_id, start_chunk, end_chunk, nc;
+	int ret, x, y, s;
+	uint32_t dest_chan_id, start_chunk, end_chunk, nc;
+	char sha_buf[40 + 1];
 	
 	d = ptr;
 
-	dest_chan_id = be32toh(*(u32 *)d);
+	dest_chan_id = be32toh(*(uint32_t *)d);
 	printf("Destination Channel ID: %#x\n", dest_chan_id);
-	d += sizeof(u32);
+	d += sizeof(uint32_t);
 
 	if (*d == INTEGRITY) {
 		printf("ok, INTEGRITY header\n");
@@ -682,49 +797,37 @@ int dump_integrity (char *ptr, int req_len, struct peer *peer)
 	}
 	d++;
 	
-	start_chunk = be32toh(*(u32 *)d);
-	d += sizeof(u32);
-	printf("start chunk: %u\n", start_chunk);
+	start_chunk = be32toh(*(uint32_t *)d);
+	d += sizeof(uint32_t);
+	printf("  start chunk: %u\n", start_chunk);
 	
-	end_chunk = be32toh(*(u32 *)d);
-	d += sizeof(u32);
-	printf("end chunk: %u\n", end_chunk);
+	end_chunk = be32toh(*(uint32_t *)d);
+	d += sizeof(uint32_t);
+	printf("  end chunk: %u\n", end_chunk);
 	
 	nc = end_chunk - start_chunk + 1;
 
-	printf("pozostalo: %u bajtow, czyli teoretycznie %u hashy, powinno byc: %u\n", req_len - (d - ptr), (req_len - (d - ptr)) / 20, nc);
+	printf("  pozostalo: %lu bajtow, czyli teoretycznie %lu hashy, powinno byc: %u\n", req_len - (d - ptr), (req_len - (d - ptr)) / 20, nc);
 
-	
-#if 0	
-	// na razie alokuj tab chunkow i skopiuj tam odebrane chunki a potem trzeba je przeniesc do lisci drzewka
-	
- 
-	peer->nc = end_chunk - start_chunk + 1;
-	peer->nl = 1 << order2(peer->nc);
-	printf("------------------nc: %u nl: %u\n", peer->nc, peer->nl);
-	
-	
-	////// mallloc powinien byc w dump_have
-
-	if (peer->chunk == NULL) {
-		peer->chunk = malloc(peer->nl * sizeof(struct chunk));
-		memset(peer->chunk, 0, peer->nl * sizeof(struct chunk));
-	}
-#endif
 	for (x = start_chunk; x <= end_chunk; x++) {
 		memcpy(peer->chunk[x].sha, d, 20);
 		peer->chunk[x].state = CH_ACTIVE;
 		peer->chunk[x].offset = (x - start_chunk) * peer->chunk_size;
 		peer->chunk[x].len = peer->chunk_size;
-#warning FIXME .len jest poprawnie poza ostatnim chunkiem
+	
+		s = 0;
+		for (y = 0; y < 20; y++)
+			s += sprintf(sha_buf + s, "%02x", peer->chunk[x].sha[y] & 0xff);
+		sha_buf[40] = '\0';
+     
+		
 		
 		d += 20;
-		//printf("dumping chunk %u\n", x);
+		printf("dumping chunk %u:  %s\n", x, sha_buf);
 	}
-//	d += nc * 20;
 	
 	if (req_len - (d - ptr) > 0)
-		printf("pozostalo: %u bajtow, rozparsowac je\n", req_len - (d - ptr));
+		printf("  pozostalo: %lu bajtow, rozparsowac je\n", req_len - (d - ptr));
 	
 	
 	ret = d - ptr;
@@ -739,15 +842,15 @@ int dump_integrity (char *ptr, int req_len, struct peer *peer)
 int dump_ack (char *ptr, int ack_len, struct peer *peer)
 {
 	char *d;
-	int ret, x;
-	u32 dest_chan_id, start_chunk, end_chunk, nc;
-	u64 delay_sample;
+	int ret;
+	uint32_t dest_chan_id, start_chunk, end_chunk;
+	uint64_t delay_sample;
 	
 	d = ptr;
 
-	dest_chan_id = be32toh(*(u32 *)d);
+	dest_chan_id = be32toh(*(uint32_t *)d);
 	printf("Destination Channel ID: %#x\n", dest_chan_id);
-	d += sizeof(u32);
+	d += sizeof(uint32_t);
 
 	if (*d == ACK) {
 		printf("ok, ACK header\n");
@@ -758,17 +861,17 @@ int dump_ack (char *ptr, int ack_len, struct peer *peer)
 	d++;
 
 	
-	start_chunk = be32toh(*(u32 *)d);
-	d += sizeof(u32);
+	start_chunk = be32toh(*(uint32_t *)d);
+	d += sizeof(uint32_t);
 	printf("start chunk: %u\n", start_chunk);
 	
-	end_chunk = be32toh(*(u32 *)d);
-	d += sizeof(u32);
+	end_chunk = be32toh(*(uint32_t *)d);
+	d += sizeof(uint32_t);
 	printf("end chunk: %u\n", end_chunk);
 	
 	
-	delay_sample = be64toh(*(u64 *)d);
-	d += sizeof(u64);
+	delay_sample = be64toh(*(uint64_t *)d);
+	d += sizeof(uint64_t);
 	printf("delay_sample: %#lx\n", delay_sample);
 	
 	
@@ -783,18 +886,26 @@ int dump_ack (char *ptr, int ack_len, struct peer *peer)
 }
 
 
+// zwraca typ komunikatu message protokolu
+// pomija pierwsze 4 bajty - bo one zawieraja destination channel id
+uint8_t message_type (char *ptr)
+{
+	return ptr[4];
+}
 
 
 
 
-void proto_test (struct peer *peer, struct req *req)
+
+//void proto_test (struct peer *peer, struct req *req)
+void proto_test (struct peer *peer)
 {
 	struct proto_opt_str pos;
 	char swarm_id[] = "swarm_id";
-	char opts[128];			// bufor na zakodowane opcje
+	char opts[1024];			// bufor na zakodowane opcje
 	char handshake_req[256], handshake_resp[256], request[256];
 	int opts_len, h_req_len, h_resp_len, req_len;
-	u32 num_chunks; ///  do usuniecia - jak tylko bedzie pobieranie danych z handshake+have 
+	//uint32_t num_chunks; ///  do usuniecia - jak tylko bedzie pobieranie danych z handshake+have 
 	
 	memset(&pos, 0, sizeof(struct proto_opt_str));
 	memset(&opts, 0, sizeof(opts));
@@ -806,7 +917,7 @@ void proto_test (struct peer *peer, struct req *req)
 	pos.version = 1;
 	pos.minimum_version = 1;
 	pos.swarm_id_len = strlen(swarm_id);
-	pos.swarm_id = swarm_id;
+	pos.swarm_id = (uint8_t *)swarm_id;
 	pos.content_prot_method = 1;			// merkle hash tree
 	pos.merkle_hash_func = 0;			// 0 = sha-1
 	pos.live_signature_alg = 0;			// trzeba wziac jakas wartosc z dnssec
@@ -815,6 +926,13 @@ void proto_test (struct peer *peer, struct req *req)
 	pos.supported_msgs_len = 2;			// przykladowo 2 bajty mapy bitowej obslugiwanych komend
 	*(unsigned int *)pos.supported_msgs = 0xffff;			// mapa bitowa: obslugujemy wszystkie komendy rfc
 	pos.chunk_size = peer->chunk_size;
+	pos.file_size = peer->file_size;
+	pos.file_name_len = peer->fname_len;
+	memset(pos.file_name, 0, sizeof(pos.file_name));
+	memcpy(pos.file_name, peer->fname, peer->fname_len);
+	
+	//printf("\n\npeerfname: %s----------------------------------\n", peer->fname);
+	//sleep(10);
 	
 	// mark the options we want to pass to make_handshake_options() (which ones are valid)
 	pos.opt_map = 0;
@@ -829,6 +947,9 @@ void proto_test (struct peer *peer, struct req *req)
 	pos.opt_map |= (1 << SUPPORTED_MSGS);
 	pos.opt_map |= (1 << CHUNK_SIZE);
 
+	pos.opt_map |= (1 << FILE_SIZE);
+	pos.opt_map |= (1 << FILE_NAME);
+	
 
 	// to dla leechera
 	opts_len = make_handshake_options(opts, &pos);
@@ -839,6 +960,9 @@ void proto_test (struct peer *peer, struct req *req)
 	dump_handshake_request(handshake_req, h_req_len, peer);
 	
 
+	
+// to przeniesione jest do seeder_worker-a
+/*	
 	// to dla seedera
 	printf("\n\nresponse handshake (have):\n");
 	// make response HANDSHAKE with 0-10 chunks available
@@ -847,32 +971,23 @@ void proto_test (struct peer *peer, struct req *req)
 	h_resp_len = make_handshake_have(handshake_resp, 0, 0xfeedbabe, opts, opts_len, peer);		// tu poprawic channel id
 	//if (peer->type == SEEDER)
 	//	dump_handshake_have(handshake_resp, h_resp_len, peer);
+*/
 
-
-	// ponizsze przeniesione do net_leecher - bo to tam ma byc
-	/*
-	// to dla leechera
-	printf("\n\nrequest:\n");
-	num_chunks = 7; 
-#warning FIXME num_chunks should be get from seeder - seeder sends HAVE where those data are embedded
-	printf("------------num_chunks: %u\n", num_chunks);
-	req_len = make_request(request, 0xfeedbabe, 0, num_chunks - 1);
-	dump_request(request, req_len);
-	*/
+	
+	
 	
 	
 	if (peer->type == SEEDER) {
 		// uzupelnij pola struktury peer - od zera sa one ustawiane w mt.c::main()
 		peer->handshake_resp = handshake_resp;
 		peer->handshake_resp_len = h_resp_len;
-		net_seeder(peer, req);					// uruchom serwer udostepniajacy plik
+		net_seeder(peer);					// uruchom serwer udostepniajacy plik
 	} else {
 		peer->handshake_req = handshake_req;
 		peer->handshake_req_len = h_req_len;
 		peer->request = request;
 		peer->request_len = req_len;
-//		net_leecher(peer);					// uruchom klienta odbierajacego plik
-		net_leecher(peer, req);					// uruchom klienta odbierajacego plik
+		net_leecher(peer);					// uruchom klienta odbierajacego plik
 	}
 }
 

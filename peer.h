@@ -1,22 +1,24 @@
 #ifndef _PEER_H_
 #define _PEER_H_
 
+#include <netinet/in.h>
+
 #include "types.h"
 
 struct peer {
 
 	enum { LEECHER, SEEDER } type;
-	
+	enum { READY, BUSY } state;		// stan watku danego peer-a- albo gotowy do wykonania nowego zadania READY, albo wlasnie zajety BUSY
 	
 
-	u32 src_chan_id;
-	u32 dest_chan_id;
+	uint32_t src_chan_id;
+	uint32_t dest_chan_id;
 	struct node *tree;		// wskaznik na poczatek (index 0) tablicy z wezlami drzewka - czyli calego drzewka
 	struct node *tree_root;		// wskaznik na root (korzen) drzewka ->tree
 	struct chunk *chunk;		// tablica ze zdalnymi hashami sciagnieta na leechera przy pomocy INTEGRITY
 	struct chunk *chunk_verify;	// tablica loklana - z obliczonymi lokalnie hashami do weryfikacji z powyzsza tab ->chunk
-	u32 nl;				// number of leaves
-	u32 nc;				// number of chunks
+	uint32_t nl;				// number of leaves
+	uint32_t nc;				// number of chunks
 
 	
 
@@ -29,31 +31,53 @@ struct peer {
 
 
 	// pobrane z opcji HANDSHAKE - w dump_options()
-	u32 chunk_size;
+	uint32_t chunk_size;
 	// swarm_id
+	
+
+	// sieciowe
+//	struct in_addr sin_addr;
+//	in_port_t sin_port;
+	struct sockaddr_in sa;
+	char *recv_buf;
+	uint16_t recv_len;
+	int sockfd;
 	
 	
 	
 	// ponizsze to chyba powinny byc w innej strukt - request
-	u32 start_chunk;
-	u32 end_chunk;
+	uint32_t start_chunk;
+	uint32_t end_chunk;
+	uint64_t curr_chunk;		// aktualnie przetwarzany chunk
+	uint64_t file_size;
+	char fname[256];
+	char fname_len;
 };
 
 
 
+struct two_peers {
+	struct peer *we;		// struktura opisujaca "nasz" czyli localhost seedera
+	struct peer *peer;		// sturktura zdalnego peera
+};
 
 
+
+/*
 struct req {
 	
 	char *fname;
-	u32 start_chunk;
-	u32 end_chunk;
-	u32 curr_chunk;		// aktualnie przetwarzany chunk
+	char fname_len;
+	uint64_t file_size;
+	uint64_t start_chunk;
+	uint64_t end_chunk;
+	uint64_t curr_chunk;		// aktualnie przetwarzany chunk
 };
+*/
 
 
-
-
+//struct peer * new_peer (struct sockaddr_in *sa, char *buf, int n, int sockfd);
+struct peer * new_peer (struct sockaddr_in *sa, int n, int sockfd);
 
 
 #endif

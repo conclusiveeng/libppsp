@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <libgen.h>
 
 #include "mt.h"
 #include "sha1.h"
@@ -22,7 +23,7 @@ struct node **tab_tree8, **tab_tree16, **tab_tree32, **tab_tree64;
 struct chunk *tab_chunk;
 
 struct peer remote_peer;
-struct req req;
+//struct req req;
 
 void interval_min_max (struct node *i, struct node *min, struct node *max);
 void dump_tree (struct node *t, int l);
@@ -147,14 +148,14 @@ void traverse_ex3 (struct node *t)
 // a w parametrze **ret - wskaznik na nowo utworzone drzewko - 0-wy index liscia
 struct node * build_tree (struct chunk *a[], int num_chunks, struct node **ret)
 {
-	int x, l, s, si, h, first_idx, nc;
+	int x, l, si, h, first_idx, nc;
 	int left, right, parent, root_idx;
 	struct node *rot, *tt;
 	
 //	printf("num_chunks: %u   tree: %#x\n", num_chunks, t);
 	printf("num_chunks: %u\n", num_chunks);
 
-
+//	abort();
 
 	h = order2(num_chunks);							// "h" - height - wysokosc drzewka
 	nc = 1 << h;								// jesli jest tylko sciagnietych np. 7 chunkow - to trzeba przyjac drzewko o 1 rzad wieksze dla pomieszczenia tych chunkow - czyli tak jakby chunkow bylo 8
@@ -238,7 +239,7 @@ struct node * build_tree (struct chunk *a[], int num_chunks, struct node **ret)
 // a moze num chunks procedura powinna sama sobie wyliczac?
 struct node * extend_tree (struct chunk *a[], struct node *orig_tree, int num_chunks, struct node **ret)
 {
-	int x, l, s, si, h, first_idx, nc, nn;
+	int x, l, si, h, first_idx, nc, nn;
 	int left, right, parent, root_idx;
 	struct node *rot, *tt;
 	int root_idx_012, root_idx_456;
@@ -367,7 +368,7 @@ struct node * extend_tree (struct chunk *a[], struct node *orig_tree, int num_ch
 //	root_idx_456 = parent;				// tu parent jest wartosci koncowa z petli for powyzej - i czassami zle liczy
 
 	
-	int fi, li; /// first_idx, last_idx - na danym poziomie
+//	int fi, li; /// first_idx, last_idx - na danym poziomie
 //	printf("\n\n\n-------------------------oblicz parent\n\n");
 	//fi = first_idx = (1 << (1 - 1)) -1;
 //	printf("++++ %u  %u\n", h, root_idx_012 + (1 << (h)));
@@ -607,9 +608,11 @@ void interval_min_max (struct node *i, struct node *min, struct node *max)
 void dump_tree (struct node *t, int l)
 {
 	int x, y, s;
-	char shas[40];	
+	char shas[40 + 1];	
 	
-	printf("dump tree: %#x\n", t);
+	memset(shas, 0, sizeof(shas));
+//	printf("dump tree: %#x\n", t);
+	printf("dump tree\n");
 	for (x = 0; x < 2 * l; x++) {
 		s = 0;
 		for (y = 0; y < 20; y++)
@@ -621,17 +624,19 @@ void dump_tree (struct node *t, int l)
 
 
 // dumpuje adresy z tablicy
+/*
 void dump_tree_raw (struct node **t, int l)
 {
 	int x;
 	
-	printf("dump tree raw: %#x\n", t);
+//	printf("dump tree raw: %#x\n", t);
+	printf("dump tree raw\n");
 	for (x = 0; x < 2 * l; x++) {
 		printf("%#x\n", t[x]);
 	}
 	printf("\n");
 }
-
+*/
 
 
 // dumpowanie tablicy chunkow - czyli wyswietlanie sha
@@ -640,14 +645,14 @@ void dump_chunk_tab (struct chunk *c, int l)
 	int x, y, s;
 	char buf[40 + 1];
 	
-	printf("%s l: %u\n", __FUNCTION__);
+	printf("%s l: %u\n", __FUNCTION__, l);
 	for (x = 0; x < l; x++) {
 		s = 0;
 		for (y = 0; y < 20; y++) {
 			s += sprintf(buf + s, "%02x", c[x].sha[y] & 0xff);
 		}
 		buf[40] = '\0';
-		printf("chunk[%3u]  off: %8u  len: %8u  sha: %s  state: %s\n", x, c[x].offset, c[x].len, buf, c[x].state == CH_EMPTY ? "EMPTY" : "ACTIVE" );
+		printf("chunk[%3u]  off: %8lu  len: %8lu  sha: %s  state: %s\n", x, c[x].offset, c[x].len, buf, c[x].state == CH_EMPTY ? "EMPTY" : "ACTIVE" );
 		
 	}
 }
@@ -678,7 +683,8 @@ void verify_tree1 (struct node *t, int l)
 // (adres_aktualnego_wezla_t - poczatek_tablicy_wezlow) / wielkosc_wezla - da index w tablicy
 void verify_tree2 (struct node *t, struct node *array)
 {
-	int l, h, si, off, idx;
+	//int l, h, si, off, idx;
+	int idx;
 	//struct node *c;
 
 
@@ -716,7 +722,8 @@ void update_sha (struct node *t, int num_chunks)
 {
 	int h, nc, l, si, first_idx, y, s;
 	int left, right, parent;
-	char sha_left[40 + 1], sha_right[40 + 1], concat[80 + 1], sha_parent[40 + 1];
+	char sha_left[40 + 1], sha_right[40 + 1], sha_parent[40 + 1];
+	uint8_t concat[80 + 1];
 	SHA1Context context;
 	unsigned char digest[20 + 1];
 
@@ -748,7 +755,7 @@ void update_sha (struct node *t, int num_chunks)
 			//printf(" r: %s\n", sha_right);
 			sha_right[40] = '\0';
 			
-			sprintf(concat, "%s%s", sha_left, sha_right);
+			sprintf((char *)concat, "%s%s", sha_left, sha_right);
 			//printf(" +: %s\n", concat);
 
 			SHA1Reset(&context);
@@ -780,14 +787,15 @@ int main (int argc, char *argv[])
 {
 	struct chunk *c0, *c1;
 	struct chunk *tab[4];
-	struct node *u;
+	//struct node *u;
 	struct node *ret, *ret2;
-	int x, size, fd, r, nc, nl, c;
-	char *fname;
+	int fd, r;
+	uint64_t x, nc, nl, c;
+	char *fname1, *fname, *fname2;
 	struct stat stat;
 	SHA1Context context;
-	unsigned char digest[20];
-	unsigned int rd;
+	unsigned char digest[20 + 1];
+	uint64_t rd;
 	char *buf;
 	int opt, chunk_size;
 	
@@ -797,7 +805,7 @@ int main (int argc, char *argv[])
 	while ((opt = getopt(argc, argv, "f:s:")) != -1) {
 		switch (opt) {
 			case 'f':				// filename
-				fname = optarg;
+				fname1 = optarg;
 				break;
 			case 's':				// chunk size [bytes]
 				chunk_size = atoi(optarg);
@@ -808,8 +816,11 @@ int main (int argc, char *argv[])
 		}
 	}
 	
-	
-	
+	if (fname1 != NULL) {
+		fname2 = strdup(fname1);
+		fname = basename(fname2);
+	}
+//	fname= fname_;
 	printf("chunk_size: %u\n", chunk_size);
 	printf("fname: %s\n", fname);
 	
@@ -936,12 +947,12 @@ int main (int argc, char *argv[])
 	if (fname != NULL) {
 		fd = open(fname, O_RDONLY);
 		if (fd < 0) {
-			printf("error opening file: %s\n", fname);
+			printf("error opening file1: %s\n", fname);
 			//printf("error opening file: %s\n", argv[1]);
 			exit(1);
 		}
 		fstat(fd, &stat);
-		printf("file size: %u\n", stat.st_size);
+		printf("file size: %lu\n", stat.st_size);
 		
 		buf = malloc(chunk_size);
 
@@ -949,11 +960,11 @@ int main (int argc, char *argv[])
 		nc = stat.st_size / chunk_size;
 		if ((stat.st_size - stat.st_size / chunk_size * chunk_size) > 0)
 			nc++;
-		printf("ilosc chunkow [%u]: %u\n", chunk_size, nc);
+		printf("ilosc chunkow [%u]: %lu\n", chunk_size, nc);
 		
 		// wylicz ilosc lisci - bo to nie to samo co ilosc chunkow
 		nl = 1 << (order2(nc));
-		printf("nc: %u  nl: %u\n", nc, nl);
+		printf("nc: %lu  nl: %lu\n", nc, nl);
 		
 		// alokuj tablice chunkow, ktora pozniej podepniemy pod liscie
 		tab_chunk = malloc(nl * sizeof(struct chunk));
@@ -977,7 +988,7 @@ int main (int argc, char *argv[])
 			r = read(fd, buf, chunk_size);
 
 			SHA1Reset(&context);
-			SHA1Input(&context, buf, r);
+			SHA1Input(&context, (uint8_t *)buf, r);
 			SHA1Result(&context, digest);
 
 
@@ -993,7 +1004,7 @@ int main (int argc, char *argv[])
 		}
 		close(fd);
 
-		printf("rd: %u\n", rd);
+		printf("rd: %lu\n", rd);
 
 		
 		
@@ -1028,8 +1039,13 @@ int main (int argc, char *argv[])
 		remote_peer.end_chunk = nc - 1;
 		remote_peer.chunk_size = chunk_size;
 		
-		req.fname = fname;
-		proto_test(&remote_peer, &req);
+		printf("-----------------------------FNAME: %s  strlen: %lu\n", fname, strlen(fname));
+		memcpy(remote_peer.fname, fname, strlen(fname));
+		remote_peer.fname_len = strlen(fname);
+		remote_peer.file_size = stat.st_size;
+
+		//proto_test(&remote_peer, &req);
+		proto_test(&remote_peer);
 	} else { // leecher
 		remote_peer.tree = NULL;
 		remote_peer.nl = 0;
@@ -1040,14 +1056,17 @@ int main (int argc, char *argv[])
 		remote_peer.handshake_resp = NULL;
 		remote_peer.handshake_resp_len = 0;
 
-		req.fname = NULL;
+		memset(remote_peer.fname, 0, sizeof(remote_peer.fname));
+		remote_peer.fname_len = 0;
+		remote_peer.file_size = 0;
 		
-		proto_test(&remote_peer, &req);			// 0 - oznacza ze to tryb receivera (klienta)
+		//proto_test(&remote_peer, &req);
+		proto_test(&remote_peer);
 		
 	}
 
 	
-	
+//	free(fname2);
 	
 	
 	return 0;
