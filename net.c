@@ -1,3 +1,28 @@
+/*
+ * Copyright (c) 2020 Conclusive Engineering Sp. z o.o.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -19,12 +44,10 @@
 #include "ppspp_protocol.h"
 #include "peer.h"
 #include "sha1.h"
+#include "debug.h"
 
 #define BUFSIZE 1500
 #define PORT    6778
-#define IP "127.0.0.1"
-//#define IP "192.168.1.64"
-
 #define FILE_DOWNLOAD "download"
 #define SEM_NAME "/ppspp"
 
@@ -43,7 +66,7 @@ sem_t * semaph_init (struct peer *p)
 
 	sem = sem_open(p->sem_name, O_CREAT | O_RDWR, 0777, 0);		/* create semaphore initially locked */
 	if (sem == SEM_FAILED) {
-		printf("sem_open error: %s\n", strerror(errno));
+		d_printf("sem_open error: %s\n", strerror(errno));
 		abort();
 	}
 
@@ -57,7 +80,7 @@ int semaph_post (sem_t *sem)
 
 	s = sem_post(sem);
 	if (s != 0) {
-		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -71,7 +94,7 @@ int semaph_wait (sem_t *sem)
 
 	s = sem_wait(sem);
 	if (s != 0) {
-		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -85,15 +108,15 @@ void * diagnostic (void *data)
 	struct timespec ts;
 
 	while (1) {
-		printf("\n\n--------------------------------------------------DIAGNOSTICS--------------------------------------------\n\n");
-		printf("not active: ");
+		d_printf("%s", "\n\n--------------------------------------------------DIAGNOSTICS--------------------------------------------\n\n");
+		d_printf("%s", "not active: ");
 		for (x = 0; x < num_threads; x++) {
 			clock_gettime(CLOCK_MONOTONIC, &ts);
 			if (ts.tv_sec - threads[x].peer->ts_last_recv.tv_sec > 1) {
-				printf("[%u] ", x);
+				d_printf("[%u] ", x);
 			}
 		}
-		printf("\n");
+		d_printf("%s", "\n");
 		sleep(1);
 	}
 }
@@ -116,7 +139,7 @@ void * seeder_worker (void *data)
 	we = p->seeder;					/* our data (seeder) */
 	sockfd = p->sockfd;
 
-	printf("\n  th: ===========\n  th: worker started\n");
+	d_printf("%s", "\n  th: ===========\n  th: worker started\n");
 
 	memset(&pos, 0, sizeof(struct proto_opt_str));
 	memset(&opts, 0, sizeof(opts));
@@ -156,17 +179,14 @@ void * seeder_worker (void *data)
 	pos.opt_map |= (1 << FILE_NAME);
 
 	opts_len = make_handshake_options(opts, &pos);
-	if (opts_len > 1024) {
-		printf("opts_len: %u > 1024\n", opts_len);
-		abort();
-	}
+
+	_assert(opts_len <= 1024, "%s but has value: %u\n", "opts_len should be <= 1024", opts_len);
+
 	dump_options(opts, we);
 
 	h_resp_len = make_handshake_have(handshake_resp, 0, 0xfeedbabe, opts, opts_len, we);
-	if (h_resp_len > 256) {
-		printf("h_resp_len (%u) > 256\n", h_resp_len);
-		abort();
-	}
+
+	_assert(h_resp_len <= 256, "%s but has value: %u\n", "h_resp_len should be <= 256", h_resp_len);
 
 	p->sm = SM_NONE;
 
@@ -190,18 +210,20 @@ void * seeder_worker (void *data)
 		}
 
 		if (p->sm == SM_HANDSHAKE_HAVE) {
-			if (p->recv_len == 0)  abort();
+			_assert(p->recv_len != 0, "%s but has value: %u\n", "p->recv_len should be != 0", p->recv_len);
+
 			/* send HANDSHAKE + HAVE */
 			n = sendto(sockfd, handshake_resp, h_resp_len, 0, (struct sockaddr *) &p->sa, clientlen);
 			if (n < 0) {
-				printf("ERROR in sendto\n");
+				d_printf("%s", "ERROR in sendto\n");
 				abort();
 			}
 
 			clock_gettime(CLOCK_MONOTONIC, &p->ts_last_send);
 			p->d_last_send = HAVE;
 
-			if ((unsigned long int) we->fname_len > sizeof(p->fname))  abort();
+			_assert((unsigned long int) we->fname_len <= sizeof(p->fname), "%s but we->fname has value: %u and sizeof(p->fname has: %lu)\n", "we->fname_len should be <= sizeof(p->fname)", we->fname_len, sizeof(p->fname));
+
 			memset(p->fname, 0, sizeof(p->fname));
 			memcpy(p->fname, we->fname, we->fname_len);
 			p->chunk_size = we->chunk_size;
@@ -221,15 +243,12 @@ void * seeder_worker (void *data)
 		}
 
 		if (p->sm == SM_REQUEST) {
-			if (p->recv_len == 0) {
-				printf("recv_len==0\n");
-				abort();
-			}
+			_assert(p->recv_len != 0, "%s but has value: %u\n", "p->recv_len should be != 0", p->recv_len);
 
 			clock_gettime(CLOCK_MONOTONIC, &p->ts_last_recv);
 			p->d_last_recv = REQUEST;
 
-			printf("REQ\n");
+			d_printf("%s", "REQ\n");
 
 			dump_request(p->recv_buf, n, p);
 			p->sm = SM_INTEGRITY;
@@ -241,12 +260,12 @@ void * seeder_worker (void *data)
 		if (p->sm == SM_INTEGRITY) {
 			n = make_integrity(p->send_buf, p, we);
 
-			if (n > BUFSIZE) abort();
+			_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 			/* send INTEGRITY with data */
 			n = sendto(sockfd, p->send_buf, n, 0, (struct sockaddr *) &p->sa, clientlen);
 			if (n < 0) {
-				printf("ERROR in sendto\n");
+				d_printf("%s", "ERROR in sendto\n");
 				abort();
 			}
 
@@ -265,15 +284,12 @@ void * seeder_worker (void *data)
 
 			data_payload_len = make_data(data_payload, p);
 
-			if ((uint32_t) data_payload_len > we->chunk_size + 4 + 1 + 4 + 4 + 8) {
-				printf("datapayloadlen: %u    allocated: %u\n", data_payload_len, we->chunk_size + 4 + 1 + 4 + 4 + 8 );
-				abort();
-			}
+			_assert((uint32_t) data_payload_len <= we->chunk_size + 4 + 1 + 4 + 4 + 8, "%s but data_payload_len has value: %u and we->chunk_size: %u\n", "data_payload_len should be <= we->chunk_size", data_payload_len, we->chunk_size);
 
 			/* send DATA datagram with contents of the chunk */
 			n = sendto(sockfd, data_payload, data_payload_len, 0, (struct sockaddr *) &p->sa, clientlen);
 			if (n < 0) {
-				printf("ERROR in sendto\n");
+				d_printf("%s", "ERROR in sendto\n");
 				abort();
 			}
 
@@ -329,11 +345,12 @@ int net_seeder(struct peer *seeder)
 	struct peer *p;
 	pthread_t thread;
 
+	printf("Ok, ready for sharing\n");
 	portno = PORT;
 
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sockfd < 0)
-		printf("ERROR opening socket\n");
+		d_printf("%s", "ERROR opening socket\n");
 
 	optval = 1;
 	setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval , sizeof(int));
@@ -344,7 +361,7 @@ int net_seeder(struct peer *seeder)
 	serveraddr.sin_port = htons((unsigned short)portno);
 
 	if (bind(sockfd, (struct sockaddr *) &serveraddr, sizeof(serveraddr)) < 0)
-		printf("ERROR on binding\n");
+		d_printf("%s", "ERROR on binding\n");
 
 	clientlen = sizeof(clientaddr);
 
@@ -355,19 +372,19 @@ int net_seeder(struct peer *seeder)
 		memset(buf, 0, BUFSIZE);
 		n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &clientlen);
 		if (n < 0)
-			printf("ERROR in recvfrom\n");
+			d_printf("%s", "ERROR in recvfrom\n");
 
 		/* locate peer basing on IP address and UDP port */
 		p = ip_port_to_peer(&peer_list_head, &clientaddr);
 
 		if (message_type(buf) == HANDSHAKE) {
-			printf("OK HANDSHAKE\n");
+			d_printf("%s", "OK HANDSHAKE\n");
 			if (handshake_type(buf) == HANDSHAKE_INIT) {
 
 				p = new_peer(&clientaddr, BUFSIZE, sockfd);
 				add_peer_to_list(&peer_list_head, p);
 
-				if (n > BUFSIZE) abort();
+				_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 				memcpy(p->recv_buf, buf, n);
 				p->recv_len = n;
@@ -378,22 +395,22 @@ int net_seeder(struct peer *seeder)
 				/* create worker thread for this client (leecher) */
 				st = pthread_create(&thread, NULL, &seeder_worker, p);
 				if (st != 0) {
-					printf("cannot create ne thread\n");
+					d_printf("%s", "cannot create ne thread\n");
 					abort();
 				}
 
-				printf("new pthread created: %#lx\n", thread);
+				d_printf("new pthread created: %#lx\n", thread);
 
 				p->thread = thread;
 				semaph_post(p->sem);	/* unlock initially locked semaphore */
 				continue;
 			} else if (handshake_type(buf) == HANDSHAKE_FINISH) {	/* does the seeder want to close connection ? */
-				printf("-------------------FINISH\n");
+				d_printf("%s", "-------------------FINISH\n");
 
 				p->finishing = 1;	/* set the flag for finishing the thread */
 
 				pthread_join(p->thread, NULL);
-				printf("---------pthread finished-----  cnt: %lu\n", cnt);
+				d_printf("---------pthread finished-----  cnt: %lu\n", cnt);
 
 				(void) remove_peer_from_list(&peer_list_head, p);
 
@@ -412,10 +429,10 @@ int net_seeder(struct peer *seeder)
 		if (message_type(buf) == REQUEST) {
 			semaph_wait(p->sem);
 
-			printf("OK REQUEST\n");
+			d_printf("%s", "OK REQUEST\n");
 
-			//tu spr czy worker jest READY - jak nie to zwroc CHOKE leecherowi - ale to pozniej
-			if (n > BUFSIZE) abort();
+			_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
+
 			memcpy(p->recv_buf, buf, n);
 			p->recv_len = n;
 			semaph_post(p->sem);
@@ -425,8 +442,8 @@ int net_seeder(struct peer *seeder)
 		if (message_type(buf) == ACK) {
 			semaph_wait(p->sem);
 
-			printf("OK ACK\n");
-			if (n > BUFSIZE) abort();
+			d_printf("%s", "OK ACK\n");
+			_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 			memcpy(p->recv_buf, buf, n);
 			p->recv_len = n;
@@ -460,7 +477,6 @@ int net_leecher(struct peer *peer)
 	memset(&pos, 0, sizeof(struct proto_opt_str));
 	memset(&opts, 0, sizeof(opts));
 	memset(&handshake_req, 0, sizeof(handshake_req));
-	//memset(&handshake_resp, 0, sizeof(handshake_resp));
 
 	/* prepare structure as a set of parameters to make_handshake_options() proc */
 	pos.version = 1;
@@ -499,7 +515,7 @@ int net_leecher(struct peer *peer)
 	/* for leecher */
 	opts_len = make_handshake_options(opts, &pos);
 	dump_options(opts, peer);
-	printf("\n\ninitial handshake:\n");
+	d_printf("%s", "\n\ninitial handshake:\n");
 	/* make initial HANDSHAKE request - serialize dest chan id, src chan id and protocol options */
 	h_req_len = make_handshake_request(handshake_req, 0, 0xfeedbabe, opts, opts_len);
 	dump_handshake_request(handshake_req, h_req_len, peer);
@@ -515,31 +531,30 @@ int net_leecher(struct peer *peer)
 
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_port = htons(PORT);
-	servaddr.sin_addr.s_addr = inet_addr(IP);
+	servaddr.sin_addr.s_addr = peer->seeder_addr.s_addr;
 
 	/* send initial HANDSHAKE to SEEDER */
 	n = sendto(sockfd, handshake_req, h_req_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 	if (n < 0) {
-		printf("error sending handhsake: %d\n", n);
-		//return -1;
+		d_printf("error sending handhsake: %d\n", n);
 		abort();
 	}
-	printf("initial message 1/3 sent\n");
+	d_printf("%s", "initial message 1/3 sent\n");
 
 	/* receive response from SEEDER: HANDSHAKE + HAVE */
 	n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
 	buffer[n] = '\0';
-	printf("server replied with %u bytes\n", n);
+	d_printf("server replied with %u bytes\n", n);
 	dump_handshake_have(buffer, n, peer);
 
 	/* calculate number of SHA hashes per 1500 bytes MTU */
 	hashes_per_mtu = (1500 - (4 + 1 + 4 + 4 + 8))/20;
-	printf("hashes_per_mtu: %lu ---------------\n", hashes_per_mtu);
+	d_printf("hashes_per_mtu: %lu ---------------\n", hashes_per_mtu);
 
 	/* calculate number of series */
 	num_series = peer->nc / hashes_per_mtu;
 	rest = peer->nc % hashes_per_mtu;
-	printf("nc: %u   num_series: %lu   rest: %lu\n", peer->nc, num_series, rest);
+	d_printf("nc: %u   num_series: %lu   rest: %lu\n", peer->nc, num_series, rest);
 
 	/* build the tree */
 	peer->tree_root = build_tree(peer->nc, &peer->tree);
@@ -554,13 +569,13 @@ int net_leecher(struct peer *peer)
 
 	fd = open(fname, O_WRONLY | O_CREAT, 0744);
 	if (fd < 0) {
-		printf("error opening file '%s' for writing: %u %s\n", fname, errno, strerror(errno));
+		d_printf("error opening file '%s' for writing: %u %s\n", fname, errno, strerror(errno));
 		abort();
 	}
 
 	z = peer->start_chunk;
 	while (z < peer->end_chunk) {
-		printf("-----------z: %u  peer->end_chunk: %u\n", z, peer->end_chunk);
+		d_printf("-----------z: %u  peer->end_chunk: %u\n", z, peer->end_chunk);
 		begin = z;
 
 		if (z + hashes_per_mtu >= peer->end_chunk)
@@ -568,37 +583,33 @@ int net_leecher(struct peer *peer)
 		else
 			end = z + hashes_per_mtu -1 ;
 
-		printf("begin: %lu   end: %lu\n", begin, end);
+		d_printf("begin: %lu   end: %lu\n", begin, end);
 
 		/* create REQUEST  */
 		request_len = make_request(request, 0xfeedbabe, begin, end);
-		if (request_len > 256) {
-			printf("request_len > 256: %u\n", request_len);
-			abort();
-		}
+
+		_assert(request_len <= sizeof(request), "%s but request_len has value: %u and sizeof(request): %lu\n", "request_len should be <= sizeof(request)", request_len, sizeof(request));
 
 		/* send REQUEST */
 		n = sendto(sockfd, request, request_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 		if (n < 0) {
-			printf("error sending request: %d\n", n);
-			//return -1;
+			d_printf("error sending request: %d\n", n);
 			abort();
 		}
-		printf("request message 3/3 sent\n");
+		d_printf("%s", "request message 3/3 sent\n");
 
 		/* receive INTEGRITY from SEEDER */
 		n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
 		if (n < 0) {
-			printf("error: recvfrom: %d errno: %d %s\n", n, errno, strerror(errno));
-			printf("	len: %d\n", len);
-			//return -1;
+			d_printf("error: recvfrom: %d errno: %d %s\n", n, errno, strerror(errno));
+			d_printf("	len: %d\n", len);
 			abort();
 		}
-		printf("server sent INTEGRITY: %d\n", n);
+		d_printf("server sent INTEGRITY: %d\n", n);
 		dump_integrity(buffer, n, peer);		/* copy SHA hashes to peer->chunk[] */
 
 		/* copy all the received now SHA hashes to tree */
-		printf("kopiowanie sha %lu-%lu =================================\n", begin, end);
+		d_printf("copying sha %lu-%lu\n", begin, end);
 		for (x = begin; x < end; x++)
 			memcpy(peer->tree[2 * x].sha, peer->chunk[x].sha, 20);
 
@@ -609,8 +620,7 @@ int net_leecher(struct peer *peer)
 			/* receive single DATA datagram */
 			nr = recvfrom(sockfd, (char *)data_buffer, data_buffer_len, 0, (struct sockaddr *) &servaddr, &len);
 			if (nr <= 0) {
-				printf("error: recvfrom: %d errno: %d %s\n", n, errno, strerror(errno));
-				//return -1;
+				d_printf("error: recvfrom: %d errno: %d %s\n", n, errno, strerror(errno));
 				abort();
 			}
 
@@ -639,25 +649,22 @@ int net_leecher(struct peer *peer)
 			cmp = memcmp(peer->chunk[peer->curr_chunk].sha, digest , 20);
 
 			if (cmp != 0) {
-				printf("error - hashes are different[%lu]: seeder %s vs digest: %s\n", cc, sha_seeder_buf, sha_buf);
+				d_printf("error - hashes are different[%lu]: seeder %s vs digest: %s\n", cc, sha_seeder_buf, sha_buf);
 				abort();
 			}
 
 			/* create ACK message to confirm that chunk in last DATA datagram has been transferred correctly */
 			ack_len = make_ack(buffer, peer);
-			if (ack_len > BUFSIZE) {
-				printf("ack_len > BUFSIZE: %lu\n" , ack_len);
-				abort();
-			}
+
+			_assert(ack_len <= BUFSIZE, "%s but ack_len has value: %lu and BUFSIZE: %u\n", "ack_len should be <= BUFSIZE", ack_len, BUFSIZE);
 
 			/* send ACK */
 			n = sendto(sockfd, buffer, ack_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				printf("error sending request: %d\n", n);
-				//return -1;
+				d_printf("error sending request: %d\n", n);
 				abort();
 			}
-			printf("ACK[%lu] sent\n" ,cc);
+			d_printf("ACK[%lu] sent\n" ,cc);
 		}
 		z += hashes_per_mtu;
 	}
@@ -666,11 +673,10 @@ int net_leecher(struct peer *peer)
 	n = make_handshake_finish(buffer, peer);
 	n = sendto(sockfd, buffer, ack_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 	if (n < 0) {
-		printf("error sending request: %d\n", n);
-		//return -1;
+		d_printf("error sending request: %d\n", n);
 		abort();
 	}
-	printf("HANDSHAKE_FINISH sent\n");
+	d_printf("%s", "HANDSHAKE_FINISH sent\n");
 
 	free(data_buffer);
 	close(sockfd);

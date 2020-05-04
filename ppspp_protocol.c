@@ -1,3 +1,28 @@
+/*
+ * Copyright (c) 2020 Conclusive Engineering Sp. z o.o.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <endian.h>
@@ -12,6 +37,7 @@
 #include "ppspp_protocol.h"
 #include "sha1.h"
 #include "mt.h"
+#include "debug.h"
 
 
 /*
@@ -35,7 +61,7 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 		*d = 1;
 		d++;
 	} else {
-		printf("no version specified - it's obligatory!\n");
+		d_printf("%s", "no version specified - it's obligatory!\n");
 		return -1;
 	}
 
@@ -45,7 +71,7 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 		*d = 1;
 		d++;
 	} else {
-		printf("no minimum_version specified - it's obligatory!\n");
+		d_printf("%s", "no minimum_version specified - it's obligatory!\n");
 		return -1;
 	}
 
@@ -64,7 +90,7 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 		*d = pos->content_prot_method & 0xff;
 		d++;
 	} else {
-		printf("no content_integrity_protection_method specified - it's obligatory!\n");
+		d_printf("%s", "no content_integrity_protection_method specified - it's obligatory!\n");
 		return -1;
 	}
 
@@ -88,7 +114,7 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 		*d = pos->chunk_addr_method & 0xff;
 		d++;
 	} else {
-		printf("no chunk_addr_method specified - it's obligatory!\n");
+		d_printf("%s", "no chunk_addr_method specified - it's obligatory!\n");
 		return -1;
 	}
 
@@ -103,7 +129,7 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 			d += sizeof(uint64_t);
 		}
 	} else {
-		printf("no chunk_addr_method specified - it's obligatory!\n");
+		d_printf("%s", "no chunk_addr_method specified - it's obligatory!\n");
 		return -1;
 	}
 
@@ -122,7 +148,7 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 		*(uint32_t *)d = htobe32((uint32_t)(pos->chunk_size & 0xffffffff));
 		d += sizeof(pos->chunk_size);
 	} else {
-		printf("no chunk_size specified - it's obligatory!\n");
+		d_printf("%s", "no chunk_size specified - it's obligatory!\n");
 		return -1;
 	}
 
@@ -139,7 +165,7 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 		*(uint64_t *)d = htobe64(pos->file_size);
 		d += sizeof(uint64_t);
 	} else {
-		printf("no file_size specified - it's obligatory!\n");
+		d_printf("%s", "no file_size specified - it's obligatory!\n");
 		return -1;
 	}
 
@@ -160,7 +186,7 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 		memcpy(d, pos->file_name, pos->file_name_len);
 		d += pos->file_name_len;
 	} else {
-		printf("no file_name specified - it's obligatory!\n");
+		d_printf("%s", "no file_name specified - it's obligatory!\n");
 		return -1;
 	}
 
@@ -168,7 +194,7 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 	d++;
 
 	ret = d - (unsigned char *)ptr;
-	printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %u bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -206,7 +232,7 @@ int make_handshake_request (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_
 	d += opt_len;
 
 	ret = d - ptr;
-	printf("%s: returning %u bytes\n", __func__, ret);
+	d_printf("%s: returning %u bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -248,7 +274,7 @@ int make_handshake_have (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id,
 	d += sizeof(uint32_t);
 
 	ret = d - ptr;
-	printf("%s: returning %u bytes\n", __func__, ret);
+	d_printf("%s: returning %u bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -284,7 +310,7 @@ int make_handshake_finish (char *ptr, struct peer *peer)
 	d++;
 
 	ret = d - (unsigned char *)ptr;
-	printf("%s: returning %u bytes\n", __func__, ret);
+	d_printf("%s: returning %u bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -324,7 +350,7 @@ int make_request (char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32
 	d++;
 
 	ret = d - ptr;
-	printf("%s: returning %u bytes\n", __func__, ret);
+	d_printf("%s: returning %u bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -363,13 +389,13 @@ int make_integrity (char *ptr, struct peer *peer, struct peer *we)
 	y = 0;
 	for (x = peer->start_chunk; x <= peer->end_chunk; x++) {
 		memcpy(d, we->tree[2 * x].sha, 20);
-		printf("copying chunk: %u\n", x);
+		d_printf("copying chunk: %u\n", x);
 		y++;
 		d += 20;
 	}
 
 	ret = d - ptr;
-	printf("%s: returning %u bytes\n", __func__, ret);
+	d_printf("%s: returning %u bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -410,7 +436,7 @@ int make_data (char *ptr, struct peer *peer)
 
 	fd = open(peer->fname, O_RDONLY);
 	if (fd < 0) {
-		printf("error opening file2: %s\n", peer->fname);
+		d_printf("error opening file2: %s\n", peer->fname);
 		return -1;
 	}
 
@@ -418,7 +444,7 @@ int make_data (char *ptr, struct peer *peer)
 
 	l = read(fd, d, peer->chunk_size);
 	if (l < 0) {
-		printf("error reading file: %s\n", peer->fname);
+		d_printf("error reading file: %s\n", peer->fname);
 		close(fd);
 		return -1;
 	}
@@ -428,7 +454,7 @@ int make_data (char *ptr, struct peer *peer)
 	d += l;
 
 	ret = d - ptr;
-	printf("%s: returning %u bytes\n", __func__, ret);
+	d_printf("%s: returning %u bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -468,7 +494,7 @@ int make_ack (char *ptr, struct peer *peer)
 	d += sizeof(uint64_t);
 
 	ret = d - ptr;
-	/* printf("%s: returning %u bytes\n", __func__, ret); */
+	/* d_printf("%s: returning %u bytes\n", __func__, ret); */
 
 	return ret;
 }
@@ -493,9 +519,9 @@ int dump_options (char *ptr, struct peer *peer)
 
 	if (*d == VERSION) {
 		d++;
-		printf("version: %u\n", *d);
+		d_printf("version: %u\n", *d);
 		if (*d != 1) {
-			printf("version should be 1 but is: %u\n", *d);
+			d_printf("version should be 1 but is: %u\n", *d);
 			abort();
 		}
 		d++;
@@ -503,7 +529,7 @@ int dump_options (char *ptr, struct peer *peer)
 
 	if (*d == MINIMUM_VERSION) {
 		d++;
-		printf("minimum_version: %u\n", *d);
+		d_printf("minimum_version: %u\n", *d);
 		d++;
 	}
 
@@ -511,54 +537,54 @@ int dump_options (char *ptr, struct peer *peer)
 		d++;
 		swarm_len = be16toh(*((uint16_t *)d) & 0xffff);
 		d += 2;
-		printf("swarm_id[%u]: %s\n", swarm_len, d);
+		d_printf("swarm_id[%u]: %s\n", swarm_len, d);
 		d += swarm_len;
 	}
 
 	if (*d == CONTENT_PROT_METHOD) {
 		d++;
-		printf("Content integrity protection method: ");
+		d_printf("%s", "Content integrity protection method: ");
 		switch (*d) {
-			case 0:	printf("No integrity protection\n"); break;
-			case 1: printf("Merkle Hash Tree\n"); break;
-			case 2: printf("Hash All\n"); break;
-			case 3: printf("Unified Merkle Tree\n"); break;
-			default: printf("Unassigned\n"); break;
+			case 0:	d_printf("%s", "No integrity protection\n"); break;
+			case 1: d_printf("%s", "Merkle Hash Tree\n"); break;
+			case 2: d_printf("%s", "Hash All\n"); break;
+			case 3: d_printf("%s", "Unified Merkle Tree\n"); break;
+			default: d_printf("%s", "Unassigned\n"); break;
 		}
 		d++;
 	}
 
 	if (*d == MERKLE_HASH_FUNC) {
 		d++;
-		printf("Merkle Tree Hash Function: ");
+		d_printf("%s", "Merkle Tree Hash Function: ");
 		switch (*d) {
-			case 0:	printf("SHA-1\n"); break;
-			case 1: printf("SHA-224\n"); break;
-			case 2: printf("SHA-256\n"); break;
-			case 3: printf("SHA-384\n"); break;
-			case 4: printf("SHA-512\n"); break;
-			default: printf("Unassigned\n"); break;
+			case 0:	d_printf("%s", "SHA-1\n"); break;
+			case 1: d_printf("%s", "SHA-224\n"); break;
+			case 2: d_printf("%s", "SHA-256\n"); break;
+			case 3: d_printf("%s", "SHA-384\n"); break;
+			case 4: d_printf("%s", "SHA-512\n"); break;
+			default: d_printf("%s", "Unassigned\n"); break;
 		}
 		d++;
 	}
 
 	if (*d == LIVE_SIGNATURE_ALG) {
 		d++;
-		printf("Live Signature Algorithm: %u\n", *d);
+		d_printf("Live Signature Algorithm: %u\n", *d);
 		d++;
 	}
 
 	chunk_addr_method = 255;
 	if (*d == CHUNK_ADDR_METHOD) {
 		d++;
-		printf("Chunk Addressing Method: ");
+		d_printf("%s", "Chunk Addressing Method: ");
 		switch (*d) {
-			case 0:	printf("32-bit bins\n"); break;
-			case 1:	printf("64-bit byte ranges\n"); break;
-			case 2:	printf("32-bit chunk ranges\n"); break;
-			case 3:	printf("64-bit bins\n"); break;
-			case 4:	printf("64-bit chunk ranges\n"); break;
-			default: printf("Unassigned\n"); break;
+			case 0:	d_printf("%s", "32-bit bins\n"); break;
+			case 1:	d_printf("%s", "64-bit byte ranges\n"); break;
+			case 2:	d_printf("%s", "32-bit chunk ranges\n"); break;
+			case 3:	d_printf("%s", "64-bit bins\n"); break;
+			case 4:	d_printf("%s", "64-bit chunk ranges\n"); break;
+			default: d_printf("%s", "Unassigned\n"); break;
 		}
 		chunk_addr_method = *d;
 		d++;
@@ -566,31 +592,31 @@ int dump_options (char *ptr, struct peer *peer)
 
 	if (*d == LIVE_DISC_WIND) {
 		d++;
-		printf("Live Discard Window: ");
+		d_printf("%s", "Live Discard Window: ");
 		switch (chunk_addr_method) {
 			case 0:
-			case 2:	ldw32 =  be32toh(*(uint32_t *)d); printf("32bit: %#x\n", ldw32); d += sizeof(uint32_t); break;
+			case 2:	ldw32 =  be32toh(*(uint32_t *)d); d_printf("32bit: %#x\n", ldw32); d += sizeof(uint32_t); break;
 			case 1:
 			case 3:
-			case 4:	ldw64 =  be64toh(*(uint64_t *)d); printf("64bit: %#lx\n", ldw64); d += sizeof(uint64_t); break;
-			default: printf("Error\n");
+			case 4:	ldw64 =  be64toh(*(uint64_t *)d); d_printf("64bit: %#lx\n", ldw64); d += sizeof(uint64_t); break;
+			default: d_printf("%s", "Error\n");
 		}
 	}
 
 	if (*d == SUPPORTED_MSGS) {
 		d++;
-		printf("Supported messages mask: ");
+		d_printf("%s", "Supported messages mask: ");
 		supported_msgs_len = *d;
 		d++;
 		for (x = 0; x < supported_msgs_len; x++)
-			printf("%#x ", *(d+x) & 0xff);
-		printf("\n");
+			d_printf("%#x ", *(d+x) & 0xff);
+		d_printf("%s", "\n");
 		d += supported_msgs_len;
 	}
 
 	if (*d == CHUNK_SIZE) {
 		d++;
-		printf("Chunk size: %u\n", be32toh(*(uint32_t *)d));
+		d_printf("Chunk size: %u\n", be32toh(*(uint32_t *)d));
 		if (peer->type == LEECHER) {
 			peer->chunk_size = be32toh(*(uint32_t *)d);
 		}
@@ -599,7 +625,7 @@ int dump_options (char *ptr, struct peer *peer)
 
 	if (*d == FILE_SIZE) {
 		d++;
-		printf("File size: %lu\n", be64toh(*(uint64_t *)d));
+		d_printf("File size: %lu\n", be64toh(*(uint64_t *)d));
 		if (peer->type == LEECHER) {
 			peer->file_size = be64toh(*(uint64_t *)d);
 		}
@@ -608,23 +634,23 @@ int dump_options (char *ptr, struct peer *peer)
 
 	if (*d == FILE_NAME) {
 		d++;
-		printf("File name size: %u\n", *d & 0xff);
+		d_printf("File name size: %u\n", *d & 0xff);
 		peer->fname_len = *d & 0xff ;
 		d++;
 		memcpy(peer->fname, d, peer->fname_len);
-		printf("File name: %s\n", peer->fname);
+		d_printf("File name: %s\n", peer->fname);
 		d += peer->fname_len;
 	}
 
 	if ((*d & 0xff) == END_OPTION) {
-		printf("end option\n");
+		d_printf("%s", "end option\n");
 		d++;
 	} else {
-		printf("error: should be END_OPTION(0xff) but is: d[%lu]: %u\n", d - ptr, *d & 0xff);
+		d_printf("error: should be END_OPTION(0xff) but is: d[%lu]: %u\n", d - ptr, *d & 0xff);
 		abort();
 	}
 
-	printf("parsed: %lu bytes\n", d - ptr);
+	d_printf("parsed: %lu bytes\n", d - ptr);
 
 	ret = d - ptr;
 	return ret;
@@ -649,27 +675,27 @@ int dump_handshake_request (char *ptr, int req_len, struct peer *peer)
 	d = ptr;
 
 	dest_chan_id = be32toh(*(uint32_t *)d);
-	printf("Destination Channel ID: %#x\n", dest_chan_id);
+	d_printf("Destination Channel ID: %#x\n", dest_chan_id);
 	d += sizeof(uint32_t);
 
 	if (*d == HANDSHAKE) {
-		printf("ok, HANDSHAKE req\n");
+		d_printf("%s", "ok, HANDSHAKE req\n");
 	} else {
-		printf("error - should be HANDSHAKE req (0) but is: %u\n", *d);
+		d_printf("error - should be HANDSHAKE req (0) but is: %u\n", *d);
 		abort();
 	}
 	d++;
 
 	src_chan_id = be32toh(*(uint32_t *)d);
-	printf("Source Channel ID: %#x\n", src_chan_id);
+	d_printf("Source Channel ID: %#x\n", src_chan_id);
 	d += sizeof(uint32_t);
 
-	printf("\n");
+	d_printf("%s", "\n");
 
 	opt_len = dump_options(d, peer);
 
 	ret = d + opt_len - ptr;
-	printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %u bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -696,11 +722,11 @@ int dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 
 	d += req_len;
 	/* dump HAVE header */
-	printf("HAVE header:\n");
+	d_printf("%s", "HAVE header:\n");
 	if (*d == HAVE) {
-		printf("ok, HAVE header\n");
+		d_printf("%s", "ok, HAVE header\n");
 	} else {
-		printf("error, should be HAVE header but is: %u\n", *d);
+		d_printf("error, should be HAVE header but is: %u\n", *d);
 		abort();
 	}
 
@@ -709,32 +735,32 @@ int dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 	start_chunk = be32toh(*(uint32_t *)d);
 	d += sizeof(uint32_t);
 	peer->start_chunk = start_chunk;
-	printf("start chunk: %u\n", start_chunk);
+	d_printf("start chunk: %u\n", start_chunk);
 
 	end_chunk = be32toh(*(uint32_t *)d);
 	d += sizeof(uint32_t);
 	peer->end_chunk = end_chunk;
-	printf("end chunk: %u\n", end_chunk);
+	d_printf("end chunk: %u\n", end_chunk);
 
 	/* calculate how many chunks seeder has */
 	num_chunks = end_chunk - start_chunk + 1;
-	printf("seeder have %u chunks\n", num_chunks);
+	d_printf("seeder have %u chunks\n", num_chunks);
 	peer->nc = num_chunks;
 
 	/* calculate number of leaves */
 	peer->nl = 1 << order2(peer->nc);
-	printf("------------------nc: %u nl: %u\n", peer->nc, peer->nl);
+	d_printf("------------------nc: %u nl: %u\n", peer->nc, peer->nl);
 
 	if (peer->chunk == NULL) {
 		peer->chunk = malloc(peer->nl * sizeof(struct chunk));
 		memset(peer->chunk, 0, peer->nl * sizeof(struct chunk));
 	} else {
-		printf("error - peer->chunk has already allocated memory, HAVE should be send only once\n");
+		d_printf("%s", "error - peer->chunk has already allocated memory, HAVE should be send only once\n");
 		abort();
 	}
 
 	ret = d - ptr;
-	printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %u bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -758,39 +784,38 @@ int dump_request (char *ptr, int req_len, struct peer *peer)
 	d = ptr;
 
 	dest_chan_id = be32toh(*(uint32_t *)d);
-	printf("Destination Channel ID: %#x\n", dest_chan_id);
+	d_printf("Destination Channel ID: %#x\n", dest_chan_id);
 	d += sizeof(uint32_t);
 
 	if (*d == REQUEST) {
-		printf("ok, REQUEST header\n");
+		d_printf("%s", "ok, REQUEST header\n");
 	} else {
-		printf("error, should be REQUEST header but is: %u\n", *d);
+		d_printf("error, should be REQUEST header but is: %u\n", *d);
 		abort();
 	}
 	d++;
 
 	start_chunk = be32toh(*(uint32_t *)d);
 	d += sizeof(uint32_t);
-	printf("  start chunk: %u\n", start_chunk);
+	d_printf("  start chunk: %u\n", start_chunk);
 
 	end_chunk = be32toh(*(uint32_t *)d);
 	d += sizeof(uint32_t);
-	printf("  end chunk: %u\n", end_chunk);
+	d_printf("  end chunk: %u\n", end_chunk);
+
+	_assert(peer->type == LEECHER, "%s\n", "Only leecher is allowed to run this procedure");
 
 	if (peer->type == LEECHER) {
 		peer->start_chunk = start_chunk;
 		peer->end_chunk = end_chunk;
-	} else {
-		printf("????????\n");
-		abort();
 	}
 
 	if (d - ptr < req_len) {
-		printf("  here do in the future maintenance of rest of messages: %lu bytes left\n" ,req_len - (d - ptr));
+		d_printf("  here do in the future maintenance of rest of messages: %lu bytes left\n" ,req_len - (d - ptr));
 	}
 
 	ret = d - ptr;
-	printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %u bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -814,24 +839,24 @@ int dump_integrity (char *ptr, int req_len, struct peer *peer)
 	d = ptr;
 
 	dest_chan_id = be32toh(*(uint32_t *)d);
-	printf("Destination Channel ID: %#x\n", dest_chan_id);
+	d_printf("Destination Channel ID: %#x\n", dest_chan_id);
 	d += sizeof(uint32_t);
 
 	if (*d == INTEGRITY) {
-		printf("ok, INTEGRITY header\n");
+		d_printf("%s", "ok, INTEGRITY header\n");
 	} else {
-		printf("error, should be INTEGRITY header but is: %u\n", *d);
+		d_printf("error, should be INTEGRITY header but is: %u\n", *d);
 		abort();
 	}
 	d++;
 
 	start_chunk = be32toh(*(uint32_t *)d);
 	d += sizeof(uint32_t);
-	printf("  start chunk: %u\n", start_chunk);
+	d_printf("  start chunk: %u\n", start_chunk);
 
 	end_chunk = be32toh(*(uint32_t *)d);
 	d += sizeof(uint32_t);
-	printf("  end chunk: %u\n", end_chunk);
+	d_printf("  end chunk: %u\n", end_chunk);
 
 	for (x = start_chunk; x <= end_chunk; x++) {
 		memcpy(peer->chunk[x].sha, d, 20);
@@ -844,17 +869,17 @@ int dump_integrity (char *ptr, int req_len, struct peer *peer)
 		for (y = 0; y < 20; y++)
 			s += sprintf(sha_buf + s, "%02x", peer->chunk[x].sha[y] & 0xff);
 		sha_buf[40] = '\0';
-		printf("dumping chunk %u:  %s\n", x, sha_buf);
+		d_printf("dumping chunk %u:  %s\n", x, sha_buf);
 */
 
 		d += 20;
 	}
 
 	if (req_len - (d - ptr) > 0)
-		printf("  %lu bytes left, parse them\n", req_len - (d - ptr));
+		d_printf("  %lu bytes left, parse them\n", req_len - (d - ptr));
 
 	ret = d - ptr;
-	printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %u bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -879,30 +904,30 @@ int dump_ack (char *ptr, int ack_len, struct peer *peer)
 	d = ptr;
 
 	dest_chan_id = be32toh(*(uint32_t *)d);
-	printf("Destination Channel ID: %#x\n", dest_chan_id);
+	d_printf("Destination Channel ID: %#x\n", dest_chan_id);
 	d += sizeof(uint32_t);
 
 	if (*d == ACK) {
-		printf("ok, ACK header\n");
+		d_printf("%s", "ok, ACK header\n");
 	} else {
-		printf("error, should be ACK header but is: %u\n", *d);
+		d_printf("error, should be ACK header but is: %u\n", *d);
 	}
 	d++;
 
 	start_chunk = be32toh(*(uint32_t *)d);
 	d += sizeof(uint32_t);
-	printf("start chunk: %u\n", start_chunk);
+	d_printf("start chunk: %u\n", start_chunk);
 
 	end_chunk = be32toh(*(uint32_t *)d);
 	d += sizeof(uint32_t);
-	printf("end chunk: %u\n", end_chunk);
+	d_printf("end chunk: %u\n", end_chunk);
 
 	delay_sample = be64toh(*(uint64_t *)d);
 	d += sizeof(uint64_t);
-	printf("delay_sample: %#lx\n", delay_sample);
+	d_printf("delay_sample: %#lx\n", delay_sample);
 
 	ret = d - ptr;
-	printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %u bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -929,37 +954,37 @@ uint8_t handshake_type (char *ptr)
 	d = ptr;
 
 	dest_chan_id = be32toh(*(uint32_t *)d);
-	printf("Destination Channel ID: %#x\n", dest_chan_id);
+	d_printf("Destination Channel ID: %#x\n", dest_chan_id);
 	d += sizeof(uint32_t);
 
 	if (*d == HANDSHAKE) {
-		printf("ok, HANDSHAKE header\n");
+		d_printf("%s", "ok, HANDSHAKE header\n");
 	} else {
-		printf("error, should be HANDSHAKE header but is: %u\n", *d);
+		d_printf("error, should be HANDSHAKE header but is: %u\n", *d);
 		abort();
 	}
 	d++;
 
 	src_chan_id = be32toh(*(uint32_t *)d);
-	printf("Destination Channel ID: %#x\n", dest_chan_id);
+	d_printf("Destination Channel ID: %#x\n", dest_chan_id);
 	d += sizeof(uint32_t);
 
 	if ((dest_chan_id == 0x0) && (src_chan_id != 0x0)) {
-		printf("handshake_init\n");
+		d_printf("%s", "handshake_init\n");
 		ret = HANDSHAKE_INIT;
 	}
 
 	if ((dest_chan_id != 0x0) && (src_chan_id == 0x0)) {
-		printf("handshake_finish\n");
+		d_printf("%s", "handshake_finish\n");
 		ret = HANDSHAKE_FINISH;
 	}
 	if ((dest_chan_id == 0x0) && (src_chan_id == 0x0)) {
-		printf("handshake_error1\n");
+		d_printf("%s", "handshake_error1\n");
 		ret = HANDSHAKE_ERROR;
 	}
 
 	if ((dest_chan_id != 0x0) && (src_chan_id != 0x0)) {
-		printf("handshake_error2\n");
+		d_printf("%s", "handshake_error2\n");
 		ret = HANDSHAKE_ERROR;
 	}
 

@@ -1,3 +1,28 @@
+/*
+ * Copyright (c) 2020 Conclusive Engineering Sp. z o.o.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,15 +31,20 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <libgen.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "mt.h"
 #include "sha1.h"
 #include "ppspp_protocol.h"
 #include "net.h"
 #include "peer.h"
+#include "debug.h"
 
 extern char *optarg;
 extern int optind, opterr, optopt;
+int debug;
 struct node *tree, *root8, *root16, *root32;
 struct chunk *tab_chunk;
 struct peer remote_peer;
@@ -40,7 +70,7 @@ int order2 (uint32_t val)
 		}
 	}
 
-	if (bits > 1) o++;		// jesli poza calkiem lewym bitem sa na prawo od niego inne bity - zwieksz rzad wielkosci zwracanej w return
+	if (bits > 1) o++;	/* increase order of the "val" if there are other bits on the right side of the most important bit */
 
 	return o;
 }
@@ -59,21 +89,21 @@ struct node * build_tree (int num_chunks, struct node **ret)
 	int left, right, parent, root_idx;
 	struct node *rot, *tt;
 
-	printf("num_chunks: %u\n", num_chunks);
+	d_printf("num_chunks: %u\n", num_chunks);
 
 	h = order2(num_chunks);							/* "h" - height of the tree */
 	nc = 1 << h;								/* if there are for example only 7 chunks - create tree with 8 leaves */
-	printf("order2(%u): %u\n", num_chunks, h);
-	printf("num_chunks(orig): %u  after_correction: %u\n", num_chunks, nc);
+	d_printf("order2(%u): %u\n", num_chunks, h);
+	d_printf("num_chunks(orig): %u  after_correction: %u\n", num_chunks, nc);
 
 	/* list the tree */
 #if 1
 	for (l = 1; l <= h + 1; l++) {		/* goes level by level from bottom up to highest level */
 		first_idx = (1 << (l - 1)) -1;  /* first index on the given level starting from left: 0, 1, 3, 7, 15, etc */
 		for (si = first_idx; si < 2 * nc; si += (1 << l)) {   /* si - sibling index */
-			printf("%u ", si);
+			d_printf("%u ", si);
 		}
-		printf("\n");
+		d_printf("%s", "\n");
 	}
 #endif
 
@@ -88,7 +118,7 @@ struct node * build_tree (int num_chunks, struct node **ret)
 		tt[x].state = INITIALIZED;
 	}
 
-	printf("\nbuilding tree - linking nodes\n\n");
+	d_printf("%s", "\nbuilding tree - linking nodes\n\n");
 	/* build the tree by linking nodes */
 	for (l = 1; l <= h; l++) {
 		first_idx = (1 << (l - 1)) -1;
@@ -96,20 +126,20 @@ struct node * build_tree (int num_chunks, struct node **ret)
 			left = si;
 			right = (si | (1 << l));
 			parent = (left + right) / 2;
-			/* printf("pair %u-%u will have parent: %u\n", left, right, parent); */
+			/* d_printf("pair %u-%u will have parent: %u\n", left, right, parent); */
 			tt[left].parent = &tt[parent];			/* parent for left node */
 			tt[right].parent = &tt[parent];			/* parent for right node */
 
 			tt[parent].left = &tt[left];			/* left child of the parent */
 			tt[parent].right = &tt[right];			/* right child of the parent */
 		}
-		/* printf("\n"); */
+		/* d_printf("%s", "\n"); */
 	}
 
 	*ret = tt;							/* return just created tree */
 
 	root_idx = (1 << h) - 1;
-	printf("root node: %u\n", root_idx);
+	d_printf("root node: %u\n", root_idx);
 
 	rot = &tt[root_idx];
 	return rot;
@@ -132,22 +162,22 @@ struct node * extend_tree (struct node *orig_tree, int orig_num_chunks, struct n
 	struct node *rot, *tt;
 	struct node min, max;
 
-	printf("extending tree - num_chunks: %u => %u\n", orig_num_chunks, orig_num_chunks * 2);
+	d_printf("extending tree - num_chunks: %u => %u\n", orig_num_chunks, orig_num_chunks * 2);
 
 	h = order2(orig_num_chunks);
 	nc = 1 << h;
-	printf("order2(%u): %u\n", orig_num_chunks, h);
-	printf("num_chunks(orig): %u  after_correction: %u\n", orig_num_chunks, nc);
+	d_printf("order2(%u): %u\n", orig_num_chunks, h);
+	d_printf("num_chunks(orig): %u  after_correction: %u\n", orig_num_chunks, nc);
 
 
-// ok to dobrze listuje drzewko (tylko listuje)
+	/* list the tree */
 #if 0
-	for (l = 1; l <= h + 1; l++) {		// idz po poziomach drzewa od dolu- "l" level
-		first_idx = (1 << (l - 1)) -1;  // pierwszy index na danym poziomie od lewej: 0, 1, 3, 7, 15, etc
-		for (si = first_idx; si < 2 * nc; si += (1 << l)) {   //si - sibling index
-			printf("%u ", si);
+	for (l = 1; l <= h + 1; l++) {		/* go through levels of the tree starting from bottom */
+		first_idx = (1 << (l - 1)) -1;  /* first index to show on given level: 0, 1, 3, 7, 15 */
+		for (si = first_idx; si < 2 * nc; si += (1 << l)) {	/* si - sibling index */
+			d_printf("%u ", si);
 		}
-		printf("\n");
+		d_printf("%s", "\n");
 	}
 #endif
 
@@ -206,7 +236,7 @@ struct node * extend_tree (struct node *orig_tree, int orig_num_chunks, struct n
 
 	free(orig_tree);
 
-	printf("extend root node: %u  %u\n", root_idx, tt[root_idx].number);
+	d_printf("extend root node: %u  %u\n", root_idx, tt[root_idx].number);
 
 	rot = &tt[root_idx];
 	return rot;
@@ -228,17 +258,17 @@ void show_tree_root_based (struct node *t)
 	int center, iw, m, sp, is;
 	struct node min, max;
 
-	printf("print the tree starting from root node: %u\n", t->number);
+	d_printf("print the tree starting from root node: %u\n", t->number);
 
 	ti = t->number;
 	interval_min_max(t, &min, &max);
-	printf("min: %u   max: %u\n", min.number, max.number);
+	d_printf("min: %u   max: %u\n", min.number, max.number);
 	nl = (max.number - min.number) / 2 + 1;		/* number of leaves in given subtree */
 	h = order2(nl) + 1;
 
 	first_idx = ti;
 
-	printf("\n\n");
+	d_printf("%s", "\n\n");
 
 	/* justification */
 #if 1
@@ -249,14 +279,14 @@ void show_tree_root_based (struct node *t)
 		is = 1 << l;			/* how many spaces has to be inserted between values on given level */
 		iw = 1 << (h - l);		/* number of nodes to print on given level */
 		m = iw * (2 + is) - is;		/*  */
-		//printf("center: %u  iw: %u  m: %u  is: %u\n", center, iw, m, is);
-		for (sp = 0; sp < (center - m/2); sp++) printf(" ");			/* insert (center - m/2) spaces first */
+		/* d_printf("center: %u  iw: %u  m: %u  is: %u\n", center, iw, m, is); */
+		for (sp = 0; sp < (center - m/2); sp++) d_printf("%s", " ");			/* insert (center - m/2) spaces first */
 		for (si = first_idx; si <= max.number; si += (1 << l)) {
-			printf("%2u", si);
-			for (sp = 0; sp < is; sp++) printf(" ");			/* add a few spaces */
+			d_printf("%2u", si);
+			for (sp = 0; sp < is; sp++) d_printf("%s", " ");			/* add a few spaces */
 		}
 		first_idx -= (1 << (l - 2));
-		printf("\n");
+		d_printf("%s", "\n");
 	}
 #endif
 }
@@ -281,15 +311,16 @@ struct node * find_uncle (struct node *t, struct node *n)
 	if (p == gp->left)		/* if parent is left child of grandparent - then uncle is right child of the grandparent */
 		u = gp->right;
 
-	printf("node: %u   parent: %u  grandparent: %u  uncle: %u\n", n->number, p->number, gp->number, u->number);
+	d_printf("node: %u   parent: %u  grandparent: %u  uncle: %u\n", n->number, p->number, gp->number, u->number);
 
 	return u;
 }
 
 
-// metoda iteracyjna (a nie rekurencyjna)
-// znajduje minimalny i maxymalny index - schodzac calkiem w lewo w dol od korzenia i calekiem w prawo
-// ta proc chyba nie jest juz potrzebna
+/*
+ * looks for min and max index going through the tree - extremely left and right
+ *
+ */
 void list_interval (struct node *i)
 {
 	struct node *c, *min, *max;
@@ -306,7 +337,7 @@ void list_interval (struct node *i)
 	}
 	max = c;
 
-	printf("root: %u  interval  min: %u  max: %u\n", i->number, min->number, max->number);
+	d_printf("root: %u  interval  min: %u  max: %u\n", i->number, min->number, max->number);
 }
 
 
@@ -329,7 +360,7 @@ void interval_min_max (struct node *i, struct node *min, struct node *max)
 
 	memcpy(max, c, sizeof(struct node));
 
-	printf("root: %u  interval  min: %u  max: %u\n", i->number, min->number, max->number);
+	d_printf("root: %u  interval  min: %u  max: %u\n", i->number, min->number, max->number);
 }
 
 
@@ -345,14 +376,14 @@ void dump_tree (struct node *t, int l)
 	int x, y, s;
 
 	memset(shas, 0, sizeof(shas));
-	printf("dump tree\n");
+	d_printf("%s", "dump tree\n");
 	for (x = 0; x < 2 * l; x++) {
 		s = 0;
 		for (y = 0; y < 20; y++)
 			s += sprintf(shas + s, "%02x", t[x].sha[y] & 0xff);
-		printf("[%3u]  %u  %s\n", t[x].number, t[x].state, shas);
+		d_printf("[%3u]  %u  %s\n", t[x].number, t[x].state, shas);
 	}
-	printf("\n");
+	d_printf("%s", "\n");
 }
 
 
@@ -368,14 +399,14 @@ void dump_chunk_tab (struct chunk *c, int l)
 	char buf[40 + 1];
 	int x, y, s;
 
-	printf("%s l: %u\n", __func__, l);
+	d_printf("%s l: %u\n", __func__, l);
 	for (x = 0; x < l; x++) {
 		s = 0;
 		for (y = 0; y < 20; y++) {
 			s += sprintf(buf + s, "%02x", c[x].sha[y] & 0xff);
 		}
 		buf[40] = '\0';
-		printf("chunk[%3u]  off: %8lu  len: %8u  sha: %s  state: %s\n", x, c[x].offset, c[x].len, buf, c[x].state == CH_EMPTY ? "EMPTY" : "ACTIVE" );
+		d_printf("chunk[%3u]  off: %8lu  len: %8u  sha: %s  state: %s\n", x, c[x].offset, c[x].len, buf, c[x].state == CH_EMPTY ? "EMPTY" : "ACTIVE" );
 	}
 }
 
@@ -388,7 +419,7 @@ void update_sha (struct node *t, int num_chunks)
 	int h, nc, l, si, first_idx, y, s, left, right, parent;
 	SHA1Context context;
 
-	printf("%s\n", __func__);
+	d_printf("%s\n", __func__);
 
 	h = order2(num_chunks);							/* "h" - height of the tree */
 	nc = 1 << h;
@@ -405,17 +436,17 @@ void update_sha (struct node *t, int num_chunks)
 			for (y = 0; y < 20; y++)
 				s += sprintf(sha_left + s, "%02x", t[left].sha[y] & 0xff);
 			sha_left[40] = '\0';
-			//printf(" l: %s\n", sha_left);
+			/* d_printf(" l: %s\n", sha_left); */
 
 			/* generate ASCII SHA for right node */
 			s = 0;
 			for (y = 0; y < 20; y++)
 				s += sprintf(sha_right + s, "%02x", t[right].sha[y] & 0xff);
-			//printf(" r: %s\n", sha_right);
+			/* d_printf(" r: %s\n", sha_right); */
 			sha_right[40] = '\0';
 
 			snprintf((char *)concat, sizeof(concat), "%s%s", sha_left, sha_right);
-			//printf(" +: %s\n", concat);
+			/* d_printf(" +: %s\n", concat); */
 
 			/* calculate SHA1 for concatenated string of both SHA (left and right) */
 			SHA1Reset(&context);
@@ -429,32 +460,46 @@ void update_sha (struct node *t, int num_chunks)
 			s = 0;
 			for (y = 0; y < 20; y++)
 				s += sprintf(sha_parent + s, "%02x", digest[y] & 0xff);
-			//printf(" p: %s\n", sha_parent);
+			/* d_printf(" p: %s\n", sha_parent); */
 			sha_parent[40] = '\0';
 
 			t[parent].state = ACTIVE;
 		}
-		printf("\n");
+		d_printf("%s", "\n");
 	}
 }
 
 
 int main (int argc, char *argv[])
 {
-	char *fname1, *fname, *fname2, *buf;
+	char *fname1, *fname, *fname2, *buf, usage;
 	unsigned char digest[20 + 1];
-	int fd, r, opt, chunk_size;
+	int fd, r, opt, chunk_size, type;
 	uint64_t x, nc, nl, c ,rd;
 	struct stat stat;
 	SHA1Context context;
-	struct node *ret, *ret2;
+	struct node *ret;
+	struct in_addr ia;
 
 	chunk_size = 1024;
 	fname = NULL;
-	while ((opt = getopt(argc, argv, "f:s:")) != -1) {
+	debug = 0;
+	usage = 0;
+	ia.s_addr = -1;
+	type = LEECHER;
+	while ((opt = getopt(argc, argv, "a:df:hs:")) != -1) {
 		switch (opt) {
+			case 'a':				/* remote address of seeder */
+				(void) inet_aton(optarg, &ia);
+				break;
+			case 'd':				/* debug */
+				debug = 1;
+				break;
 			case 'f':				/* filename */
 				fname1 = optarg;
+				break;
+			case 'h':				/* help/usage */
+				usage = 1;
 				break;
 			case 's':				/* chunk size [bytes] */
 				chunk_size = atoi(optarg);
@@ -464,11 +509,39 @@ int main (int argc, char *argv[])
 		}
 	}
 
-	if (fname1 != NULL) {
-		fname2 = strdup(fname1);
-		fname = basename(fname2);		/* skip any "./" */
+
+	if (usage) {
+		printf("Peer-to-Peer Streaming Peer Protocol proof of concept\n");
+		printf("usage:\n");
+		printf("%s: -adfhs\n", argv[0]);
+		printf("-a ip_address:	numeric IP address of the remote SEEDER\n");
+		printf("		example: -a 192.168.1.1\n");
+		printf("-d:		enables debug mode\n");
+		printf("-f filename:	filename of the file for sharing\n");
+		printf("		enables SEEDER mode\n");
+		printf("		example: -f ./filename\n");
+		printf("-h:		this help\n");
+		printf("-s:		chunk size valid only on the SEEDER side\n");
+		printf("		example: -s 1024\n");
+		exit(0);
 	}
 
+	if (fname1 != NULL) {
+		type = SEEDER;
+		fname2 = strdup(fname1);
+		fname = basename(fname2);		/* skip any "./" and other directory parts */
+	}
+
+	if (type == LEECHER) {
+		if (ia.s_addr == -1) {
+			printf("Error: in LEECHER mode '-a' parameter is obligatory\n");
+			exit(1);
+		}
+	}
+
+
+
+#if 0
 	root8 = build_tree(8, &ret);			/* 8 - number of leaves */
 	ret2 = ret;
 
@@ -480,27 +553,31 @@ int main (int argc, char *argv[])
 
 	root32 = extend_tree(ret2, 32, &ret);		/* 32 => 64 */
 	ret2 = ret;
+#endif
 
 #if 0
 	u = find_uncle(root, tab_tree[9]);		/* uncle: 3 */
 	if (u == NULL)
-		printf("no uncle\n");
+		d_printf("%s", "no uncle\n");
 #endif
 
+#if 0
 	list_interval(&ret[7]);				/* starting from 7 - should be: 0-30 */
 
 	show_tree_root_based(&ret[7]);
 	show_tree_root_based(&ret[15]);
+
+#endif
 
 #if 0
 	x = 0;
 	size = 64;
 	while ((x < 30) && (size < 33554432)) {
 		ret2 = ret;
-		printf("\n\n\nsize: %u\n", size);
+		d_printf("\n\n\nsize: %u\n", size);
 		root32 = extend_tree(ret2, size, &ret);		/* 32 => 64,  64 => 128, etc*/
-		printf("root32: %u\n", root32->number);
-		//show_tree_root_based(root32);
+		d_printf("root32: %u\n", root32->number);
+		/* show_tree_root_based(root32); */
 		size *= 2;
 		getc(stdin);
 		x++;
@@ -508,10 +585,12 @@ int main (int argc, char *argv[])
 #endif
 
 	/* example of computing SHA1 for given file */
-	if (fname != NULL) {
+	if (type == SEEDER) {
+		printf("Please wait... \n");
+
 		fd = open(fname, O_RDONLY);
 		if (fd < 0) {
-			printf("error opening file1: %s\n", fname);
+			d_printf("error opening file1: %s\n", fname);
 			exit(1);
 		}
 		fstat(fd, &stat);
@@ -521,7 +600,7 @@ int main (int argc, char *argv[])
 		nc = stat.st_size / chunk_size;
 		if ((stat.st_size - stat.st_size / chunk_size * chunk_size) > 0)
 			nc++;
-		printf("ilosc chunkow [%u]: %lu\n", chunk_size, nc);
+		d_printf("ilosc chunkow [%u]: %lu\n", chunk_size, nc);
 
 		/* compute number of leaves - it is not the same as numbe of chunks */
 		nl = 1 << (order2(nc));
@@ -591,6 +670,7 @@ int main (int argc, char *argv[])
 		memset(remote_peer.fname, 0, sizeof(remote_peer.fname));
 		remote_peer.fname_len = 0;
 		remote_peer.file_size = 0;
+		memcpy(&remote_peer.seeder_addr, &ia, sizeof(struct in_addr));
 
 		proto_test(&remote_peer);
 	}

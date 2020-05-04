@@ -24,13 +24,12 @@
  */
 
 
-#ifndef _NET_H_
-#define _NET_H_
+#ifndef _DEBUG_H_
+#define _DEBUG_H_
 
-#include "mt.h"
-#include "peer.h"
+extern int debug;
 
-int net_seeder(struct peer *);
-int net_leecher(struct peer *);
+#define _assert(cond, format, ...) if (!(cond)) { printf("*** %s:%u %s() [%u] Assertion failed: " format, __FILE__, __LINE__, __func__, getpid(), __VA_ARGS__); abort(); }
+#define d_printf(format, ...) if (debug > 0) { printf(format, __VA_ARGS__); }
 
 #endif
