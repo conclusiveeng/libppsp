@@ -1,12 +1,14 @@
+CC = gcc
+#CFLAGS = -pthread -Wall -Wextra -ggdb3 -std=c11 -D_DEFAULT_SOURCE
+CFLAGS = -pthread -Wall -ggdb3 -std=c11 -D_DEFAULT_SOURCE
 
+all: ppspp
 
-CFLAGS = -pthread -Wall
-#CFLAGS = -pthread
+%.o: %.c %.h
+	$(CC) $< -o $@ -c $(CFLAGS)
 
-all: mt
-
-mt: mt.c sha1.c ppspp_protocol.c net.c peer.c
-	$(CC) $^ -o $@ -ggdb3 $(CFLAGS)
+ppspp: mt.o sha1.o ppspp_protocol.o net.o peer.o
+	$(CC) $^ -o $@ $(CFLAGS)
 
 clean:
-	rm mt
+	rm -f ppspp *.o

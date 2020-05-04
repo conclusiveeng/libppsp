@@ -15,16 +15,9 @@
 
 extern char *optarg;
 extern int optind, opterr, optopt;
-
 struct node *tree, *root8, *root16, *root32;
-struct node **tab_tree8;
 struct chunk *tab_chunk;
 struct peer remote_peer;
-
-
-
-
-
 
 
 /*
@@ -46,14 +39,11 @@ int order2 (uint32_t val)
 			bits++;
 		}
 	}
-	
+
 	if (bits > 1) o++;		// jesli poza calkiem lewym bitem sa na prawo od niego inne bity - zwieksz rzad wielkosci zwracanej w return
 
 	return o;
 }
-
-
-
 
 
 /*
@@ -61,23 +51,21 @@ int order2 (uint32_t val)
  * returns:
  * 	pointer to root node of the new created tree
  * 	as "**ret" parameter - pointer to new created tree - 0 index of the leaf
- * 
+ *
  */
 struct node * build_tree (int num_chunks, struct node **ret)
 {
 	int x, l, si, h, first_idx, nc;
 	int left, right, parent, root_idx;
 	struct node *rot, *tt;
-	
+
 	printf("num_chunks: %u\n", num_chunks);
 
 	h = order2(num_chunks);							/* "h" - height of the tree */
 	nc = 1 << h;								/* if there are for example only 7 chunks - create tree with 8 leaves */
 	printf("order2(%u): %u\n", num_chunks, h);
 	printf("num_chunks(orig): %u  after_correction: %u\n", num_chunks, nc);
-	
 
-	
 	/* list the tree */
 #if 1
 	for (l = 1; l <= h + 1; l++) {		/* goes level by level from bottom up to highest level */
@@ -87,13 +75,11 @@ struct node * build_tree (int num_chunks, struct node **ret)
 		}
 		printf("\n");
 	}
-#endif	
-	
-	
-	
+#endif
+
 	/* allocate array of "struct node" */
 	tt = malloc(2 * nc * sizeof(struct node));
-	
+
 	/* initialize array of struct node */
 	for (x = 0; x < 2 * nc; x++) {
 		tt[x].number = x;
@@ -101,12 +87,11 @@ struct node * build_tree (int num_chunks, struct node **ret)
 		tt[x].left = tt[x].right = tt[x].parent = NULL;
 		tt[x].state = INITIALIZED;
 	}
-	
-	
+
 	printf("\nbuilding tree - linking nodes\n\n");
 	/* build the tree by linking nodes */
 	for (l = 1; l <= h; l++) {
-		first_idx = (1 << (l - 1)) -1; 
+		first_idx = (1 << (l - 1)) -1;
 		for (si = first_idx; si < 2 * nc; si += (2 << l)) {
 			left = si;
 			right = (si | (1 << l));
@@ -114,27 +99,21 @@ struct node * build_tree (int num_chunks, struct node **ret)
 			/* printf("pair %u-%u will have parent: %u\n", left, right, parent); */
 			tt[left].parent = &tt[parent];			/* parent for left node */
 			tt[right].parent = &tt[parent];			/* parent for right node */
-			
+
 			tt[parent].left = &tt[left];			/* left child of the parent */
 			tt[parent].right = &tt[right];			/* right child of the parent */
 		}
 		/* printf("\n"); */
 	}
-	
-	
+
 	*ret = tt;							/* return just created tree */
-	
+
 	root_idx = (1 << h) - 1;
 	printf("root node: %u\n", root_idx);
-	
+
 	rot = &tt[root_idx];
 	return rot;
-	
 }
-
-
-
-
 
 
 /*
@@ -147,21 +126,19 @@ struct node * build_tree (int num_chunks, struct node **ret)
  */
 struct node * extend_tree (struct node *orig_tree, int orig_num_chunks, struct node **ret)
 {
-	int x, l, si, h, first_idx, nc, nn;
+	int x, l, si, h, first_idx, nc;
 	int left, right, parent, root_idx;
-	struct node *rot, *tt;
 	int root_idx_012, root_idx_456;
+	struct node *rot, *tt;
 	struct node min, max;
 
-
 	printf("extending tree - num_chunks: %u => %u\n", orig_num_chunks, orig_num_chunks * 2);
-
 
 	h = order2(orig_num_chunks);
 	nc = 1 << h;
 	printf("order2(%u): %u\n", orig_num_chunks, h);
 	printf("num_chunks(orig): %u  after_correction: %u\n", orig_num_chunks, nc);
-	
+
 
 // ok to dobrze listuje drzewko (tylko listuje)
 #if 0
@@ -172,14 +149,11 @@ struct node * extend_tree (struct node *orig_tree, int orig_num_chunks, struct n
 		}
 		printf("\n");
 	}
-#endif	
-	
-	
-	
+#endif
+
 	/* allocate array of nodes for the new tree (2 times more of the leaves than original tree */
 	tt = malloc(2 * 2 * nc * sizeof(struct node));
 	*ret = tt;			/* return pointer to index [0] of the new tree */
-	
 
 	/* initialize the nodes of the new tree */
 #if 1
@@ -189,24 +163,19 @@ struct node * extend_tree (struct node *orig_tree, int orig_num_chunks, struct n
 			tt[x].left = tt[x].right = tt[x].parent = NULL;
 			tt[x].state = INITIALIZED;
 	}
-#endif	
-	
-	
+#endif
+
 	/* copy SHA hashes of the original tree */
 	for (x = 0; x < nc; x++)
 		memcpy(tt[x].sha, orig_tree[x].sha, 20);
-
-
 
 	/* compute height and number of leaves for the new created tree */
 	h++;
 	nc = 2 * nc;
 
-	
 	/* find extreme left and right nodes for old tree */
 	interval_min_max(&orig_tree[(1 << (h - 1)) - 1], &min, &max);		/* for example: 0-14 */
 
-	
 	/* linking nodes */
 	for (l = 1; l <= h; l++) {
 		first_idx = (1 << (l - 1)) -1;
@@ -221,17 +190,15 @@ struct node * extend_tree (struct node *orig_tree, int orig_num_chunks, struct n
 		}
 	}
 
-
-	
 	/* link both trees */
 	root_idx_012 = (1 << (h - 1)) - 1;
 	root_idx_456 = root_idx_012 + (1 << h);
 
 	root_idx = (1 << h) - 1;
-	
+
 	tt[root_idx_012].parent = &tt[root_idx];			/* parent for left node */
 	tt[root_idx_456].parent = &tt[root_idx];			/* parent for right node */
-	
+
 	tt[root_idx].left = &tt[root_idx_012];				/* left child of the parent */
 	tt[root_idx].right = &tt[root_idx_456];				/* right child of the parent */
 
@@ -240,16 +207,10 @@ struct node * extend_tree (struct node *orig_tree, int orig_num_chunks, struct n
 	free(orig_tree);
 
 	printf("extend root node: %u  %u\n", root_idx, tt[root_idx].number);
-	
+
 	rot = &tt[root_idx];
 	return rot;
 }
-
-
-
-
-
-
 
 
 int update_chunk (struct node *t, unsigned int cn, struct chunk *c)
@@ -258,24 +219,21 @@ int update_chunk (struct node *t, unsigned int cn, struct chunk *c)
 }
 
 
-
-
 /*
  * print tree - root node at top, leaves at bottom
  */
 void show_tree_root_based (struct node *t)
 {
-	int l, si, nl, h, nn, ti, first_idx;
-	struct node min, max;
+	int l, si, nl, h, ti, first_idx;
 	int center, iw, m, sp, is;
-	
+	struct node min, max;
+
 	printf("print the tree starting from root node: %u\n", t->number);
-	
+
 	ti = t->number;
 	interval_min_max(t, &min, &max);
 	printf("min: %u   max: %u\n", min.number, max.number);
 	nl = (max.number - min.number) / 2 + 1;		/* number of leaves in given subtree */
-	nn = max.number - min.number + 1;		/* number of nodes in subtree */
 	h = order2(nl) + 1;
 
 	first_idx = ti;
@@ -284,9 +242,8 @@ void show_tree_root_based (struct node *t)
 
 	/* justification */
 #if 1
-	
 	first_idx = ti;
-	
+
 	center = (nl * (2 + 2)) / 2;
 	for (l = h; l >= 1; l--) {
 		is = 1 << l;			/* how many spaces has to be inserted between values on given level */
@@ -302,9 +259,7 @@ void show_tree_root_based (struct node *t)
 		printf("\n");
 	}
 #endif
-
 }
-
 
 
 /*
@@ -325,12 +280,11 @@ struct node * find_uncle (struct node *t, struct node *n)
 		u = gp->left;
 	if (p == gp->left)		/* if parent is left child of grandparent - then uncle is right child of the grandparent */
 		u = gp->right;
-	
+
 	printf("node: %u   parent: %u  grandparent: %u  uncle: %u\n", n->number, p->number, gp->number, u->number);
-	
+
 	return u;
 }
-
 
 
 // metoda iteracyjna (a nie rekurencyjna)
@@ -345,14 +299,12 @@ void list_interval (struct node *i)
 		c = c->left;
 	}
 	min = c;
-	
 
 	c = i;
 	while (c->right != NULL) {
 		c = c->right;
 	}
 	max = c;
-
 
 	printf("root: %u  interval  min: %u  max: %u\n", i->number, min->number, max->number);
 }
@@ -370,17 +322,15 @@ void interval_min_max (struct node *i, struct node *min, struct node *max)
 		c = c->left;
 
 	memcpy(min, c, sizeof(struct node));
-	
+
 	c = i;
 	while (c->right != NULL)
 		c = c->right;
 
 	memcpy(max, c, sizeof(struct node));
 
-	
 	printf("root: %u  interval  min: %u  max: %u\n", i->number, min->number, max->number);
 }
-
 
 
 /*
@@ -391,9 +341,9 @@ void interval_min_max (struct node *i, struct node *min, struct node *max)
  */
 void dump_tree (struct node *t, int l)
 {
+	char shas[40 + 1];
 	int x, y, s;
-	char shas[40 + 1];	
-	
+
 	memset(shas, 0, sizeof(shas));
 	printf("dump tree\n");
 	for (x = 0; x < 2 * l; x++) {
@@ -406,49 +356,43 @@ void dump_tree (struct node *t, int l)
 }
 
 
-
 /*
  * dump array of chunks
  * in params:
  * 	t - pointer to array of tree
  * 	l - number of leaves
- * 
+ *
  */
 void dump_chunk_tab (struct chunk *c, int l)
 {
-	int x, y, s;
 	char buf[40 + 1];
-	
-	printf("%s l: %u\n", __FUNCTION__, l);
+	int x, y, s;
+
+	printf("%s l: %u\n", __func__, l);
 	for (x = 0; x < l; x++) {
 		s = 0;
 		for (y = 0; y < 20; y++) {
 			s += sprintf(buf + s, "%02x", c[x].sha[y] & 0xff);
 		}
 		buf[40] = '\0';
-		printf("chunk[%3u]  off: %8lu  len: %8lu  sha: %s  state: %s\n", x, c[x].offset, c[x].len, buf, c[x].state == CH_EMPTY ? "EMPTY" : "ACTIVE" );
-		
+		printf("chunk[%3u]  off: %8lu  len: %8u  sha: %s  state: %s\n", x, c[x].offset, c[x].len, buf, c[x].state == CH_EMPTY ? "EMPTY" : "ACTIVE" );
 	}
 }
 
 
-
-
 void update_sha (struct node *t, int num_chunks)
 {
-	int h, nc, l, si, first_idx, y, s;
-	int left, right, parent;
 	char sha_left[40 + 1], sha_right[40 + 1], sha_parent[40 + 1];
 	uint8_t concat[80 + 1];
-	SHA1Context context;
 	unsigned char digest[20 + 1];
+	int h, nc, l, si, first_idx, y, s, left, right, parent;
+	SHA1Context context;
 
-	
-	printf("%s\n", __FUNCTION__);
+	printf("%s\n", __func__);
 
 	h = order2(num_chunks);							/* "h" - height of the tree */
 	nc = 1 << h;
-	
+
 	for (l = 1; l <= h; l++) {		/* go through levels of the tree starting from bottom of the tree */
 		first_idx = (1 << (l - 1)) -1;  /* first index on given level starting from left: 0, 1, 3, 7, 15, etc */
 		for (si = first_idx; si < 2 * nc; si += (2 << l)) {   /* si - sibling index */
@@ -462,32 +406,32 @@ void update_sha (struct node *t, int num_chunks)
 				s += sprintf(sha_left + s, "%02x", t[left].sha[y] & 0xff);
 			sha_left[40] = '\0';
 			//printf(" l: %s\n", sha_left);
-			
+
 			/* generate ASCII SHA for right node */
 			s = 0;
 			for (y = 0; y < 20; y++)
 				s += sprintf(sha_right + s, "%02x", t[right].sha[y] & 0xff);
 			//printf(" r: %s\n", sha_right);
 			sha_right[40] = '\0';
-			
-			sprintf((char *)concat, "%s%s", sha_left, sha_right);
+
+			snprintf((char *)concat, sizeof(concat), "%s%s", sha_left, sha_right);
 			//printf(" +: %s\n", concat);
 
 			/* calculate SHA1 for concatenated string of both SHA (left and right) */
 			SHA1Reset(&context);
-			SHA1Input(&context, concat, 40);
+			SHA1Input(&context, concat, 80);
 			SHA1Result(&context, digest);
 
 			/* copy generated SHA hash to parent node */
 			memcpy(t[parent].sha, digest, 20);
-			
+
 			/* generate ASCII SHA for parent node */
 			s = 0;
 			for (y = 0; y < 20; y++)
 				s += sprintf(sha_parent + s, "%02x", digest[y] & 0xff);
 			//printf(" p: %s\n", sha_parent);
 			sha_parent[40] = '\0';
-			
+
 			t[parent].state = ACTIVE;
 		}
 		printf("\n");
@@ -495,25 +439,16 @@ void update_sha (struct node *t, int num_chunks)
 }
 
 
-
-
-
 int main (int argc, char *argv[])
 {
-	struct chunk *c0, *c1;
-	struct chunk *tab[4];
-	struct node *ret, *ret2;
-	int fd, r;
-	uint64_t x, nc, nl, c;
-	char *fname1, *fname, *fname2;
+	char *fname1, *fname, *fname2, *buf;
+	unsigned char digest[20 + 1];
+	int fd, r, opt, chunk_size;
+	uint64_t x, nc, nl, c ,rd;
 	struct stat stat;
 	SHA1Context context;
-	unsigned char digest[20 + 1];
-	uint64_t rd;
-	char *buf;
-	int opt, chunk_size;
-	
-	
+	struct node *ret, *ret2;
+
 	chunk_size = 1024;
 	fname = NULL;
 	while ((opt = getopt(argc, argv, "f:s:")) != -1) {
@@ -524,18 +459,16 @@ int main (int argc, char *argv[])
 			case 's':				/* chunk size [bytes] */
 				chunk_size = atoi(optarg);
 				break;
-
 			default:
 				break;
 		}
 	}
-	
+
 	if (fname1 != NULL) {
 		fname2 = strdup(fname1);
 		fname = basename(fname2);		/* skip any "./" */
 	}
-	
-	
+
 	root8 = build_tree(8, &ret);			/* 8 - number of leaves */
 	ret2 = ret;
 
@@ -545,35 +478,19 @@ int main (int argc, char *argv[])
 	root32 = extend_tree(ret2, 16, &ret);		/* extend array: 16 => 32 */
 	ret2 = ret;
 
-	root32 = extend_tree(ret2, 32, &ret);		// 32 => 64
+	root32 = extend_tree(ret2, 32, &ret);		/* 32 => 64 */
 	ret2 = ret;
 
-
-
-
-	
-	
-	
 #if 0
 	u = find_uncle(root, tab_tree[9]);		/* uncle: 3 */
 	if (u == NULL)
 		printf("no uncle\n");
-
 #endif
-	
-	
-	
 
 	list_interval(&ret[7]);				/* starting from 7 - should be: 0-30 */
-	
-	
+
 	show_tree_root_based(&ret[7]);
 	show_tree_root_based(&ret[15]);
-	
-	
-	
-	
-
 
 #if 0
 	x = 0;
@@ -589,49 +506,40 @@ int main (int argc, char *argv[])
 		x++;
 	}
 #endif
-	
-	
-	
-	
-	
-	
-	/* example of computing SHA1 for given file */	
+
+	/* example of computing SHA1 for given file */
 	if (fname != NULL) {
 		fd = open(fname, O_RDONLY);
 		if (fd < 0) {
 			printf("error opening file1: %s\n", fname);
-			//printf("error opening file: %s\n", argv[1]);
 			exit(1);
 		}
 		fstat(fd, &stat);
-		
+
 		buf = malloc(chunk_size);
 
 		nc = stat.st_size / chunk_size;
 		if ((stat.st_size - stat.st_size / chunk_size * chunk_size) > 0)
 			nc++;
 		printf("ilosc chunkow [%u]: %lu\n", chunk_size, nc);
-		
+
 		/* compute number of leaves - it is not the same as numbe of chunks */
 		nl = 1 << (order2(nc));
-		
-		
+
 		/* allocate array of chunks which will be linked to leaves later*/
 		tab_chunk = malloc(nl * sizeof(struct chunk));
 		memset(tab_chunk, 0, nl * sizeof(struct chunk));
-		
+
 		/* initialize array of chunks */
 		for (x = 0; x < nl; x++)
 			tab_chunk[x].state = CH_EMPTY;
 
-
 		root8 = build_tree(nc, &ret);
 
-		
 		/* compute SHA hash for every chunk form given file */
 		rd = 0;
 		c = 0;
-		while (rd < stat.st_size) {
+		while (rd < (uint64_t) stat.st_size) {
 			r = read(fd, buf, chunk_size);
 
 			SHA1Reset(&context);
@@ -649,63 +557,47 @@ int main (int argc, char *argv[])
 		}
 		close(fd);
 
-
-
 		/* link array of chunks to leaves */
 		for (x = 0; x < nl; x++) {
 			ret[x * 2].chunk = &tab_chunk[x];
 			tab_chunk[x].node = &ret[x * 2];
 		}
 
-		
 		/* print the tree for given file */
 		show_tree_root_based(&ret[root8->number]);
 
 		dump_chunk_tab(tab_chunk, nl);
-		
+
 		update_sha(ret, nl);
-		dump_tree(ret, nl);	
-		
-		
+		dump_tree(ret, nl);
+
 		remote_peer.tree = ret;
 		remote_peer.nl = nl;
 		remote_peer.nc = nc;
 		remote_peer.type = SEEDER;
-		remote_peer.handshake_req = NULL;
-		remote_peer.handshake_req_len = 0;
-		remote_peer.handshake_resp = NULL;
-		remote_peer.handshake_resp_len = 0;
 		remote_peer.start_chunk = 0;
 		remote_peer.end_chunk = nc - 1;
 		remote_peer.chunk_size = chunk_size;
-		
 		memcpy(remote_peer.fname, fname, strlen(fname));
 		remote_peer.fname_len = strlen(fname);
 		remote_peer.file_size = stat.st_size;
 
 		proto_test(&remote_peer);
-	} else { // leecher
+	} else { /* leecher */
 		remote_peer.tree = NULL;
 		remote_peer.nl = 0;
 		remote_peer.nc = 0;
 		remote_peer.type = LEECHER;
-		remote_peer.handshake_req = NULL;
-		remote_peer.handshake_req_len = 0;
-		remote_peer.handshake_resp = NULL;
-		remote_peer.handshake_resp_len = 0;
-
 		memset(remote_peer.fname, 0, sizeof(remote_peer.fname));
 		remote_peer.fname_len = 0;
 		remote_peer.file_size = 0;
-		
+
 		proto_test(&remote_peer);
 	}
 
-	
 	free(fname2);
 	free(buf);
 	free(tab_chunk);
-	
+
 	return 0;
 }
-

@@ -20,19 +20,19 @@ struct node {
 };
 
 
-int order2 (uint32_t val);
-struct node * build_tree (int num_chunks, struct node **ret);
-struct node * extend_tree (struct node *orig_tree, int num_chunks, struct node **ret);
-int update_chunk (struct node *t, unsigned int cn, struct chunk *c);
-void show_tree_root_based (struct node *t);
-struct node * find_uncle (struct node *t, struct node *n);
-void list_interval (struct node *i);
-void interval_min_max (struct node *i, struct node *min, struct node *max);
-void dump_tree (struct node *t, int l);
-void dump_tree_raw (struct node **t, int l);
-void dump_chunk_tab (struct chunk *c, int l);
-void verify_tree1 (struct node *t, int l);
-void verify_tree2 (struct node *t, struct node *array);
-void update_sha (struct node *t, int num_chunks);
+int order2 (uint32_t);
+struct node * build_tree (int, struct node **);
+struct node * extend_tree (struct node *, int, struct node **);
+int update_chunk (struct node *, unsigned int, struct chunk *);
+void show_tree_root_based (struct node *);
+struct node * find_uncle (struct node *, struct node *);
+void list_interval (struct node *);
+void interval_min_max (struct node *, struct node *, struct node *);
+void dump_tree (struct node *, int);
+void dump_tree_raw (struct node **, int);
+void dump_chunk_tab (struct chunk *, int);
+void verify_tree1 (struct node *, int);
+void verify_tree2 (struct node *, struct node *);
+void update_sha (struct node *, int);
 
 #endif
