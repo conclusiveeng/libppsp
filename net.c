@@ -63,7 +63,7 @@ sem_t * semaph_init (struct peer *p)
 
 	sem_unlink(p->sem_name);
 
-	sem = sem_open(p->sem_name, O_CREAT | O_RDWR, 0777, 0);		/* create semaphore initially locked */
+	sem = sem_open(p->sem_name, O_CREAT, 0777, 0);		/* create semaphore initially locked */
 	if (sem == SEM_FAILED) {
 		d_printf("sem_open error: %s\n", strerror(errno));
 		abort();

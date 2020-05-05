@@ -612,7 +612,7 @@ int main (int argc, char *argv[])
 		nc = stat.st_size / chunk_size;
 		if ((stat.st_size - stat.st_size / chunk_size * chunk_size) > 0)
 			nc++;
-		d_printf("ilosc chunkow [%u]: %lu\n", chunk_size, nc);
+		d_printf("number of chunks [%u]: %lu\n", chunk_size, nc);
 
 		/* compute number of leaves - it is not the same as numbe of chunks */
 		nl = 1 << (order2(nc));
