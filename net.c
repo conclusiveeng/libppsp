@@ -48,7 +48,6 @@
 
 #define BUFSIZE 1500
 #define PORT    6778
-#define FILE_DOWNLOAD "download"
 #define SEM_NAME "/ppspp"
 
 extern int h_errno;
@@ -392,7 +391,7 @@ int net_seeder(struct peer *seeder)
 					abort();
 				}
 
-				d_printf("new pthread created: %#lx\n", thread);
+				d_printf("new pthread created: %#lx\n", (uint64_t) thread);
 
 				p->thread = thread;
 				semaph_post(p->sem);	/* unlock initially locked semaphore */
@@ -543,9 +542,7 @@ int net_leecher(struct peer *peer)
 	data_buffer_len = peer->chunk_size + 4 + 1 + 4 + 4 + 8;
 	data_buffer = malloc(data_buffer_len);
 
-	/* concatenate phrase "download_" and downloading file to avoid overwriting original file */
-	snprintf(fname, sizeof(fname), "%s_%s", FILE_DOWNLOAD, peer->fname);
-
+	snprintf(fname, sizeof(fname), "%s", peer->fname);
 	unlink(fname);
 
 	fd = open(fname, O_WRONLY | O_CREAT, 0744);

@@ -30,6 +30,7 @@
 #include <netinet/in.h>
 #include <semaphore.h>
 #include <time.h>
+#include <stdint.h>
 
 struct peer {
 	enum { LEECHER, SEEDER } type;

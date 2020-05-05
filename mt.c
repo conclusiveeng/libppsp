@@ -476,7 +476,7 @@ int main (int argc, char *argv[])
 	unsigned char digest[20 + 1];
 	int fd, r, opt, chunk_size, type;
 	uint32_t timeout;
-	uint64_t x, nc, nl, c ,rd;
+	uint64_t x, nc, nl, c, rd;
 	struct stat stat;
 	SHA1Context context;
 	struct node *ret;

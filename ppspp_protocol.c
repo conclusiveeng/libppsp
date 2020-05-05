@@ -25,7 +25,12 @@
 
 #include <stdio.h>
 #include <string.h>
+#ifdef __FreeBSD__
+#include <sys/endian.h>
+#endif
+#ifdef __gnu_linux__
 #include <endian.h>
+#endif
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
