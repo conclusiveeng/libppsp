@@ -27,6 +27,8 @@
 #ifndef _DEBUG_H_
 #define _DEBUG_H_
 
+#include <unistd.h>
+
 extern int debug;
 
 #define _assert(cond, format, ...) if (!(cond)) { printf("*** %s:%u %s() [%u] Assertion failed: " format, __FILE__, __LINE__, __func__, getpid(), __VA_ARGS__); abort(); }

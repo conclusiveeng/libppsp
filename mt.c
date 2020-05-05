@@ -475,6 +475,7 @@ int main (int argc, char *argv[])
 	char *fname1, *fname, *fname2, *buf, usage;
 	unsigned char digest[20 + 1];
 	int fd, r, opt, chunk_size, type;
+	uint32_t timeout;
 	uint64_t x, nc, nl, c ,rd;
 	struct stat stat;
 	SHA1Context context;
@@ -487,7 +488,8 @@ int main (int argc, char *argv[])
 	usage = 0;
 	ia.s_addr = -1;
 	type = LEECHER;
-	while ((opt = getopt(argc, argv, "a:df:hs:")) != -1) {
+	timeout = 3 * 60;	/* 3 minutes timeout as default */
+	while ((opt = getopt(argc, argv, "a:df:hs:t:")) != -1) {
 		switch (opt) {
 			case 'a':				/* remote address of seeder */
 				(void) inet_aton(optarg, &ia);
@@ -504,8 +506,11 @@ int main (int argc, char *argv[])
 			case 's':				/* chunk size [bytes] */
 				chunk_size = atoi(optarg);
 				break;
-			default:
+			case 't':				/* timeout [seconds] */
+				timeout = atoi(optarg);
 				break;
+			default:
+				usage = 1;
 		}
 	}
 
@@ -513,7 +518,7 @@ int main (int argc, char *argv[])
 	if (usage) {
 		printf("Peer-to-Peer Streaming Peer Protocol proof of concept\n");
 		printf("usage:\n");
-		printf("%s: -adfhs\n", argv[0]);
+		printf("%s: -adfhst\n", argv[0]);
 		printf("-a ip_address:	numeric IP address of the remote SEEDER\n");
 		printf("		example: -a 192.168.1.1\n");
 		printf("-d:		enables debug mode\n");
@@ -521,8 +526,15 @@ int main (int argc, char *argv[])
 		printf("		enables SEEDER mode\n");
 		printf("		example: -f ./filename\n");
 		printf("-h:		this help\n");
-		printf("-s:		chunk size valid only on the SEEDER side\n");
+		printf("-s:		chunk size in bytes valid only on the SEEDER side, default: 1024 bytes\n");
 		printf("		example: -s 1024\n");
+		printf("-t:		timeout of network communication in seconds, valid only on SEEDER side, default: 180 seconds\n");
+		printf("		example: -t 10\n");
+		printf("\nInvocation examples:\n");
+		printf("SEEDER mode:\n");
+		printf("%s -f filename -s 1024\n\n", argv[0]);
+		printf("LEECHER mode:\n");
+		printf("%s -a 192.168.1.1\n\n", argv[0]);
 		exit(0);
 	}
 
@@ -586,7 +598,7 @@ int main (int argc, char *argv[])
 
 	/* example of computing SHA1 for given file */
 	if (type == SEEDER) {
-		printf("Please wait... \n");
+		printf("Processing data, please wait... \n");
 
 		fd = open(fname, O_RDONLY);
 		if (fd < 0) {
@@ -660,6 +672,7 @@ int main (int argc, char *argv[])
 		memcpy(remote_peer.fname, fname, strlen(fname));
 		remote_peer.fname_len = strlen(fname);
 		remote_peer.file_size = stat.st_size;
+		remote_peer.timeout = timeout;
 
 		proto_test(&remote_peer);
 	} else { /* leecher */
@@ -671,6 +684,7 @@ int main (int argc, char *argv[])
 		remote_peer.fname_len = 0;
 		remote_peer.file_size = 0;
 		memcpy(&remote_peer.seeder_addr, &ia, sizeof(struct in_addr));
+		remote_peer.timeout = timeout;
 
 		proto_test(&remote_peer);
 	}

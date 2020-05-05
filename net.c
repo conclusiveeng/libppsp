@@ -53,7 +53,7 @@
 
 extern int h_errno;
 struct peer peer_list_head = { .next = NULL };
-
+uint8_t remove_dead_peers;
 
 sem_t * semaph_init (struct peer *p)
 {
@@ -101,27 +101,6 @@ int semaph_wait (sem_t *sem)
 	return 0;
 }
 
-#if 0
-void * diagnostic (void *data)
-{
-	int x;
-	struct timespec ts;
-
-	while (1) {
-		d_printf("%s", "\n\n--------------------------------------------------DIAGNOSTICS--------------------------------------------\n\n");
-		d_printf("%s", "not active: ");
-		for (x = 0; x < num_threads; x++) {
-			clock_gettime(CLOCK_MONOTONIC, &ts);
-			if (ts.tv_sec - threads[x].peer->ts_last_recv.tv_sec > 1) {
-				d_printf("[%u] ", x);
-			}
-		}
-		d_printf("%s", "\n");
-		sleep(1);
-	}
-}
-#endif
-
 
 /* thread - seeder worker */
 void * seeder_worker (void *data)
@@ -133,6 +112,7 @@ void * seeder_worker (void *data)
 	char handshake_resp[256];
 	struct peer *p, *we;
 	struct proto_opt_str pos;
+	struct timespec ts;
 
 	clientlen = sizeof(struct sockaddr_in);
 	p = (struct peer *) data;			/* data of remote host (leecher) connecting to us (seeder)*/
@@ -194,6 +174,18 @@ void * seeder_worker (void *data)
 
 	while (p->finishing == 0) {
 		semaph_wait(p->sem);
+
+		/* check how long ago we received anything from LEECHER */
+		clock_gettime(CLOCK_MONOTONIC, &ts);
+		//printf("ptimeout: %u\n", p->seeder->timeout);
+		if (ts.tv_sec - p->ts_last_recv.tv_sec > p->seeder->timeout) {
+			d_printf("finishing thread due to timeout in communication: %#lx\n", (uint64_t)p);
+			p->finishing = 1;
+			p->to_remove = 1;	/* mark this particular peer to remove by GC */
+			remove_dead_peers = 1;	/* set global flag for removing dead peers by garbage collector */
+			semaph_post(p->sem);
+			continue;
+		}
 
 		if ((p->sm == SM_NONE) && (message_type(p->recv_buf) == HANDSHAKE) && (p->recv_len > 0))
 			p->sm = SM_HANDSHAKE_INIT;
@@ -280,8 +272,6 @@ void * seeder_worker (void *data)
 		}
 
 		if (p->sm == SM_DATA) {
-			clock_gettime(CLOCK_MONOTONIC, &p->ts_last_recv);
-
 			data_payload_len = make_data(data_payload, p);
 
 			_assert((uint32_t) data_payload_len <= we->chunk_size + 4 + 1 + 4 + 4 + 8, "%s but data_payload_len has value: %u and we->chunk_size: %u\n", "data_payload_len should be <= we->chunk_size", data_payload_len, we->chunk_size);
@@ -310,6 +300,8 @@ void * seeder_worker (void *data)
 		}
 
 		if (p->sm == SM_ACK) {
+			clock_gettime(CLOCK_MONOTONIC, &p->ts_last_recv);
+
 			dump_ack(p->recv_buf, p->recv_len, p);
 
 			p->curr_chunk++;
@@ -337,7 +329,6 @@ void * seeder_worker (void *data)
 int net_seeder(struct peer *seeder)
 {
 	int sockfd, portno, optval, n, st;
-	uint64_t cnt = 0;
 	char buf[BUFSIZE];
 	socklen_t clientlen;
 	struct sockaddr_in serveraddr;
@@ -364,11 +355,13 @@ int net_seeder(struct peer *seeder)
 		d_printf("%s", "ERROR on binding\n");
 
 	clientlen = sizeof(clientaddr);
-
-	/* diagnostic thread */
-	/* th_diag = pthread_create(&th_diag, NULL, &diagnostic, NULL); */
+	remove_dead_peers = 0;
 
 	while (1) {
+		/* invoke garbage collector */
+		if (remove_dead_peers == 1) 
+			cleanup_all_dead_peers(&peer_list_head);
+
 		memset(buf, 0, BUFSIZE);
 		n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &clientlen);
 		if (n < 0)
@@ -409,19 +402,7 @@ int net_seeder(struct peer *seeder)
 
 				p->finishing = 1;	/* set the flag for finishing the thread */
 
-				pthread_join(p->thread, NULL);
-				d_printf("---------pthread finished-----  cnt: %lu\n", cnt);
-
-				(void) remove_peer_from_list(&peer_list_head, p);
-
-				/* destroy the semaphore */
-				sem_unlink(p->sem_name);
-
-				/* free allocated memory */
-				free(p->recv_buf);
-				free(p->send_buf);
-				free(p);
-
+				cleanup_peer(p);
 				continue;
 			}
 		}
@@ -454,7 +435,7 @@ int net_seeder(struct peer *seeder)
 }
 
 
-/*UDP datagram client - LEECHER */
+/* UDP datagram client - LEECHER */
 int net_leecher(struct peer *peer)
 {
 	char buffer[BUFSIZE];

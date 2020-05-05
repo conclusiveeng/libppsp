@@ -48,6 +48,8 @@ struct peer {
 	uint8_t finishing;
 	pthread_t thread;
 
+	uint32_t timeout;
+
 	/* timestamp of last received and sent message */
 	struct timespec ts_last_recv, ts_last_send;
 
@@ -66,6 +68,7 @@ struct peer {
 	/* synchronization */
 	sem_t *sem;
 	char sem_name[64];
+	uint8_t to_remove;
 
 	uint32_t chunk_size;
 	uint32_t start_chunk;
@@ -79,10 +82,14 @@ struct peer {
 	struct peer *next;
 };
 
+extern struct peer peer_list_head;
+extern uint8_t remove_dead_peers;
 
 void add_peer_to_list (struct peer *, struct peer *);
 int remove_peer_from_list (struct peer *, struct peer *);
 struct peer * ip_port_to_peer (struct peer *, struct sockaddr_in *);
 struct peer * new_peer (struct sockaddr_in *, int, int);
+void cleanup_peer (struct peer *);
+void cleanup_all_dead_peers (struct peer *);
 
 #endif
