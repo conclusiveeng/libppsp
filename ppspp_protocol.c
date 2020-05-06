@@ -754,7 +754,7 @@ int dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 
 	/* calculate number of leaves */
 	peer->nl = 1 << order2(peer->nc);
-	d_printf("------------------nc: %u nl: %u\n", peer->nc, peer->nl);
+	d_printf("nc: %u nl: %u\n", peer->nc, peer->nl);
 
 	if (peer->chunk == NULL) {
 		peer->chunk = malloc(peer->nl * sizeof(struct chunk));

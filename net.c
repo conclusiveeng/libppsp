@@ -118,7 +118,7 @@ void * seeder_worker (void *data)
 	we = p->seeder;					/* our data (seeder) */
 	sockfd = p->sockfd;
 
-	d_printf("%s", "\n  th: ===========\n  th: worker started\n");
+	d_printf("%s", "worker started\n");
 
 	memset(&pos, 0, sizeof(struct proto_opt_str));
 	memset(&opts, 0, sizeof(opts));
@@ -159,13 +159,13 @@ void * seeder_worker (void *data)
 
 	opts_len = make_handshake_options(opts, &pos);
 
-	_assert(opts_len <= 1024, "%s but has value: %u\n", "opts_len should be <= 1024", opts_len);
+	_assert(opts_len <= sizeof(opts), "%s but has value: %u\n", "opts_len should be <= 1024", opts_len);
 
 	dump_options(opts, we);
 
 	h_resp_len = make_handshake_have(handshake_resp, 0, 0xfeedbabe, opts, opts_len, we);
 
-	_assert(h_resp_len <= 256, "%s but has value: %u\n", "h_resp_len should be <= 256", h_resp_len);
+	_assert(h_resp_len <= sizeof(handshake_resp), "%s but has value: %u\n", "h_resp_len should be <= 256", h_resp_len);
 
 	p->sm = SM_NONE;
 
@@ -176,7 +176,6 @@ void * seeder_worker (void *data)
 
 		/* check how long ago we received anything from LEECHER */
 		clock_gettime(CLOCK_MONOTONIC, &ts);
-		//printf("ptimeout: %u\n", p->seeder->timeout);
 		if (ts.tv_sec - p->ts_last_recv.tv_sec > p->seeder->timeout) {
 			d_printf("finishing thread due to timeout in communication: %#lx\n", (uint64_t)p);
 			p->finishing = 1;
@@ -358,7 +357,7 @@ int net_seeder(struct peer *seeder)
 
 	while (1) {
 		/* invoke garbage collector */
-		if (remove_dead_peers == 1) 
+		if (remove_dead_peers == 1)
 			cleanup_all_dead_peers(&peer_list_head);
 
 		memset(buf, 0, BUFSIZE);
@@ -397,7 +396,7 @@ int net_seeder(struct peer *seeder)
 				semaph_post(p->sem);	/* unlock initially locked semaphore */
 				continue;
 			} else if (handshake_type(buf) == HANDSHAKE_FINISH) {	/* does the seeder want to close connection ? */
-				d_printf("%s", "-------------------FINISH\n");
+				d_printf("%s", "FINISH\n");
 
 				p->finishing = 1;	/* set the flag for finishing the thread */
 
@@ -453,6 +452,7 @@ int net_leecher(struct peer *peer)
 	socklen_t len;
 	SHA1Context context;
 	struct proto_opt_str pos;
+	struct timeval tv;
 
 	memset(&pos, 0, sizeof(struct proto_opt_str));
 	memset(&opts, 0, sizeof(opts));
@@ -513,23 +513,32 @@ int net_leecher(struct peer *peer)
 	servaddr.sin_port = htons(PORT);
 	servaddr.sin_addr.s_addr = peer->seeder_addr.s_addr;
 
-	/* send initial HANDSHAKE to SEEDER */
-	n = sendto(sockfd, handshake_req, h_req_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
-	if (n < 0) {
-		d_printf("error sending handhsake: %d\n", n);
-		abort();
-	}
-	d_printf("%s", "initial message 1/3 sent\n");
+	/* set 1 second timeout for response from SEEDER */
+	tv.tv_sec = 1;
+	tv.tv_usec = 0;
+	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
-	/* receive response from SEEDER: HANDSHAKE + HAVE */
-	n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
+	/* wait for SEEDER */
+	do {
+		/* send initial HANDSHAKE to SEEDER */
+		n = sendto(sockfd, handshake_req, h_req_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
+		if (n < 0) {
+			d_printf("error sending handhsake: %d\n", n);
+			abort();
+		}
+		d_printf("%s", "initial message 1/3 sent\n");
+
+		/* receive response from SEEDER: HANDSHAKE + HAVE */
+		n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
+	} while (n < 0);
+
 	buffer[n] = '\0';
 	d_printf("server replied with %u bytes\n", n);
 	dump_handshake_have(buffer, n, peer);
 
 	/* calculate number of SHA hashes per 1500 bytes MTU */
 	hashes_per_mtu = (1500 - (4 + 1 + 4 + 4 + 8))/20;
-	d_printf("hashes_per_mtu: %lu ---------------\n", hashes_per_mtu);
+	d_printf("hashes_per_mtu: %lu\n", hashes_per_mtu);
 
 	/* calculate number of series */
 	num_series = peer->nc / hashes_per_mtu;
@@ -553,7 +562,7 @@ int net_leecher(struct peer *peer)
 
 	z = peer->start_chunk;
 	while (z < peer->end_chunk) {
-		d_printf("-----------z: %u  peer->end_chunk: %u\n", z, peer->end_chunk);
+		d_printf("z: %u  peer->end_chunk: %u\n", z, peer->end_chunk);
 		begin = z;
 
 		if (z + hashes_per_mtu >= peer->end_chunk)

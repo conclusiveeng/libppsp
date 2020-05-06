@@ -551,7 +551,6 @@ int example_main (int argc, char *argv[])
 	}
 
 
-
 #if 0
 	root8 = build_tree(8, &ret);			/* 8 - number of leaves */
 	ret2 = ret;
