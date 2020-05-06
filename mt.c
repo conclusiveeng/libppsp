@@ -47,7 +47,7 @@ extern int optind, opterr, optopt;
 int debug;
 struct node *tree, *root8, *root16, *root32;
 struct chunk *tab_chunk;
-struct peer remote_peer;
+struct peer local_peer;
 
 
 /*
@@ -470,7 +470,7 @@ void update_sha (struct node *t, int num_chunks)
 }
 
 
-int main (int argc, char *argv[])
+int example_main (int argc, char *argv[])
 {
 	char *fname1, *fname, *fname2, *buf, usage;
 	unsigned char digest[20 + 1];
@@ -519,11 +519,10 @@ int main (int argc, char *argv[])
 		printf("Peer-to-Peer Streaming Peer Protocol proof of concept\n");
 		printf("usage:\n");
 		printf("%s: -adfhst\n", argv[0]);
-		printf("-a ip_address:	numeric IP address of the remote SEEDER\n");
+		printf("-a ip_address:	numeric IP address of the remote SEEDER, enables LEECHER mode\n");
 		printf("		example: -a 192.168.1.1\n");
-		printf("-d:		enables debug mode\n");
-		printf("-f filename:	filename of the file for sharing\n");
-		printf("		enables SEEDER mode\n");
+		printf("-d:		enables debugging messages\n");
+		printf("-f filename:	filename of the file for sharing, enables SEEDER mode\n");
 		printf("		example: -f ./filename\n");
 		printf("-h:		this help\n");
 		printf("-s:		chunk size in bytes valid only on the SEEDER side, default: 1024 bytes\n");
@@ -614,7 +613,7 @@ int main (int argc, char *argv[])
 			nc++;
 		d_printf("number of chunks [%u]: %lu\n", chunk_size, nc);
 
-		/* compute number of leaves - it is not the same as numbe of chunks */
+		/* compute number of leaves - it is not the same as number of chunks */
 		nl = 1 << (order2(nc));
 
 		/* allocate array of chunks which will be linked to leaves later*/
@@ -627,7 +626,7 @@ int main (int argc, char *argv[])
 
 		root8 = build_tree(nc, &ret);
 
-		/* compute SHA hash for every chunk form given file */
+		/* compute SHA hash for every chunk for given file */
 		rd = 0;
 		c = 0;
 		while (rd < (uint64_t) stat.st_size) {
@@ -662,35 +661,35 @@ int main (int argc, char *argv[])
 		update_sha(ret, nl);
 		dump_tree(ret, nl);
 
-		remote_peer.tree = ret;
-		remote_peer.nl = nl;
-		remote_peer.nc = nc;
-		remote_peer.type = SEEDER;
-		remote_peer.start_chunk = 0;
-		remote_peer.end_chunk = nc - 1;
-		remote_peer.chunk_size = chunk_size;
-		memcpy(remote_peer.fname, fname, strlen(fname));
-		remote_peer.fname_len = strlen(fname);
-		remote_peer.file_size = stat.st_size;
-		remote_peer.timeout = timeout;
+		local_peer.tree = ret;
+		local_peer.nl = nl;
+		local_peer.nc = nc;
+		local_peer.type = SEEDER;
+		local_peer.start_chunk = 0;
+		local_peer.end_chunk = nc - 1;
+		local_peer.chunk_size = chunk_size;
+		memcpy(local_peer.fname, fname, strlen(fname));
+		local_peer.fname_len = strlen(fname);
+		local_peer.file_size = stat.st_size;
+		local_peer.timeout = timeout;
 
-		proto_test(&remote_peer);
+		proto_test(&local_peer);
 	} else { /* leecher */
-		remote_peer.tree = NULL;
-		remote_peer.nl = 0;
-		remote_peer.nc = 0;
-		remote_peer.type = LEECHER;
-		memset(remote_peer.fname, 0, sizeof(remote_peer.fname));
-		remote_peer.fname_len = 0;
-		remote_peer.file_size = 0;
-		memcpy(&remote_peer.seeder_addr, &ia, sizeof(struct in_addr));
-		remote_peer.timeout = timeout;
+		local_peer.tree = NULL;
+		local_peer.nl = 0;
+		local_peer.nc = 0;
+		local_peer.type = LEECHER;
+		memset(local_peer.fname, 0, sizeof(local_peer.fname));
+		local_peer.fname_len = 0;
+		local_peer.file_size = 0;
+		memcpy(&local_peer.seeder_addr, &ia, sizeof(struct in_addr));
+		local_peer.timeout = 0;
 
-		proto_test(&remote_peer);
+		proto_test(&local_peer);
 	}
 
 	free(fname2);
-	free(buf);
+	if (type == SEEDER) free(buf);
 	free(tab_chunk);
 
 	return 0;
