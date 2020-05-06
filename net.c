@@ -272,7 +272,7 @@ void * seeder_worker (void *data)
 		if (p->sm == SM_DATA) {
 			data_payload_len = make_data(data_payload, p);
 
-			_assert((uint32_t) data_payload_len <= we->chunk_size + 4 + 1 + 4 + 4 + 8, "%s but data_payload_len has value: %u and we->chunk_size: %u\n", "data_payload_len should be <= we->chunk_size", data_payload_len, we->chunk_size);
+			_assert((uint32_t) data_payload_len <= we->chunk_size + 4 + 1 + 4 + 4 + 8, "%s but data_payload_len has value: %d and we->chunk_size: %u\n", "data_payload_len should be <= we->chunk_size", data_payload_len, we->chunk_size);
 
 			/* send DATA datagram with contents of the chunk */
 			n = sendto(sockfd, data_payload, data_payload_len, 0, (struct sockaddr *) &p->sa, clientlen);
@@ -406,6 +406,8 @@ int net_seeder(struct peer *seeder)
 		}
 
 		if (message_type(buf) == REQUEST) {
+			_assert(p != NULL, "%s but p has value: %lu\n", "p should be != NULL", (uint64_t)p);
+
 			semaph_wait(p->sem);
 
 			d_printf("%s", "OK REQUEST\n");
@@ -419,6 +421,8 @@ int net_seeder(struct peer *seeder)
 		}
 
 		if (message_type(buf) == ACK) {
+			_assert(p != NULL, "%s but p has value: %lu\n", "p should be != NULL", (uint64_t)p);
+
 			semaph_wait(p->sem);
 
 			d_printf("%s", "OK ACK\n");
@@ -453,6 +457,7 @@ int net_leecher(struct peer *peer)
 	SHA1Context context;
 	struct proto_opt_str pos;
 	struct timeval tv;
+	fd_set fs;
 
 	memset(&pos, 0, sizeof(struct proto_opt_str));
 	memset(&opts, 0, sizeof(opts));
@@ -513,11 +518,6 @@ int net_leecher(struct peer *peer)
 	servaddr.sin_port = htons(PORT);
 	servaddr.sin_addr.s_addr = peer->seeder_addr.s_addr;
 
-	/* set 1 second timeout for response from SEEDER */
-	tv.tv_sec = 1;
-	tv.tv_usec = 0;
-	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-
 	/* wait for SEEDER */
 	do {
 		/* send initial HANDSHAKE to SEEDER */
@@ -528,9 +528,18 @@ int net_leecher(struct peer *peer)
 		}
 		d_printf("%s", "initial message 1/3 sent\n");
 
-		/* receive response from SEEDER: HANDSHAKE + HAVE */
-		n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
-	} while (n < 0);
+		FD_ZERO(&fs);
+		FD_SET(sockfd, &fs);
+		tv.tv_sec = 1;
+		tv.tv_usec = 0;
+
+		s = select(sockfd + 1, &fs, NULL, NULL, &tv);
+		n = 0;
+		if (FD_ISSET(sockfd, &fs)) {
+			/* receive response from SEEDER: HANDSHAKE + HAVE */
+			n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
+		}
+	} while (n <= 0);
 
 	buffer[n] = '\0';
 	d_printf("server replied with %u bytes\n", n);
@@ -577,21 +586,35 @@ int net_leecher(struct peer *peer)
 
 		_assert(request_len <= sizeof(request), "%s but request_len has value: %u and sizeof(request): %lu\n", "request_len should be <= sizeof(request)", request_len, sizeof(request));
 
-		/* send REQUEST */
-		n = sendto(sockfd, request, request_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
-		if (n < 0) {
-			d_printf("error sending request: %d\n", n);
-			abort();
-		}
-		d_printf("%s", "request message 3/3 sent\n");
+		do {
 
-		/* receive INTEGRITY from SEEDER */
-		n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
-		if (n < 0) {
-			d_printf("error: recvfrom: %d errno: %d %s\n", n, errno, strerror(errno));
-			d_printf("	len: %d\n", len);
-			abort();
-		}
+			/* send REQUEST */
+			n = sendto(sockfd, request, request_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
+			if (n < 0) {
+				d_printf("error sending request: %d\n", n);
+				abort();
+			}
+			d_printf("%s", "request message 3/3 sent\n");
+
+
+			FD_ZERO(&fs);
+			FD_SET(sockfd, &fs);
+			tv.tv_sec = 1;
+			tv.tv_usec = 0;
+
+			s = select(sockfd + 1, &fs, NULL, NULL, &tv);
+			n = 0;
+			if (FD_ISSET(sockfd, &fs)) {
+				/* receive INTEGRITY from SEEDER */
+				n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
+		
+				if (n < 0) {
+					printf("error: recvfrom: %d errno: %d %s\n", n, errno, strerror(errno));
+					printf("	len: %d\n", len);
+					abort();
+				}
+			}
+		} while (n <= 0);
 		d_printf("server sent INTEGRITY: %d\n", n);
 		dump_integrity(buffer, n, peer);		/* copy SHA hashes to peer->chunk[] */
 

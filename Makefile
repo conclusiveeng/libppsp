@@ -1,7 +1,6 @@
-CC = gcc
-#CC = clang
+CC = cc
 LIB_CFLAGS = -pthread -Wall -std=c11 -D_DEFAULT_SOURCE -fPIC
-#LIB_CFLAGS += -ggdb3
+LIB_CFLAGS += -ggdb3
 EXE_CFLAGS = -L. -lppspp -lpthread
 
 LDFLAGS = -shared
