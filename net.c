@@ -65,7 +65,7 @@ sem_t * semaph_init (struct peer *p)
 
 	sem = sem_open(p->sem_name, O_CREAT, 0777, 0);		/* create semaphore initially locked */
 	if (sem == SEM_FAILED) {
-		d_printf("sem_open error: %s\n", strerror(errno));
+		printf("sem_open error: %s\n", strerror(errno));
 		abort();
 	}
 
@@ -79,7 +79,7 @@ int semaph_post (sem_t *sem)
 
 	s = sem_post(sem);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -93,7 +93,7 @@ int semaph_wait (sem_t *sem)
 
 	s = sem_wait(sem);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -205,7 +205,7 @@ void * seeder_worker (void *data)
 			/* send HANDSHAKE + HAVE */
 			n = sendto(sockfd, handshake_resp, h_resp_len, 0, (struct sockaddr *) &p->sa, clientlen);
 			if (n < 0) {
-				d_printf("%s", "ERROR in sendto\n");
+				printf("%s", "ERROR in sendto\n");
 				abort();
 			}
 
@@ -255,7 +255,7 @@ void * seeder_worker (void *data)
 			/* send INTEGRITY with data */
 			n = sendto(sockfd, p->send_buf, n, 0, (struct sockaddr *) &p->sa, clientlen);
 			if (n < 0) {
-				d_printf("%s", "ERROR in sendto\n");
+				printf("%s", "ERROR in sendto\n");
 				abort();
 			}
 
@@ -277,7 +277,7 @@ void * seeder_worker (void *data)
 			/* send DATA datagram with contents of the chunk */
 			n = sendto(sockfd, data_payload, data_payload_len, 0, (struct sockaddr *) &p->sa, clientlen);
 			if (n < 0) {
-				d_printf("%s", "ERROR in sendto\n");
+				printf("%s", "ERROR in sendto\n");
 				abort();
 			}
 
@@ -367,6 +367,8 @@ int net_seeder(struct peer *seeder)
 
 		/* locate peer basing on IP address and UDP port */
 		p = ip_port_to_peer(&peer_list_head, &clientaddr);
+		if ((p == NULL) && (message_type(buf) != HANDSHAKE))
+                        continue;
 
 		if (message_type(buf) == HANDSHAKE) {
 			d_printf("%s", "OK HANDSHAKE\n");
@@ -386,7 +388,7 @@ int net_seeder(struct peer *seeder)
 				/* create worker thread for this client (leecher) */
 				st = pthread_create(&thread, NULL, &seeder_worker, p);
 				if (st != 0) {
-					d_printf("%s", "cannot create ne thread\n");
+					printf("%s", "cannot create new thread\n");
 					abort();
 				}
 
@@ -523,7 +525,7 @@ int net_leecher(struct peer *peer)
 		/* send initial HANDSHAKE to SEEDER */
 		n = sendto(sockfd, handshake_req, h_req_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 		if (n < 0) {
-			d_printf("error sending handhsake: %d\n", n);
+			printf("error sending handhsake: %d\n", n);
 			abort();
 		}
 		d_printf("%s", "initial message 1/3 sent\n");
@@ -546,7 +548,8 @@ int net_leecher(struct peer *peer)
 	dump_handshake_have(buffer, n, peer);
 
 	/* calculate number of SHA hashes per 1500 bytes MTU */
-	hashes_per_mtu = (1500 - (4 + 1 + 4 + 4 + 8))/20;
+	/* (MTU - sizeof(iphdr) - sizeof(udphdr) - ppspp_headers) / sha_size */
+	hashes_per_mtu = (1500 - 20 - 8 - (4 + 1 + 4 + 4 + 8))/20;
 	d_printf("hashes_per_mtu: %lu\n", hashes_per_mtu);
 
 	/* calculate number of series */
@@ -565,7 +568,7 @@ int net_leecher(struct peer *peer)
 
 	fd = open(fname, O_WRONLY | O_CREAT, 0744);
 	if (fd < 0) {
-		d_printf("error opening file '%s' for writing: %u %s\n", fname, errno, strerror(errno));
+		printf("error opening file '%s' for writing: %u %s\n", fname, errno, strerror(errno));
 		abort();
 	}
 
@@ -591,7 +594,7 @@ int net_leecher(struct peer *peer)
 			/* send REQUEST */
 			n = sendto(sockfd, request, request_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				d_printf("error sending request: %d\n", n);
+				printf("error sending request: %d\n", n);
 				abort();
 			}
 			d_printf("%s", "request message 3/3 sent\n");
@@ -630,7 +633,7 @@ int net_leecher(struct peer *peer)
 			/* receive single DATA datagram */
 			nr = recvfrom(sockfd, (char *)data_buffer, data_buffer_len, 0, (struct sockaddr *) &servaddr, &len);
 			if (nr <= 0) {
-				d_printf("error: recvfrom: %d errno: %d %s\n", n, errno, strerror(errno));
+				printf("error: recvfrom: %d errno: %d %s\n", n, errno, strerror(errno));
 				abort();
 			}
 
@@ -659,7 +662,7 @@ int net_leecher(struct peer *peer)
 			cmp = memcmp(peer->chunk[peer->curr_chunk].sha, digest , 20);
 
 			if (cmp != 0) {
-				d_printf("error - hashes are different[%lu]: seeder %s vs digest: %s\n", cc, sha_seeder_buf, sha_buf);
+				printf("error - hashes are different[%lu]: seeder %s vs digest: %s\n", cc, sha_seeder_buf, sha_buf);
 				abort();
 			}
 
@@ -671,7 +674,7 @@ int net_leecher(struct peer *peer)
 			/* send ACK */
 			n = sendto(sockfd, buffer, ack_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				d_printf("error sending request: %d\n", n);
+				printf("error sending request: %d\n", n);
 				abort();
 			}
 			d_printf("ACK[%lu] sent\n" ,cc);
@@ -683,7 +686,7 @@ int net_leecher(struct peer *peer)
 	n = make_handshake_finish(buffer, peer);
 	n = sendto(sockfd, buffer, ack_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 	if (n < 0) {
-		d_printf("error sending request: %d\n", n);
+		printf("error sending request: %d\n", n);
 		abort();
 	}
 	d_printf("%s", "HANDSHAKE_FINISH sent\n");

@@ -526,7 +526,7 @@ int dump_options (char *ptr, struct peer *peer)
 		d++;
 		d_printf("version: %u\n", *d);
 		if (*d != 1) {
-			d_printf("version should be 1 but is: %u\n", *d);
+			printf("version should be 1 but is: %u\n", *d);
 			abort();
 		}
 		d++;
@@ -651,7 +651,7 @@ int dump_options (char *ptr, struct peer *peer)
 		d_printf("%s", "end option\n");
 		d++;
 	} else {
-		d_printf("error: should be END_OPTION(0xff) but is: d[%lu]: %u\n", d - ptr, *d & 0xff);
+		printf("error: should be END_OPTION(0xff) but is: d[%lu]: %u\n", d - ptr, *d & 0xff);
 		abort();
 	}
 
@@ -686,7 +686,7 @@ int dump_handshake_request (char *ptr, int req_len, struct peer *peer)
 	if (*d == HANDSHAKE) {
 		d_printf("%s", "ok, HANDSHAKE req\n");
 	} else {
-		d_printf("error - should be HANDSHAKE req (0) but is: %u\n", *d);
+		printf("error - should be HANDSHAKE req (0) but is: %u\n", *d);
 		abort();
 	}
 	d++;
@@ -731,7 +731,7 @@ int dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 	if (*d == HAVE) {
 		d_printf("%s", "ok, HAVE header\n");
 	} else {
-		d_printf("error, should be HAVE header but is: %u\n", *d);
+		printf("error, should be HAVE header but is: %u\n", *d);
 		abort();
 	}
 
@@ -760,7 +760,7 @@ int dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 		peer->chunk = malloc(peer->nl * sizeof(struct chunk));
 		memset(peer->chunk, 0, peer->nl * sizeof(struct chunk));
 	} else {
-		d_printf("%s", "error - peer->chunk has already allocated memory, HAVE should be send only once\n");
+		printf("%s", "error - peer->chunk has already allocated memory, HAVE should be send only once\n");
 		abort();
 	}
 
@@ -795,7 +795,7 @@ int dump_request (char *ptr, int req_len, struct peer *peer)
 	if (*d == REQUEST) {
 		d_printf("%s", "ok, REQUEST header\n");
 	} else {
-		d_printf("error, should be REQUEST header but is: %u\n", *d);
+		printf("error, should be REQUEST header but is: %u\n", *d);
 		abort();
 	}
 	d++;
@@ -850,7 +850,7 @@ int dump_integrity (char *ptr, int req_len, struct peer *peer)
 	if (*d == INTEGRITY) {
 		d_printf("%s", "ok, INTEGRITY header\n");
 	} else {
-		d_printf("error, should be INTEGRITY header but is: %u\n", *d);
+		printf("error, should be INTEGRITY header but is: %u\n", *d);
 		abort();
 	}
 	d++;
@@ -965,7 +965,7 @@ uint8_t handshake_type (char *ptr)
 	if (*d == HANDSHAKE) {
 		d_printf("%s", "ok, HANDSHAKE header\n");
 	} else {
-		d_printf("error, should be HANDSHAKE header but is: %u\n", *d);
+		printf("error, should be HANDSHAKE header but is: %u\n", *d);
 		abort();
 	}
 	d++;

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 project(ppspp)
 
-set(CMAKE_C_FLAGS "-Wall -std=c11 -D_DEFAULT_SOURCE")
+set(CMAKE_C_FLAGS "-Wall -ggdb3 -std=c11 -D_DEFAULT_SOURCE")
 add_library(ppspp SHARED mt.c ppspp_protocol.c net.c peer.c sha1.c)
 
 add_executable(ppspp_exe main.c)
