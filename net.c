@@ -289,12 +289,15 @@ void * seeder_worker (void *data)
 			continue;
 		}
 
-		if (p->sm == SM_WAIT_ACK)	{
-			if (message_type(p->recv_buf) == ACK)
+		if (p->sm == SM_WAIT_ACK) {
+			if ((message_type(p->recv_buf) == ACK) && (p->recv_len > 0))
 				p->sm = SM_ACK;
-
-			semaph_post(p->sem);
-			continue;
+			else {
+				if ((message_type(p->recv_buf) == REQUEST) && (p->recv_len > 0))
+					p->sm = SM_WAIT_REQUEST;
+				semaph_post(p->sem);
+				continue;
+			}
 		}
 
 		if (p->sm == SM_ACK) {
