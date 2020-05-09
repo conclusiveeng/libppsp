@@ -101,6 +101,99 @@ int semaph_wait (sem_t *sem)
 }
 
 
+int mutex_init (struct peer *p)
+{
+	int s;
+
+	s = pthread_mutex_init(&p->mutex, NULL);
+	if (s != 0) {
+		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		abort();
+	}
+
+	return 0;
+}
+
+
+int mutex_lock (pthread_mutex_t *mutex)
+{
+	int s;
+
+	s = pthread_mutex_lock(mutex);
+	if (s != 0) {
+		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		abort();
+	}
+
+	return 0;
+}
+
+
+int mutex_unlock (pthread_mutex_t *mutex)
+{
+	int s;
+
+	s = pthread_mutex_unlock(mutex);
+	if (s != 0) {
+		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		abort();
+	}
+
+	return 0;
+}
+
+
+int cond_lock_init (struct peer *p)
+{
+	int s;
+
+	s = pthread_mutex_init(&p->mutex, NULL);
+	if (s != 0) {
+		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		abort();
+	}
+
+	s = pthread_cond_init(&p->mtx_cond, NULL);
+	if (s != 0) {
+		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		abort();
+	}
+
+	return 0;
+}
+
+
+int cond_lock (struct peer *p)
+{
+	pthread_mutex_lock(&p->mutex);
+	p->cond = C_TODO;
+	do {
+		if (p->cond == C_DONE)
+			break;
+		else
+			pthread_cond_wait(&p->mtx_cond, &p->mutex);
+
+	} while(1);
+
+	pthread_mutex_unlock(&p->mutex);
+
+	return 0;
+}
+
+
+int cond_unlock (struct peer *p)
+{
+	pthread_mutex_lock(&p->mutex);
+
+	p->cond = C_DONE;
+	pthread_cond_signal(&p->mtx_cond);
+
+	pthread_mutex_unlock(&p->mutex);
+
+	return 0;
+}
+
+
 /* thread - seeder worker */
 void * seeder_worker (void *data)
 {
@@ -172,8 +265,6 @@ void * seeder_worker (void *data)
 	data_payload = malloc(we->chunk_size + 4 + 1 + 4 + 4 + 8);	/* chunksize + headers */
 
 	while (p->finishing == 0) {
-		semaph_wait(p->sem);
-
 		/* check how long ago we received anything from LEECHER */
 		clock_gettime(CLOCK_MONOTONIC, &ts);
 		if (ts.tv_sec - p->ts_last_recv.tv_sec > p->seeder->timeout) {
@@ -181,7 +272,7 @@ void * seeder_worker (void *data)
 			p->finishing = 1;
 			p->to_remove = 1;	/* mark this particular peer to remove by GC */
 			remove_dead_peers = 1;	/* set global flag for removing dead peers by garbage collector */
-			semaph_post(p->sem);
+			cond_unlock(p);
 			continue;
 		}
 
@@ -195,7 +286,7 @@ void * seeder_worker (void *data)
 			dump_handshake_request(p->recv_buf, p->recv_len, p);
 
 			p->sm = SM_HANDSHAKE_HAVE;
-			semaph_post(p->sem);
+			cond_unlock(p);
 			continue;
 		}
 
@@ -219,8 +310,7 @@ void * seeder_worker (void *data)
 			p->chunk_size = we->chunk_size;
 			p->recv_len = 0;
 			p->sm = SM_WAIT_REQUEST;
-
-			semaph_post(p->sem);
+			cond_unlock(p);
 			continue;
 		}
 
@@ -228,7 +318,7 @@ void * seeder_worker (void *data)
 			if ((message_type(p->recv_buf) == REQUEST) && (p->recv_len > 0))
 				p->sm = SM_REQUEST;
 
-			semaph_post(p->sem);
+			cond_unlock(p);
 			continue;
 		}
 
@@ -243,7 +333,7 @@ void * seeder_worker (void *data)
 			dump_request(p->recv_buf, n, p);
 			p->sm = SM_INTEGRITY;
 
-			semaph_post(p->sem);
+			cond_unlock(p);
 			continue;
 		}
 
@@ -265,7 +355,7 @@ void * seeder_worker (void *data)
 			p->curr_chunk = p->start_chunk;		/* set beginning number of chunk for DATA0 */
 			p->sm = SM_DATA;
 
-			semaph_post(p->sem);
+			cond_unlock(p);
 			continue;
 		}
 
@@ -285,7 +375,7 @@ void * seeder_worker (void *data)
 			p->d_last_send = DATA;
 			p->sm = SM_WAIT_ACK;
 
-			semaph_post(p->sem);
+			cond_unlock(p);
 			continue;
 		}
 
@@ -293,9 +383,12 @@ void * seeder_worker (void *data)
 			if ((message_type(p->recv_buf) == ACK) && (p->recv_len > 0))
 				p->sm = SM_ACK;
 			else {
-				if ((message_type(p->recv_buf) == REQUEST) && (p->recv_len > 0))
+#if 0
+				if ((message_type(p->recv_buf) == REQUEST) && (p->recv_len > 0)) {
 					p->sm = SM_WAIT_REQUEST;
-				semaph_post(p->sem);
+				}
+#endif
+				cond_unlock(p);
 				continue;
 			}
 		}
@@ -313,7 +406,7 @@ void * seeder_worker (void *data)
 			else if (p->curr_chunk > p->end_chunk)
 				p->sm = SM_WAIT_REQUEST;		/* that was ACK for last DATA in serie so wait for REQUEST */
 
-			semaph_post(p->sem);
+			cond_unlock(p);
 			continue;
 		}
 	}
@@ -386,7 +479,7 @@ int net_seeder(struct peer *seeder)
 				p->recv_len = n;
 				p->seeder = seeder;
 				/* create new semaphore */
-				p->sem = semaph_init(p);
+				cond_lock_init(p);
 
 				/* create worker thread for this client (leecher) */
 				st = pthread_create(&thread, NULL, &seeder_worker, p);
@@ -398,7 +491,6 @@ int net_seeder(struct peer *seeder)
 				d_printf("new pthread created: %#lx\n", (uint64_t) thread);
 
 				p->thread = thread;
-				semaph_post(p->sem);	/* unlock initially locked semaphore */
 				continue;
 			} else if (handshake_type(buf) == HANDSHAKE_FINISH) {	/* does the seeder want to close connection ? */
 				d_printf("%s", "FINISH\n");
@@ -413,7 +505,7 @@ int net_seeder(struct peer *seeder)
 		if (message_type(buf) == REQUEST) {
 			_assert(p != NULL, "%s but p has value: %lu\n", "p should be != NULL", (uint64_t)p);
 
-			semaph_wait(p->sem);
+			cond_lock(p);
 
 			d_printf("%s", "OK REQUEST\n");
 
@@ -421,21 +513,19 @@ int net_seeder(struct peer *seeder)
 
 			memcpy(p->recv_buf, buf, n);
 			p->recv_len = n;
-			semaph_post(p->sem);
 			continue;
 		}
 
 		if (message_type(buf) == ACK) {
 			_assert(p != NULL, "%s but p has value: %lu\n", "p should be != NULL", (uint64_t)p);
 
-			semaph_wait(p->sem);
+			cond_lock(p);
 
 			d_printf("%s", "OK ACK\n");
 			_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 			memcpy(p->recv_buf, buf, n);
 			p->recv_len = n;
-			semaph_post(p->sem);
 			continue;
 		}
 	}
@@ -613,7 +703,7 @@ int net_leecher(struct peer *peer)
 			if (FD_ISSET(sockfd, &fs)) {
 				/* receive INTEGRITY from SEEDER */
 				n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
-		
+
 				if (n < 0) {
 					printf("error: recvfrom: %d errno: %d %s\n", n, errno, strerror(errno));
 					printf("	len: %d\n", len);

@@ -70,6 +70,9 @@ struct peer {
 	sem_t *sem;
 	char sem_name[64];
 	uint8_t to_remove;
+	pthread_mutex_t mutex;
+	pthread_cond_t mtx_cond;
+	enum { C_TODO = 1, C_DONE = 2 } cond;
 
 	uint32_t chunk_size;
 	uint32_t start_chunk;

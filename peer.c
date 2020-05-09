@@ -131,8 +131,8 @@ void cleanup_peer (struct peer *p)
 	(void) remove_peer_from_list(&peer_list_head, p);
 
 	/* destroy the semaphore */
-	sem_close(p->sem);
-	sem_unlink(p->sem_name);
+	pthread_mutex_destroy(&p->mutex);
+	pthread_cond_destroy(&p->mtx_cond);
 
 	/* free allocated memory */
 	free(p->recv_buf);
