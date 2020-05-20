@@ -94,7 +94,7 @@ int main (int argc, char *argv[])
 	if (fname1 != NULL) {
 		type = SEEDER;
 		fname2 = strdup(fname1);
-		fname = basename(fname2);		/* skip any "./" and other directory parts */
+		fname = fname2;
 	}
 
 	if (type == LEECHER) {

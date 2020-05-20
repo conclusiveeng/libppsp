@@ -38,6 +38,7 @@
 #include <pthread.h>
 #include <inttypes.h>
 #include <semaphore.h>
+#include <libgen.h>
 
 #include "mt.h"
 #include "net.h"
@@ -198,7 +199,7 @@ int cond_unlock (struct peer *p)
 void * seeder_worker (void *data)
 {
 	int n, clientlen, sockfd, data_payload_len, h_resp_len, opts_len;
-	char *data_payload;
+	char *data_payload, *bn;
 	char opts[1024];			/* buffer for encoded options */
 	char swarm_id[] = "swarm_id";
 	char handshake_resp[256];
@@ -230,9 +231,11 @@ void * seeder_worker (void *data)
 	*(unsigned int *)pos.supported_msgs = 0xffff;	/* bitmap of supported messages */
 	pos.chunk_size = we->chunk_size;
 	pos.file_size = we->file_size;
-	pos.file_name_len = we->fname_len;
+
+	bn = basename(we->fname);
+	pos.file_name_len = strlen(bn);
 	memset(pos.file_name, 0, sizeof(pos.file_name));
-	memcpy(pos.file_name, we->fname, we->fname_len);
+	memcpy(pos.file_name, bn, pos.file_name_len);
 
 	/* mark the options we want to pass to make_handshake_options() (which ones are valid) */
 	pos.opt_map = 0;
@@ -254,7 +257,7 @@ void * seeder_worker (void *data)
 
 	_assert(opts_len <= sizeof(opts), "%s but has value: %u\n", "opts_len should be <= 1024", opts_len);
 
-	dump_options(opts, we);
+	/* dump_options(opts, we); */ /* do we really need this? */
 
 	h_resp_len = make_handshake_have(handshake_resp, 0, 0xfeedbabe, opts, opts_len, we);
 
