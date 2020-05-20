@@ -38,7 +38,7 @@ int main (int argc, char *argv[])
 	struct in_addr ia;
 
 	chunk_size = 1024;
-	fname = NULL;
+	fname = fname1 = NULL;
 	debug = 0;
 	usage = 0;
 	ia.s_addr = -1;
@@ -184,6 +184,11 @@ int main (int argc, char *argv[])
 		local_peer.timeout = timeout;
 
 		proto_test(&local_peer);
+
+		free(fname2);
+		free(buf);
+		free(tab_chunk);
+
 	} else { /* LEECHER mode */
 		local_peer.tree = NULL;
 		local_peer.nl = 0;
@@ -197,10 +202,6 @@ int main (int argc, char *argv[])
 
 		proto_test(&local_peer);
 	}
-
-	free(fname2);
-	if (type == SEEDER) free(buf);
-	free(tab_chunk);
 
 	return 0;
 }
