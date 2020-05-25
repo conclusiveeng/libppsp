@@ -33,8 +33,24 @@
 #include <stdint.h>
 
 struct peer {
-	enum { LEECHER, SEEDER } type;
-	enum { SM_NONE = 0, SM_HANDSHAKE_INIT, SM_HANDSHAKE_HAVE, SM_WAIT_REQUEST, SM_REQUEST, SM_INTEGRITY, SM_DATA, SM_WAIT_ACK, SM_ACK, SM_WAIT_FINISH,  SM_HANDSHAKE_FINISH } sm;
+	enum {
+		LEECHER,
+		SEEDER
+	} type;
+
+	enum {
+		SM_NONE = 0,
+		SM_HANDSHAKE_INIT,
+		SM_HANDSHAKE_HAVE,
+		SM_WAIT_REQUEST,
+		SM_REQUEST,
+		SM_INTEGRITY,
+		SM_DATA,
+		SM_WAIT_ACK,
+		SM_ACK,
+		SM_WAIT_FINISH,
+		SM_HANDSHAKE_FINISH
+	} sm;
 
 	uint32_t src_chan_id;
 	uint32_t dest_chan_id;
