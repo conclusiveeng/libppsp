@@ -1,7 +1,9 @@
 CC = cc
 LIB_CFLAGS = -pthread -Wall -std=c11 -D_DEFAULT_SOURCE -fPIC
 LIB_CFLAGS += -ggdb3
-EXE_CFLAGS = -L. -lppspp -lpthread
+#LIB_CFLAGS += -Wextra
+#LIB_CFLAGS += -Wpedantic
+EXE_CFLAGS = -L. -lppspp -lpthread -ggdb3
 
 LDFLAGS = -shared
 all: libppspp.so ppspp

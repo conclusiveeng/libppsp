@@ -31,6 +31,13 @@
 
 extern int debug;
 
+#define _assert(cond, format, ...) do { 				\
+	if (!(cond)) {							\
+		printf("*** %s:%u %s() [%u] Assertion failed: " format, \
+		__FILE__, __LINE__, __func__, getpid(), __VA_ARGS__); 	\
+		abort(); }						\
+} while(0)
+
 #define d_printf(format, ...) do {					\
 	if (debug > 0)							\
 		printf(format, __VA_ARGS__);				\

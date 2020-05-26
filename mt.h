@@ -35,6 +35,7 @@ struct chunk {
 	char sha[20 + 1];
 	struct node *node;
 	enum { CH_EMPTY = 0, CH_ACTIVE } state;
+	enum { CH_NO = 0, CH_YES } downloaded;
 };
 
 struct node {

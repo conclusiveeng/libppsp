@@ -31,8 +31,7 @@
 
 
 /* handshake protocol options */
-enum proto_options
-{
+enum proto_options {
 	VERSION = 0,
 	MINIMUM_VERSION,
 	SWARM_ID,
@@ -45,11 +44,11 @@ enum proto_options
 	CHUNK_SIZE,
 	FILE_SIZE,
 	FILE_NAME,
+	FILE_HASH,
 	END_OPTION = 255
 };
 
-enum message
-{
+enum message {
 	HANDSHAKE = 0,
 	DATA,
 	ACK,
@@ -66,8 +65,7 @@ enum message
 	PEX_RESCERT
 };
 
-enum handshake_type
-{
+enum handshake_type {
 	HANDSHAKE_INIT = 1,
 	HANDSHAKE_FINISH,
 	HANDSHAKE_ERROR
@@ -89,6 +87,7 @@ struct proto_opt_str {
 	uint64_t file_size;
 	uint8_t file_name[256];
 	uint8_t file_name_len;
+	uint8_t sha_demanded[20];
 	uint32_t opt_map;				/* bitmap - which of the fields above have any data */
 };
 
@@ -96,7 +95,8 @@ int make_handshake_options (char *, struct proto_opt_str *);
 int make_handshake_request (char *, uint32_t, uint32_t, char *, int);
 int make_handshake_have (char *, uint32_t, uint32_t, char *, int, struct peer *);
 int make_handshake_finish (char *, struct peer *);
-int make_request (char *, uint32_t, uint32_t, uint32_t);
+int make_request (char *, uint32_t, uint32_t, uint32_t, struct peer*);
+int make_pex_resp (char *, struct peer *, struct peer *);
 int make_integrity (char *, struct peer *, struct peer *);
 int make_data (char *, struct peer *);
 int make_ack (char *, struct peer *);
@@ -104,10 +104,11 @@ int dump_options (char *ptr, struct peer *);
 int dump_handshake_request (char *, int, struct peer *);
 int dump_handshake_have (char *, int, struct peer *);
 int dump_request (char *, int, struct peer *);
+int dump_pex_resp (char *, int, struct peer *, int);
 int dump_integrity (char *, int, struct peer *);
 int dump_ack (char *, int, struct peer *);
 uint8_t message_type (char *);
 uint8_t handshake_type (char *);
 void proto_test (struct peer *);
 
-#endif
+#endif /* _PPSPP_PROTOCOL_H_ */

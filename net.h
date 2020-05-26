@@ -30,7 +30,10 @@
 #include "mt.h"
 #include "peer.h"
 
+#define BUFSIZE 1500
+#define PORT    6778
+
 int net_seeder(struct peer *);
 int net_leecher(struct peer *);
 
-#endif
+#endif /* _NET_H_ */

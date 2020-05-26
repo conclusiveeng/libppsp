@@ -553,7 +553,7 @@ int example_main (int argc, char *argv[])
 
 #if 0
 	root8 = build_tree(8, &ret);			/* 8 - number of leaves */
-	ret2 = ret;
+	ret2 = ret;seeder
 
 	root16 = extend_tree(ret2, 8, &ret);		/* extend array: 8 => 16 */
 	ret2 = ret;

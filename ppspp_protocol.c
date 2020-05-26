@@ -37,12 +37,17 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <libgen.h>
 
 #include "net.h"
 #include "ppspp_protocol.h"
 #include "sha1.h"
 #include "mt.h"
 #include "debug.h"
+#include "peer.h"
 
 
 /*
@@ -161,7 +166,7 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 	 * extension to original PPSPP protocol
 	 * format: 1 + 8 bytes
 	 *
-	 * uint8_t  = FILE_SIZE = 10
+	 * uint8_t  = FILE_SIZE marker = 10
 	 * uint64_t = big-endian encoded length of file
 	 */
 	if (pos->opt_map & (1 << FILE_SIZE)) {
@@ -178,7 +183,7 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 	 * extension to original PPSPP protocol
 	 * format: 1 + 1 + max 255 bytes
 	 *
-	 * uint8_t = FILE_NAME = 11
+	 * uint8_t = FILE_NAME marker = 11
 	 * uint8_t = length of the file name
 	 * uint8_t [0..255] file name
 	 */
@@ -192,6 +197,24 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 		d += pos->file_name_len;
 	} else {
 		d_printf("%s", "no file_name specified - it's obligatory!\n");
+		return -1;
+	}
+
+	/*
+	 * extension to original PPSPP protocol
+	 * format: 1 + 20 bytes
+	 *
+	 * uint8_t = FILE_HASH marker = 12
+	 * uint8_t[20] = SHA1 hash of the file the LEECHER wants to download from SEEDER
+	 */
+
+	if (pos->opt_map & (1 << FILE_HASH)) {
+		*d = FILE_HASH;
+		d++;
+		memcpy(d, pos->sha_demanded, 20);
+		d += 20;
+	} else {
+		d_printf("%s", "no file_hash specified - it's obligatory!\n");
 		return -1;
 	}
 
@@ -272,12 +295,23 @@ int make_handshake_have (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id,
 	*d = HAVE;
 	d++;
 
-	*(uint32_t *)d = htobe32(peer->start_chunk);
-	d += sizeof(uint32_t);
+	/* check if we (seeder) have demanded by leecher file with given SHA1 hash,
+	 * if not (peer->file_list_entry == NULL) then return special range of chunks 0xfffffffe-0xfffffffe
+	 * to inform leecher that we have no file which he demanded for
+	 */
+	if (peer->file_list_entry == NULL) {
+		*(uint32_t *)d = htobe32(0xfffffffe);
+		d += sizeof(uint32_t);
 
-	*(uint32_t *)d = htobe32(peer->end_chunk);
-	d += sizeof(uint32_t);
+		*(uint32_t *)d = htobe32(0xfffffffe);
+		d += sizeof(uint32_t);
+	} else {
+		*(uint32_t *)d = htobe32(peer->file_list_entry->start_chunk);
+		d += sizeof(uint32_t);
 
+		*(uint32_t *)d = htobe32(peer->file_list_entry->end_chunk);
+		d += sizeof(uint32_t);
+	}
 	ret = d - ptr;
 	d_printf("%s: returning %u bytes\n", __func__, ret);
 
@@ -333,7 +367,7 @@ int make_handshake_finish (char *ptr, struct peer *peer)
  * out params:
  * 	ptr - pointer to buffer where data of this request should be placed
  */
-int make_request (char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32_t end_chunk)
+int make_request (char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32_t end_chunk, struct peer *peer)
 {
 	char *d;
 	int ret;
@@ -351,13 +385,68 @@ int make_request (char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32
 	*(uint32_t *)d = htobe32(end_chunk);
 	d += sizeof(uint32_t);
 
-	*d = PEX_REQ;
-	d++;
+	if (peer->pex_required == 1) {
+		*d = PEX_REQ;
+		d++;
+	}
 
 	ret = d - ptr;
 	d_printf("%s: returning %u bytes\n", __func__, ret);
 
 	return ret;
+}
+
+
+/*
+ * make packet with data of our seeder which shares complete file
+ * list of seeders is taken from commandline with "-l" option
+ */
+int make_pex_resp (char *ptr, struct peer *peer, struct peer *we)
+{
+	char *d;
+	int ret, addr_size, x;
+	uint16_t space, max_pex, pex;
+	struct peer *c;
+
+	d = ptr;
+
+
+	*(uint32_t *)d = htobe32(peer->dest_chan_id);
+	d += sizeof(uint32_t);
+
+	*d = PEX_RESV4;
+	d++;
+
+	/* calculate amount of available space in UDP payload */
+	/* 1500 - 20(ip) - 8(udp) - 4(chanid) */
+	space = 1500 - 20 - 8 - 4;
+	addr_size = 4 + 2;  /* 4 - ip, 2- port */
+	max_pex = space / addr_size;
+
+	d_printf("we're sending PEX_RESP to: %s\n", inet_ntoa(peer->leecher_addr.sin_addr));
+
+
+	/* IP addresses taken from "-l" commandline option: -l ip1:ip2:ip3: ...etc */
+	pex = 0;
+	x = 0;
+	while ((x < we->nr_in_addr) && (pex < max_pex)) {
+		if (memcmp(&peer->leecher_addr.sin_addr, &we->other_seeders[x], sizeof(struct in_addr)) != 0) {
+			//memcpy(d, &we->other_seeders[x], sizeof(c->leecher_addr.sin_addr));	/* IP */
+			memcpy(d, &we->other_seeders[x].sin_addr, sizeof(c->leecher_addr.sin_addr));	/* IP */
+			d += sizeof(c->leecher_addr.sin_addr);
+			//*(uint16_t *)d = htons(PORT);
+			*(uint16_t *)d = we->other_seeders[x].sin_port;
+			d += sizeof(c->leecher_addr.sin_port);
+		}
+		x++;
+	}
+
+
+	ret = d - ptr;
+	d_printf("%s: returning %u bytes\n", __func__, ret);
+
+	return ret;
+
 }
 
 
@@ -393,7 +482,7 @@ int make_integrity (char *ptr, struct peer *peer, struct peer *we)
 
 	y = 0;
 	for (x = peer->start_chunk; x <= peer->end_chunk; x++) {
-		memcpy(d, we->tree[2 * x].sha, 20);
+		memcpy(d, peer->file_list_entry->tree[2 * x].sha, 20);
 		d_printf("copying chunk: %u\n", x);
 		y++;
 		d += 20;
@@ -439,9 +528,10 @@ int make_data (char *ptr, struct peer *peer)
 	*(uint64_t *)d = htobe64(timestamp);
 	d += sizeof(uint64_t);
 
-	fd = open(peer->fname, O_RDONLY);
+	fd = open(peer->file_list_entry->path, O_RDONLY);
 	if (fd < 0) {
-		d_printf("error opening file2: %s\n", peer->fname);
+		d_printf("error opening file2: %s\n", peer->file_list_entry->path);
+		abort();
 		return -1;
 	}
 
@@ -514,11 +604,12 @@ int make_ack (char *ptr, struct peer *peer)
  */
 int dump_options (char *ptr, struct peer *peer)
 {
-	char *d;
-	int swarm_len, x, ret;
+	char *d, buf[40 + 1];
+	int swarm_len, x, ret, s, y;
 	uint8_t chunk_addr_method, supported_msgs_len;
 	uint32_t ldw32;
 	uint64_t ldw64;
+	struct file_list_entry *fi;
 
 	d = ptr;
 
@@ -647,6 +738,33 @@ int dump_options (char *ptr, struct peer *peer)
 		d += peer->fname_len;
 	}
 
+	if (*d == FILE_HASH) {
+		d++;
+
+		if (peer->seeder != NULL) {	/* is this proc called by seeder? */
+			memcpy(peer->sha_demanded, d, 20);
+		}
+		s = 0;
+		for (y = 0; y < 20; y++)
+			s += sprintf(buf + s, "%02x", peer->sha_demanded[y] & 0xff);
+		buf[40] = '\0';
+		d += 20;
+
+
+		/* find file name for given received SHA1 hash from leecher */
+		if (peer->seeder != NULL) {	/* is this proc called by seeder? */
+			SLIST_FOREACH(fi, &file_list_head, next) {
+				if (memcmp(fi->tree_root->sha, peer->sha_demanded, 20) == 0) {
+					strcpy(peer->fname, basename(fi->path));
+					peer->fname_len = strlen(peer->fname);
+					peer->file_size = fi->file_size;
+					peer->file_list_entry = fi;		/* set pointer to selected file by leecher using SHA1 hash */
+					break;
+				}
+			}
+		}
+	}
+
 	if ((*d & 0xff) == END_OPTION) {
 		d_printf("%s", "end option\n");
 		d++;
@@ -749,7 +867,7 @@ int dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 
 	/* calculate how many chunks seeder has */
 	num_chunks = end_chunk - start_chunk + 1;
-	d_printf("seeder have %u chunks\n", num_chunks);
+	d_printf("seeder has %u chunks\n", num_chunks);
 	peer->nc = num_chunks;
 
 	/* calculate number of leaves */
@@ -760,8 +878,16 @@ int dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 		peer->chunk = malloc(peer->nl * sizeof(struct chunk));
 		memset(peer->chunk, 0, peer->nl * sizeof(struct chunk));
 	} else {
-		printf("%s", "error - peer->chunk has already allocated memory, HAVE should be send only once\n");
-		abort();
+		d_printf("%s", "error - peer->chunk has already allocated memory, HAVE should be send only once\n");
+	}
+
+	if (peer->download_schedule == NULL) {
+		peer->download_schedule = malloc(peer->nl * sizeof(struct schedule_entry));
+		memset(peer->download_schedule, 0, peer->nl * sizeof(struct schedule_entry));
+
+		create_download_schedule(peer);
+	} else {
+		d_printf("%s", "error - peer->download_schedule has already allocated memory, HAVE should be send only once\n");
 	}
 
 	ret = d - ptr;
@@ -815,8 +941,84 @@ int dump_request (char *ptr, int req_len, struct peer *peer)
 		peer->end_chunk = end_chunk;
 	}
 
+	if (*d == PEX_REQ) {
+		peer->pex_required = 1;
+		d++;
+	}
+
 	if (d - ptr < req_len) {
-		d_printf("  here do in the future maintenance of rest of messages: %lu bytes left\n" ,req_len - (d - ptr));
+		d_printf("  here do in the future maintenance of rest of messages: %lu bytes left\n", req_len - (d - ptr));
+		printf("  here do in the future maintenance of rest of messages: %lu bytes left\n", req_len - (d - ptr));
+	}
+
+	ret = d - ptr;
+	d_printf("%s returning: %u bytes\n", __func__, ret);
+
+	return ret;
+}
+
+/*
+ * parse PEX_RESV4
+ * called by LEECHER
+ *
+ */
+int dump_pex_resp (char *ptr, int req_len, struct peer *peer, int sockfd)
+{
+	char *d;
+	int ret;
+	uint16_t pex, max_pex, space, addr_size;
+	uint32_t dest_chan_id;
+	struct peer *c;
+	struct sockaddr_in sa;
+
+	d = ptr;
+
+	dest_chan_id = be32toh(*(uint32_t *)d);
+	d_printf("Destination Channel ID: %#x\n", dest_chan_id);
+	d += sizeof(uint32_t);
+
+	if (*d == PEX_RESV4) {
+		d_printf("%s", "ok, PEX_RESV4 header\n");
+	} else {
+		printf("error, should be PEX_RESV4 header but is: %u\n", *d);
+		abort();
+	}
+	d++;
+
+	addr_size = sizeof(sa.sin_addr.s_addr) + sizeof(sa.sin_port);	/* 4 bytes IP address, 2 bytes port */
+	space = req_len - (d - ptr);
+	max_pex = space / addr_size;
+
+	if (peer->current_seeder == NULL) {
+		/* add primary seeder as a first entry to the peer_list_head list */
+		memcpy(&sa.sin_addr.s_addr, &peer->seeder_addr.sin_addr.s_addr, sizeof(sa.sin_addr.s_addr));
+		//sa.sin_port = htons(PORT);
+		sa.sin_port = peer->seeder_addr.sin_port;
+		c = new_seeder(&sa, BUFSIZE);
+		c->sockfd = sockfd;
+		add_peer_to_list(&peer_list_head, c);
+
+		/* initially set current_seeder on primary seeder */
+		peer->current_seeder = c;
+
+		d_printf("[__] %s:%u\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
+
+		d_printf("max_pex: %u\n", max_pex);
+		pex = 0;
+		while (pex < max_pex) {
+			memcpy(&sa.sin_addr.s_addr, d, sizeof(sa.sin_addr.s_addr));
+			d += sizeof(sa.sin_addr.s_addr);
+			memcpy(&sa.sin_port, d, sizeof(sa.sin_port));
+			d += sizeof(sa.sin_port);
+
+			d_printf("[%u] %s:%u\n", pex, inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
+
+			c = new_seeder(&sa, BUFSIZE);
+			c->sockfd = sockfd;
+			add_peer_to_list(&peer_list_head, c);
+
+			pex++;
+		}
 	}
 
 	ret = d - ptr;
@@ -866,16 +1068,19 @@ int dump_integrity (char *ptr, int req_len, struct peer *peer)
 	for (x = start_chunk; x <= end_chunk; x++) {
 		memcpy(peer->chunk[x].sha, d, 20);
 		peer->chunk[x].state = CH_ACTIVE;
+		peer->chunk[x].downloaded = CH_NO;
 		peer->chunk[x].offset = (x - start_chunk) * peer->chunk_size;
 		peer->chunk[x].len = peer->chunk_size;
 
-/*
+#if 1
+		int s, y;
+		char sha_buf[40 + 1];
 		s = 0;
 		for (y = 0; y < 20; y++)
 			s += sprintf(sha_buf + s, "%02x", peer->chunk[x].sha[y] & 0xff);
 		sha_buf[40] = '\0';
 		d_printf("dumping chunk %u:  %s\n", x, sha_buf);
-*/
+#endif
 
 		d += 20;
 	}
