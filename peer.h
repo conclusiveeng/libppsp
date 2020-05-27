@@ -44,12 +44,12 @@ struct schedule_entry {
 
 
 struct peer {
-	enum { 
+	enum {
 		LEECHER,
 		SEEDER
 	} type;
 
-	enum { 
+	enum {
 		SM_NONE = 0,
 		SM_HANDSHAKE_INIT,
 		SM_SEND_HANDSHAKE_HAVE,
@@ -117,13 +117,12 @@ struct peer {
 	/* network things */
 	uint16_t port;					/* seeder: udp port number to bind to */
 	struct sockaddr_in leecher_addr;		/* leecher address: IP/PORT from seeder point of view */
-	//struct in_addr seeder_addr;	/* primary seeder IP address from leecher point of view */
+	/* struct in_addr seeder_addr; */		/* primary seeder IP address from leecher point of view */
 	struct sockaddr_in seeder_addr;			/* primary seeder IP/PORT address from leecher point of view */
 	char *recv_buf;
 	char *send_buf;
 
 	int nr_in_addr;
-	//struct in_addr other_seeders[16];
 	struct sockaddr_in other_seeders[16];
 
 	uint16_t recv_len;

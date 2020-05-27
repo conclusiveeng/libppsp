@@ -308,7 +308,7 @@ void * seeder_worker (void *data)
 				abort();
 			}
 
-			/* if we (seeder) have no such SHA1 file then p->file_list_entry is NULL and as a result we cannot send anything 
+			/* if we (seeder) have no such SHA1 file then p->file_list_entry is NULL and as a result we cannot send anything
 			   to leecher but the HANDSHAKE_HAVE with special range of chunks 0xfffffffe-0xfffffffe,
 			   make_handshake_have() prepared appropriate message for leecher and we've just sent him this special message,
 			   next step is to end this thread
@@ -675,7 +675,6 @@ int net_leecher_algo1_nosm(struct peer *peer)
 
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_port = htons(PORT);
-	//servaddr.sin_addr.s_addr = peer->seeder_addr.s_addr;
 	servaddr.sin_addr.s_addr = peer->seeder_addr.sin_addr.s_addr;
 
 	/* wait for SEEDER */
@@ -2178,10 +2177,9 @@ void * leecher_algo5_worker(void *data)
 	/* set primary seeder IP:port as a initial default values */
 	memset(&servaddr, 0, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
-	//servaddr.sin_port = htons(PORT);
 	servaddr.sin_port = p->leecher_addr.sin_port;
 	servaddr.sin_addr.s_addr = p->leecher_addr.sin_addr.s_addr;
-	d_printf("pthread %#lx   IP: %s\n", p->thread, inet_ntoa(servaddr.sin_addr));
+	d_printf("pthread %#lx   IP: %s\n", (uint64_t) p->thread, inet_ntoa(servaddr.sin_addr));
 
 	fd = local_peer->fd;
 
@@ -2247,9 +2245,8 @@ void * leecher_algo5_worker(void *data)
 					s += sprintf(buf + s, "%02x", local_peer->sha_demanded[y] & 0xff);
 				buf[40] = '\0';
 				printf("Seeder %s:%u has no file for hash: %s\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port), buf);
-				//p->sm_leecher = SM_SEND_HANDSHAKE_FINISH;
 				p->to_remove = 1; /* mark peer to remove by garbage collector */
-				
+
 				goto exit;
 				continue;
 			}
@@ -2425,7 +2422,7 @@ void * leecher_algo5_worker(void *data)
 				sha_seeder_buf[40] = '\0';
 
 				printf("error - hashes are different[%lu]: seeder %s vs digest: %s\n", cc, sha_seeder_buf, sha_buf);
-				printf("pthread %#lx   IP: %s\n", p->thread, inet_ntoa(servaddr.sin_addr));
+				printf("pthread %#lx   IP: %s\n", (uint64_t) p->thread, inet_ntoa(servaddr.sin_addr));
 				abort();
 			} else {
 				local_peer->chunk[p->curr_chunk].downloaded = CH_YES;
@@ -2511,7 +2508,6 @@ void * leecher_algo5_worker(void *data)
 			/* change IP address and port for all the new connections */
 			memset(&servaddr, 0, sizeof(servaddr));
 			servaddr.sin_family = AF_INET;
-			//servaddr.sin_port = htons(PORT);
 			servaddr.sin_port = p->current_seeder->leecher_addr.sin_port;
 			servaddr.sin_addr.s_addr = p->current_seeder->leecher_addr.sin_addr.s_addr;
 
@@ -2612,7 +2608,6 @@ int net_leecher_algo5_parallel_downloading(struct peer *local_peer)
 	/* set primary seeder IP:port as a initial default values */
 	memset(&servaddr, 0, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
-	//servaddr.sin_port = htons(PORT);
 	servaddr.sin_port = local_peer->seeder_addr.sin_port;
 	servaddr.sin_addr.s_addr = local_peer->seeder_addr.sin_addr.s_addr;
 
@@ -2676,7 +2671,7 @@ int net_leecher_algo5_parallel_downloading(struct peer *local_peer)
 				printf("Primary seeder %s:%u has no file for hash: %s\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port), buf);
 				goto exit;
 			}
-			
+
 			/* build the tree */
 			local_peer->tree_root = build_tree(local_peer->nc, &local_peer->tree);
 

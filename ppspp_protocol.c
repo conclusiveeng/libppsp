@@ -431,10 +431,8 @@ int make_pex_resp (char *ptr, struct peer *peer, struct peer *we)
 	x = 0;
 	while ((x < we->nr_in_addr) && (pex < max_pex)) {
 		if (memcmp(&peer->leecher_addr.sin_addr, &we->other_seeders[x], sizeof(struct in_addr)) != 0) {
-			//memcpy(d, &we->other_seeders[x], sizeof(c->leecher_addr.sin_addr));	/* IP */
 			memcpy(d, &we->other_seeders[x].sin_addr, sizeof(c->leecher_addr.sin_addr));	/* IP */
 			d += sizeof(c->leecher_addr.sin_addr);
-			//*(uint16_t *)d = htons(PORT);
 			*(uint16_t *)d = we->other_seeders[x].sin_port;
 			d += sizeof(c->leecher_addr.sin_port);
 		}
@@ -992,7 +990,6 @@ int dump_pex_resp (char *ptr, int req_len, struct peer *peer, int sockfd)
 	if (peer->current_seeder == NULL) {
 		/* add primary seeder as a first entry to the peer_list_head list */
 		memcpy(&sa.sin_addr.s_addr, &peer->seeder_addr.sin_addr.s_addr, sizeof(sa.sin_addr.s_addr));
-		//sa.sin_port = htons(PORT);
 		sa.sin_port = peer->seeder_addr.sin_port;
 		c = new_seeder(&sa, BUFSIZE);
 		c->sockfd = sockfd;

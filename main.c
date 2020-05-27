@@ -179,7 +179,6 @@ int main (int argc, char *argv[])
 	while ((opt = getopt(argc, argv, "a:c:d:f:g:hl:p:s:t:v")) != -1) {
 		switch (opt) {
 			case 'a':				/* remote address of seeder */
-				//(void) inet_aton(optarg, &ia);
 				sa = optarg;
 				break;
 			case 'c':				/* chunk size [bytes] */
@@ -319,7 +318,6 @@ int main (int argc, char *argv[])
 				exit(1);
 			}
 
-			//sia = inet_aton(buf_ip_addr, &local_peer.other_seeders[local_peer.nr_in_addr]);
 			sia = inet_aton(buf_ip_addr, &local_peer.other_seeders[local_peer.nr_in_addr].sin_addr);
 			local_peer.other_seeders[local_peer.nr_in_addr].sin_port = ntohs(atoi(colon + 1));
 			printf("IP: %s   sia: %d\n", buf_ip_addr, sia);
