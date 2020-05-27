@@ -1,4 +1,5 @@
 CC = cc
+#CC = clang
 LIB_CFLAGS = -pthread -Wall -std=c11 -D_DEFAULT_SOURCE -fPIC
 LIB_CFLAGS += -ggdb3
 #LIB_CFLAGS += -Wextra

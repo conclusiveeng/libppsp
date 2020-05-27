@@ -27,14 +27,15 @@
 #ifndef _DEBUG_H_
 #define _DEBUG_H_
 
-#include <unistd.h>
+#include <pthread.h>
+
 
 extern int debug;
 
 #define _assert(cond, format, ...) do {					\
 	if (!(cond)) {							\
-		printf("*** %s:%u %s() [%u] Assertion failed: " format,	\
-		__FILE__, __LINE__, __func__, getpid(), __VA_ARGS__);	\
+		printf("*** %s:%u %s() [%#lx] Assertion failed: " format,	\
+		__FILE__, __LINE__, __func__, pthread_self(), __VA_ARGS__);	\
 		abort(); }						\
 } while(0)
 

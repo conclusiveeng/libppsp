@@ -37,6 +37,7 @@
 
 #include "mt.h"
 
+#define INTERNAL_LINKAGE __attribute__((__visibility__("hidden")))
 
 struct schedule_entry {
 	uint64_t begin, end;
@@ -116,7 +117,6 @@ struct peer {
 	/* network things */
 	uint16_t port;					/* seeder: udp port number to bind to */
 	struct sockaddr_in leecher_addr;		/* leecher address: IP/PORT from seeder point of view */
-	/* struct in_addr seeder_addr; */		/* primary seeder IP address from leecher point of view */
 	struct sockaddr_in seeder_addr;			/* primary seeder IP/PORT address from leecher point of view */
 	char *recv_buf;
 	char *send_buf;
@@ -166,7 +166,6 @@ struct file_list_entry {
 	struct chunk *tab_chunk;	/* array of chunks for this file */
 	struct node *tree;		/* tree of the file */
 	struct node *tree_root;		/* pointer to root node of the tree */
-
 	uint32_t start_chunk;
 	uint32_t end_chunk;
 
