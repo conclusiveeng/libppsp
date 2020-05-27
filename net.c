@@ -2149,7 +2149,6 @@ void * leecher_algo5_worker(void *data)
 	pos.opt_map |= (1 << LIVE_DISC_WIND);
 	pos.opt_map |= (1 << SUPPORTED_MSGS);
 	pos.opt_map |= (1 << CHUNK_SIZE);
-
 	pos.opt_map |= (1 << FILE_SIZE);
 	pos.opt_map |= (1 << FILE_NAME);
 	pos.opt_map |= (1 << FILE_HASH);
@@ -2221,6 +2220,11 @@ void * leecher_algo5_worker(void *data)
 			}
 
 			if (n <= 0) {
+				if (all_chunks_downloaded(local_peer) == 1) {
+					p->sm_leecher = SM_SEND_HANDSHAKE_FINISH;
+					continue;
+				}
+
 				if (p->after_seeder_switch == 0)
 					p->sm_leecher = SM_HANDSHAKE;
 				else

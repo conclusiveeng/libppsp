@@ -187,6 +187,7 @@ struct peer * new_seeder (struct sockaddr_in *, int);
 void cleanup_peer (struct peer *);
 void cleanup_all_dead_peers (struct peer *);
 void create_download_schedule (struct peer *);
+int all_chunks_downloaded (struct peer *);
 void create_file_list (char *);
 
 #endif /* _PEER_H_ */

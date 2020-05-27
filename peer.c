@@ -240,6 +240,26 @@ void create_download_schedule (struct peer *p)
 }
 
 
+int all_chunks_downloaded (struct peer *p)
+{
+	int ret;
+	uint64_t x;
+
+	d_printf("%s", "checking whether all of chunks has been downloaded\n");
+
+	ret = 1;
+	x = 0;
+	while ((x < p->nc)) {
+		if (p->chunk[x].downloaded == CH_NO) {
+			ret = 0;
+			break;
+		}
+		x++;
+	}
+	return ret;
+}
+
+
 void list_dir (char *dname)
 {
 	DIR *dir;
