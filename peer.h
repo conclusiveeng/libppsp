@@ -83,7 +83,7 @@ struct peer {
 	uint32_t src_chan_id;
 	uint32_t dest_chan_id;
 	struct peer *seeder;		/* pointer to seeder peer struct - used on seeder side in threads */
-	struct peer *local_leecher;	/* pointer to local leecher peer struct - used on leecher side in threads in algo5 */
+	struct peer *local_leecher;	/* pointer to local leecher peer struct - used on leecher side in threads */
 	struct node *tree;		/* pointer to beginning (index 0) array with tree nodes */
 	struct node *tree_root;		/* pointer to root of the tree */
 	struct chunk *chunk;		/* array of chunks */
@@ -105,7 +105,6 @@ struct peer {
 	pthread_t thread;
 	uint8_t thread_num;				/* only for debugging - thread number */
 
-	uint8_t algo;					/* leecher's algorithm number: 4 or 5 */
 	uint32_t timeout;
 
 	/* timestamp of last received and sent message */

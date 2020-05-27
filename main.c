@@ -158,7 +158,7 @@ int main (int argc, char *argv[])
 	char *fname1, *fname, *fname2, usage, *peer_list, *colon, *comma, *last_char, *ch, *dir, *sa;
 	char sha[40 + 1], *sha_demanded;
 	char buf_ip_addr[24], buf_ip_port[64];
-	int opt, chunk_size, type, sia, algo, s, y, port;
+	int opt, chunk_size, type, sia, s, y, port;
 	uint32_t timeout;
 	struct stat stat;
 	struct file_list_entry *f, *fi;
@@ -169,14 +169,13 @@ int main (int argc, char *argv[])
 	debug = 0;
 	usage = 0;
 	peer_list = NULL;
-	algo = -1;
 	dir = NULL;
 	type = LEECHER;
 	timeout = 3 * 60;	/* 3 minutes timeout as default */
 	sha_demanded = NULL;
 	port = 6778;
 	sa = NULL;
-	while ((opt = getopt(argc, argv, "a:c:d:f:g:hl:p:s:t:v")) != -1) {
+	while ((opt = getopt(argc, argv, "a:c:d:f:hl:p:s:t:v")) != -1) {
 		switch (opt) {
 			case 'a':				/* remote address of seeder */
 				sa = optarg;
@@ -189,9 +188,6 @@ int main (int argc, char *argv[])
 				break;
 			case 'f':				/* filename */
 				fname1 = optarg;
-				break;
-			case 'g':				/* algorithm */
-				algo = atoi(optarg);
 				break;
 			case 'h':				/* help/usage */
 				usage = 1;
@@ -228,7 +224,6 @@ int main (int argc, char *argv[])
 		printf("		example: -d /tmp/directory\n");
 		printf("-f filename:	filename of the file for sharing, enables SEEDER mode\n");
 		printf("		example: -f ./filename\n");
-		printf("-g algorithm:	algorithm number: 4 or 5, valid only on LEECHER side\n");
 		printf("-h:		this help\n");
 		printf("-l:		list of pairs of IP address and udp port of other seeders, separated by comma ','\n");
 		printf("		valid only for SEEDER\n");
@@ -246,7 +241,7 @@ int main (int argc, char *argv[])
 		printf("%s -f filename -c 1024 -t 5 -l 192.168.1.1:6778\n", argv[0]);
 		printf("%s -d /tmp/test -c 1024 -t 5 -l 192.168.1.1:6778,192.168.1.2:6778 -p 6778\n\n", argv[0]);
 		printf("LEECHER mode:\n");
-		printf("%s -a 192.168.1.1 -g 5 -s 82da6c1c7ac0de27c3fedf1dd52560323e7b1758 -t 10\n\n", argv[0]);
+		printf("%s -a 192.168.1.1 -s 82da6c1c7ac0de27c3fedf1dd52560323e7b1758 -t 10\n\n", argv[0]);
 		exit(0);
 	}
 
@@ -263,11 +258,6 @@ int main (int argc, char *argv[])
 	if (type == LEECHER) {
 		if (sa == NULL) {
 			printf("Error: in LEECHER mode '-a' parameter is obligatory\n");
-			exit(1);
-		}
-
-		if ((algo == -1) || ((algo != 4) && (algo != 5))) {
-			printf("Error: algorithm must have value of 4 or 5\n");
 			exit(1);
 		}
 
@@ -383,7 +373,6 @@ int main (int argc, char *argv[])
 		local_peer.file_size = 0;
 		local_peer.timeout = timeout;
 		local_peer.current_seeder = NULL;
-		local_peer.algo = algo;
 		ascii_sha_to_bin(sha_demanded, local_peer.sha_demanded);
 
 		proto_test(&local_peer);
