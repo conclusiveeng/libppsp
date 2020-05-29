@@ -404,9 +404,10 @@ int make_request (char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32
 int make_pex_resp (char *ptr, struct peer *peer, struct peer *we)
 {
 	char *d;
-	int ret, addr_size, x;
+	int ret, addr_size;
 	uint16_t space, max_pex, pex;
-	struct peer *c;
+	//struct peer *c;
+	struct other_seeders_entry *e;
 
 	d = ptr;
 
@@ -426,8 +427,9 @@ int make_pex_resp (char *ptr, struct peer *peer, struct peer *we)
 	d_printf("we're sending PEX_RESP to: %s\n", inet_ntoa(peer->leecher_addr.sin_addr));
 
 
-	/* IP addresses taken from "-l" commandline option: -l ip1:ip2:ip3: ...etc */
+	/* IP addresses taken from "-l" commandline option: -l ip1:port1,ip2:port2,ip3:port3 ...etc */
 	pex = 0;
+#if 0
 	x = 0;
 	while ((x < we->nr_in_addr) && (pex < max_pex)) {
 		if (memcmp(&peer->leecher_addr.sin_addr, &we->other_seeders[x], sizeof(struct in_addr)) != 0) {
@@ -437,6 +439,16 @@ int make_pex_resp (char *ptr, struct peer *peer, struct peer *we)
 			d += sizeof(c->leecher_addr.sin_port);
 		}
 		x++;
+	}
+#endif
+	SLIST_FOREACH(e, &other_seeders_list_head, next) {
+			memcpy(d, &e->sa.sin_addr, sizeof(struct in_addr));	/* IP */
+			d += sizeof(struct in_addr);
+			*(uint16_t *)d = e->sa.sin_port;			/* UDP port */
+			d += sizeof(e->sa.sin_port);
+		pex++;
+		if (pex >= max_pex)
+			break;
 	}
 
 

@@ -121,9 +121,6 @@ struct peer {
 	char *recv_buf;
 	char *send_buf;
 
-	int nr_in_addr;
-	struct sockaddr_in other_seeders[16];
-
 	uint16_t recv_len;
 	int sockfd, fd;
 	pthread_mutex_t fd_mutex;
@@ -153,10 +150,9 @@ struct peer {
 };
 
 
+/* list of files shared by seeder */
 SLIST_HEAD(slisthead, file_list_entry);
-
 extern struct slisthead file_list_head;
-
 struct file_list_entry {
 	char path[1024];		/* full path to file: directory name + file name */
 	char sha[20];			/* do we need this? */
@@ -170,6 +166,15 @@ struct file_list_entry {
 	uint32_t end_chunk;
 
 	SLIST_ENTRY(file_list_entry) next;
+};
+
+
+/* list of other (alternative) seeders maintained by primary seeder */
+SLIST_HEAD(slist_seeders, other_seeders_entry);
+extern struct slist_seeders other_seeders_list_head;
+struct other_seeders_entry {
+	struct sockaddr_in sa;
+	SLIST_ENTRY(other_seeders_entry) next;
 };
 
 

@@ -245,7 +245,7 @@ int all_chunks_downloaded (struct peer *p)
 	int ret;
 	uint64_t x;
 
-	d_printf("%s", "checking whether all of chunks has been downloaded\n");
+	d_printf("%s", "checking whether all of chunks have been downloaded\n");
 
 	ret = 1;
 	x = 0;
@@ -269,7 +269,8 @@ void list_dir (char *dname)
 	struct stat stat;
 
 	dir = opendir(dname);
-	if (dir == NULL) return;
+	if (dir == NULL) 
+		return;
 
 	while (1) {
 		dirent = readdir(dir);
@@ -296,7 +297,6 @@ void list_dir (char *dname)
 
 void create_file_list (char *dname)
 {
-	SLIST_INIT(&file_list_head);
 	list_dir(dname);
 }
 

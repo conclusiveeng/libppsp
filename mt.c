@@ -42,12 +42,7 @@
 #include "peer.h"
 #include "debug.h"
 
-extern char *optarg;
-extern int optind, opterr, optopt;
-int debug;
-struct node *tree, *root8, *root16, *root32;
-struct chunk *tab_chunk;
-struct peer local_peer;
+extern int debug;
 
 
 /*
