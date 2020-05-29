@@ -44,10 +44,8 @@
 
 struct slist_seeders other_seeders_list_head;
 
-extern char *optarg;
-//extern int optind, opterr, optopt;
 int debug;
-struct peer local_peer;
+struct peer local_seeder;
 
 
 void process_file(struct file_list_entry *file_entry, int chunk_size)
@@ -144,12 +142,12 @@ void process_file(struct file_list_entry *file_entry, int chunk_size)
 
 void ppspp_seeder_create (seeder_params_t *params)
 {
-	memset(&local_peer, 0, sizeof(struct peer));
+	memset(&local_seeder, 0, sizeof(struct peer));
 
-	local_peer.chunk_size = params->chunk_size;
-	local_peer.timeout = params->timeout;
-	local_peer.port = params->port;
-	local_peer.type = SEEDER;
+	local_seeder.chunk_size = params->chunk_size;
+	local_seeder.timeout = params->timeout;
+	local_seeder.port = params->port;
+	local_seeder.type = SEEDER;
 	
 	SLIST_INIT(&file_list_head);
 	// init other_seeders list
@@ -161,17 +159,17 @@ int ppspp_seeder_add_seeder(struct sockaddr_in *sa)
 {
 	struct other_seeders_entry *ss;
 	int ret;
-	
+
 	// add mutex protection here
-	
+
 	ret = 0;
-	
+
 	ss = malloc(sizeof(struct other_seeders_entry));
-	
+
 	memcpy(&ss->sa, sa, sizeof(struct sockaddr_in));
 
 	SLIST_INSERT_HEAD(&other_seeders_list_head, ss, next);
-	
+
 	return ret;
 }
 
@@ -192,8 +190,6 @@ int ppspp_seeder_remove_seeder(struct sockaddr_in *sa)
 		}
 	}
 
-	
-	
 	return ret;
 }
 
@@ -204,7 +200,6 @@ void ppspp_seeder_list_seeders(void)
 
 	SLIST_FOREACH(e, &other_seeders_list_head, next) {
 		printf("%s:%u\n", inet_ntoa(e->sa.sin_addr), ntohs(e->sa.sin_port));
-		
 	}
 }
 
@@ -242,7 +237,7 @@ void ppspp_seeder_add_file_or_directory(char *name)
 		if (f->tree_root == NULL) {		/* no - so create tree for it */
 			printf("processing: %s  ", f->path);
 			fflush(stdout);
-			process_file(f, local_peer.chunk_size);
+			process_file(f, local_seeder.chunk_size);
 
 			memset(sha, 0, sizeof(sha));
 			s = 0;
@@ -282,7 +277,7 @@ int ppspp_seeder_remove_file_or_directory(char *name)
 	if (stat.st_mode & S_IFREG) {	/* does the user want to remove file? */
 		SLIST_FOREACH(f, &file_list_head, next) {
 			if (strcmp(f->path, name) == 0) {
-				printf("file to remove found: %s\n", name);
+				d_printf("file to remove found: %s\n", name);
 				remove_and_free(f);
 			}
 		}
@@ -290,17 +285,17 @@ int ppspp_seeder_remove_file_or_directory(char *name)
 		buf = malloc(strlen(name) + 2);
 		memset(buf, 0, strlen(name) + 2);
 		strcpy(buf, name);
-		
+
 		/* "name" is directory name and must be ended with slash here - check it */
 		if (buf[strlen(buf) - 1] != '/') {
 			buf[strlen(buf)] = '/';
-			printf("adding / to dir name: %s => %s\n", name, buf);
+			d_printf("adding / to dir name: %s => %s\n", name, buf);
 		}
-		
+
 		SLIST_FOREACH(f, &file_list_head, next) {
 			c = strstr(f->path, buf);	/* compare current file entry with directory name to remove */
 			if (c == f->path) {		/* if both matches */
-				printf("removing file: %s\n", f->path);
+				d_printf("removing file: %s\n", f->path);
 				remove_and_free(f);
 			}
 		}
@@ -313,5 +308,5 @@ int ppspp_seeder_remove_file_or_directory(char *name)
 
 void ppspp_seeder_run (void)
 {
-	proto_test(&local_peer);
+	proto_test(&local_seeder);
 }
