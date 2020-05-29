@@ -66,12 +66,10 @@ void ascii_sha_to_bin (char *sha_ascii, uint8_t *bin)
 int main (int argc, char *argv[])
 {
 	char *fname1, *fdname, *fname2, usage, *peer_list, *colon, *comma, *last_char, *ch, *sa;
-	char sha[40 + 1], *sha_demanded;
+	char *sha_demanded;
 	char buf_ip_addr[24], buf_ip_port[64];
-	int opt, chunk_size, type, sia, s, y, port;
+	int opt, chunk_size, type, sia, port;
 	uint32_t timeout;
-	struct stat stat;
-	struct file_list_entry *f, *fi;
 	struct sockaddr_in sa_in;
 
 
