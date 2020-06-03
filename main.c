@@ -34,6 +34,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <errno.h>
 
 #include "mt.h"
 #include "sha1.h"
@@ -45,7 +46,7 @@
 
 
 struct peer local_peer;
-seeder_params_t seeder_params;
+
 
 void ascii_sha_to_bin (char *sha_ascii, uint8_t *bin)
 {
@@ -68,10 +69,13 @@ int main (int argc, char *argv[])
 	char *fname1, *fdname, *fname2, usage, *peer_list, *colon, *comma, *last_char, *ch, *sa;
 	char *sha_demanded;
 	char buf_ip_addr[24], buf_ip_port[64];
-	int opt, chunk_size, type, sia, port;
-	uint32_t timeout;
+	uint8_t *transfer_buf;
+	int opt, chunk_size, type, sia, port, old, file_exist, fd;
+	uint32_t timeout, buf_size;
 	struct sockaddr_in sa_in;
-
+	seeder_params_t seeder_params;
+	leecher_params_t leecher_params;
+	metadata_t meta;
 
 	chunk_size = 1024;
 	fdname = fname1 = NULL;
@@ -83,7 +87,8 @@ int main (int argc, char *argv[])
 	sha_demanded = NULL;
 	port = 6778;
 	sa = NULL;
-	while ((opt = getopt(argc, argv, "a:c:f:hl:p:s:t:v")) != -1) {
+	old = 0;
+	while ((opt = getopt(argc, argv, "a:c:f:hl:op:s:t:v")) != -1) {
 		switch (opt) {
 			case 'a':				/* remote address of seeder */
 				sa = optarg;
@@ -99,6 +104,9 @@ int main (int argc, char *argv[])
 				break;
 			case 'l':				/* peer IP list separated by ':' */
 				peer_list = optarg;
+				break;
+			case 'o':				/* old method for calling leecher */
+				old = 1;
 				break;
 			case 'p':				/* UDP port number of seeder */
 				port = atoi(optarg);
@@ -120,7 +128,7 @@ int main (int argc, char *argv[])
 	if (usage || (argc == 1)) {
 		printf("Peer-to-Peer Streaming Peer Protocol proof of concept\n");
 		printf("usage:\n");
-		printf("%s: -acdfghlpstv\n", argv[0]);
+		printf("%s: -acfhlopstv\n", argv[0]);
 		printf("-a ip_address:port:	numeric IP address and udp port of the remote SEEDER, enables LEECHER mode\n");
 		printf("			example: -a 192.168.1.1:6778\n");
 		printf("-c:			chunk size in bytes valid only on the SEEDER side, default: 1024 bytes\n");
@@ -132,6 +140,7 @@ int main (int argc, char *argv[])
 		printf("-l:			list of pairs of IP address and udp port of other seeders, separated by comma ','\n");
 		printf("			valid only for SEEDER\n");
 		printf("			example: -l 192.168.1.1:6778,192.168.1.2:6778,192.168.1.4:6778\n");
+		printf("-o:			old method for calling leecher\n");
 		printf("-p port:		UDP listening port number, valid only on SEEDER side, default 6778\n");
 		printf("			example: -p 7777\n");
 		printf("-s sha1:		SHA1 of the file for downloading, valid only on LEECHER side\n");
@@ -171,13 +180,19 @@ int main (int argc, char *argv[])
 		}
 	}
 
+	/* for leecher only */
 	if (sa != NULL) {
 		colon = strchr(sa, ':');
 		if (colon != NULL) {
 			memset(buf_ip_port, 0, sizeof(buf_ip_port));
 			memcpy(buf_ip_port, sa, colon - sa);
-			inet_aton(buf_ip_port, &local_peer.seeder_addr.sin_addr);
-			local_peer.seeder_addr.sin_port = ntohs(atoi(colon + 1));
+			if (old) {
+				inet_aton(buf_ip_port, &local_peer.seeder_addr.sin_addr);
+				local_peer.seeder_addr.sin_port = ntohs(atoi(colon + 1));
+			} else {
+				inet_aton(buf_ip_port, &leecher_params.seeder_addr.sin_addr);
+				leecher_params.seeder_addr.sin_port = ntohs(atoi(colon + 1));
+			}
 		} else {
 			printf("Error: no colon found at: %s\n", sa);
 			exit(1);
@@ -249,24 +264,91 @@ int main (int argc, char *argv[])
 		ppspp_seeder_remove_file_or_directory("/tmp/test2");
 		
 
-//		proto_test(&local_peer);
 		ppspp_seeder_run();
 
 		free(fname2);
 
 	} else { /* LEECHER mode */
-		local_peer.tree = NULL;
-		local_peer.nl = 0;
-		local_peer.nc = 0;
-		local_peer.type = LEECHER;
-		memset(local_peer.fname, 0, sizeof(local_peer.fname));
-		local_peer.fname_len = 0;
-		local_peer.file_size = 0;
-		local_peer.timeout = timeout;
-		local_peer.current_seeder = NULL;
-		ascii_sha_to_bin(sha_demanded, local_peer.sha_demanded);
+		if (old) {
+			/* leecher continuous version (old one) */
+			printf("old method\n");
+			local_peer.sbs_mode = 0;
+			local_peer.tree = NULL;
+			local_peer.nl = 0;
+			local_peer.nc = 0;
+			local_peer.type = LEECHER;
+			memset(local_peer.fname, 0, sizeof(local_peer.fname));
+			local_peer.fname_len = 0;
+			local_peer.file_size = 0;
+			local_peer.timeout = timeout;
+			local_peer.current_seeder = NULL;
+			ascii_sha_to_bin(sha_demanded, local_peer.sha_demanded);
+			//proto_test(&local_peer);
+			net_leecher_continuous(&local_peer);
+		} else {
+			/* prepare data for step-by-step leecher version */
+			leecher_params.timeout = timeout;
+			ascii_sha_to_bin(sha_demanded, leecher_params.sha_demanded);
+			ppspp_leecher_create(&leecher_params);
 
-		proto_test(&local_peer);
+			/* get metadata for demanded sha file */
+			file_exist = ppspp_leecher_get_metadata(&meta);
+			if (file_exist == 0) {
+				printf("seeder has demanded file: %s  size: %lu  chunks: %lu-%lu\n", meta.file_name, meta.file_size, meta.start_chunk, meta.end_chunk);
+
+				unlink(meta.file_name);
+				fd = open(meta.file_name, O_WRONLY | O_CREAT, 0744);
+				if (fd < 0) {
+					printf("error opening file '%s' for writing: %u %s\n", meta.file_name, errno, strerror(errno));
+					abort();
+				}
+#if 1
+				/* file descriptor transfer method */
+				//ppspp_set_fd_transfer_method(fd); // proc zastapiona przez ppspp_leecher_fetch_chunk_to_fd
+
+				/* run 1 (non-blocking) leecher thread with state machine */
+				//net_leecher_sbs(&local_peer);
+				ppspp_leecher_run();
+
+				/* let the library prepare itself for transfer */
+				//ppspp_prepare_chunk_range(0, 1);
+				ppspp_prepare_chunk_range(meta.start_chunk, meta.end_chunk);
+
+				printf("fd: %u\n\n", fd);
+
+				ppspp_leecher_fetch_chunk_to_fd(fd);
+				printf("main: przed close\n");
+
+				ppspp_leecher_close();
+#else
+				/* transfering buffer transfer method */
+
+				/* run 1 (non-blocking) leecher thread with state machine */
+				//net_leecher_sbs(&local_peer);
+				ppspp_leecher_run();
+
+				/* let the library prepare itself for transfer */
+				buf_size = ppspp_prepare_chunk_range(0, 99);
+				printf("wielkosc bufora do zaallokowania: %u\n", buf_size);
+		
+				transfer_buf = malloc(buf_size);
+				
+				ppspp_leecher_fetch_chunk_to_buf(transfer_buf);
+
+				buf_size = ppspp_prepare_chunk_range(100, 199);
+				ppspp_leecher_fetch_chunk_to_buf(transfer_buf);
+
+
+				printf("main: przed close\n");
+
+				ppspp_leecher_close();
+				free(transfer_buf);
+
+#endif	
+			}
+			
+		}
+
 	}
 
 	return 0;

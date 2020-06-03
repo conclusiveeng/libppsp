@@ -85,6 +85,7 @@ int remove_peer_from_list (struct peer *list_head, struct peer *peer)
 		ret = 0;
 	} else {
 		ret = -2; /* peer not found in the list */
+		printf("error: peer to remove: %#lx not found\n", (uint64_t) peer);
 	}
 
 	return ret;
@@ -94,15 +95,20 @@ int remove_peer_from_list (struct peer *list_head, struct peer *peer)
 struct peer * ip_port_to_peer (struct peer *list_head, struct sockaddr_in *client)
 {
 	struct peer *p;
+	int x;
 
+	x = 0;
 	p = list_head->next; /* get the first element of the list */
 	while (p != NULL) {
 		if (memcmp(&p->leecher_addr, client, sizeof(struct sockaddr_in)) == 0) {
 			return p;
 		}
 		p = p->next;
+		x++;
 	}
 
+	printf("x: %u\n", x);
+	
 	return NULL;
 }
 
@@ -171,10 +177,10 @@ void cleanup_peer (struct peer *p)
 
 		d_printf("cleaning up peer: %#lx\n", (uint64_t) p);
 		(void) remove_peer_from_list(&peer_list_head, p);
-
+		
 		/* destroy the semaphore */
-		pthread_mutex_destroy(&p->mutex);
-		pthread_cond_destroy(&p->mtx_cond);
+		pthread_mutex_destroy(&p->seeder_mutex);
+		pthread_cond_destroy(&p->seeder_mtx_cond);
 	}
 
 	/* free allocated memory */
@@ -235,9 +241,50 @@ void create_download_schedule (struct peer *p)
 		p->download_schedule[p->download_schedule_len].begin = oldo;
 		p->download_schedule[p->download_schedule_len].end = o - 1;
 		p->download_schedule_len++;
+		
+		_assert((p->chunk[o].downloaded == CH_NO) || (p->chunk[o].downloaded == CH_YES), "p->chunk[o].downloaded should have CH_NO or CH_YES, but have: %u\n", p->chunk[o].downloaded);
+		_assert(p->download_schedule_len <= p->nc, "p->download_schedule_len should be <= p->nc, but p->download_schedule_len=%lu and p->nc=%u\n", p->download_schedule_len, p->nc);
 	}
 	printf("\n");
 }
+
+
+/*
+ * basing on chunk array - create download schedule (array)
+ */
+void create_download_schedule_sbs (struct peer *p, uint32_t start_chunk, uint32_t end_chunk)
+{
+	uint64_t o, oldo, y;
+
+	d_printf("creating schedule for %u chunks\n", p->nc);
+
+	p->download_schedule_len = 0;
+	o = start_chunk;
+	while ((o < p->nc) && (o <= end_chunk)) {
+		/* find first/closest not yet downloaded chunk */
+		while ((p->chunk[o].downloaded == CH_YES) && (o < p->nc)) o++;
+		if (o >= p->nc) break;
+
+		oldo = o;
+		y = 0;
+		while ((y < p->hashes_per_mtu) && (o < p->nc) && (o <= end_chunk)) {
+			if (p->chunk[o].downloaded == CH_NO) o++;
+			else break;
+			y++;
+		}
+		d_printf("range of chunks: %lu-%lu   %lu\n", oldo, o - 1, o - oldo);
+		printf("range of chunks: %lu-%lu   %lu\n", oldo, o - 1, o - oldo);
+
+		p->download_schedule[p->download_schedule_len].begin = oldo;
+		p->download_schedule[p->download_schedule_len].end = o - 1;
+		p->download_schedule_len++;
+		
+		_assert((p->chunk[o].downloaded == CH_NO) || (p->chunk[o].downloaded == CH_YES), "p->chunk[o].downloaded should have CH_NO or CH_YES, but have: %u\n", p->chunk[o].downloaded);
+		_assert(p->download_schedule_len <= p->nc, "p->download_schedule_len should be <= p->nc, but p->download_schedule_len=%lu and p->nc=%u\n", p->download_schedule_len, p->nc);
+	}
+	printf("\n");
+}
+
 
 
 int all_chunks_downloaded (struct peer *p)

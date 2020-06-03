@@ -32,15 +32,40 @@ typedef struct {
 	uint16_t port;					/* seeder: udp port number to bind to */
 } seeder_params_t;
 
+typedef struct {
+	uint32_t timeout;
+	uint8_t sha_demanded[20];
+	struct sockaddr_in seeder_addr;			/* primary seeder IP/PORT address from leecher point of view */
+} leecher_params_t;
 
+/* metadata of the file published for user of library */
+typedef struct {
+	char file_name[256];
+	uint64_t file_size;
+	uint32_t chunk_size;
+	uint32_t start_chunk;
+	uint32_t end_chunk;
+} metadata_t;
 
 void process_file(struct file_list_entry *, int);
-void ppspp_seeder_create (seeder_params_t *);
+void ppspp_seeder_create(seeder_params_t *);
 int ppspp_seeder_add_seeder(struct sockaddr_in *);
 int ppspp_seeder_remove_seeder(struct sockaddr_in *);
 void ppspp_seeder_list_seeders(void);
 void ppspp_seeder_add_file_or_directory(char *);
 int ppspp_seeder_remove_file_or_directory(char *);
-void ppspp_seeder_run (void);
+void ppspp_seeder_run(void);
+void ppspp_seeder_close(void);
 
+void ppspp_leecher_create(leecher_params_t *);
+int ppspp_leecher_get_metadata(metadata_t *);
+//void ppspp_set_fd_transfer_method(int);
+//void ppspp_set_buf_transfer_method(void);
+uint32_t ppspp_prepare_chunk_range(uint32_t, uint32_t);
+
+void ppspp_leecher_fetch_chunk_to_fd(int);
+void ppspp_leecher_fetch_chunk_to_buf(uint8_t *);
+void ppspp_leecher_close(void);
+
+void ppspp_leecher_run(void);
 #endif /* _PPSPP_H_ */

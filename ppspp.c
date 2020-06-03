@@ -45,10 +45,10 @@
 struct slist_seeders other_seeders_list_head;
 
 int debug;
-struct peer local_seeder;
+struct peer local_seeder, local_leecher;
 
 
-void process_file(struct file_list_entry *file_entry, int chunk_size)
+INTERNAL_LINKAGE void process_file(struct file_list_entry *file_entry, int chunk_size)
 {
 	char *buf;
 	unsigned char digest[20 + 1];
@@ -135,11 +135,6 @@ void process_file(struct file_list_entry *file_entry, int chunk_size)
 }
 
 
-
-
-
-
-
 void ppspp_seeder_create (seeder_params_t *params)
 {
 	memset(&local_seeder, 0, sizeof(struct peer));
@@ -172,7 +167,6 @@ int ppspp_seeder_add_seeder(struct sockaddr_in *sa)
 
 	return ret;
 }
-
 
 
 int ppspp_seeder_remove_seeder(struct sockaddr_in *sa)
@@ -250,7 +244,7 @@ void ppspp_seeder_add_file_or_directory(char *name)
 
 
 
-void remove_and_free(struct file_list_entry *f)
+INTERNAL_LINKAGE void remove_and_free(struct file_list_entry *f)
 {
 	free(f->tab_chunk);
 	free(f->tree);
@@ -306,7 +300,147 @@ int ppspp_seeder_remove_file_or_directory(char *name)
 }
 
 
-void ppspp_seeder_run (void)
+void ppspp_seeder_run(void)
 {
 	proto_test(&local_seeder);
 }
+
+
+void ppspp_seeder_close(void)
+{
+}
+
+
+void ppspp_leecher_create(leecher_params_t *params)
+{
+	memset(&local_leecher, 0, sizeof(struct peer));
+
+	local_leecher.sbs_mode = 1;
+	local_leecher.timeout = params->timeout;
+	local_leecher.type = LEECHER;
+	local_leecher.current_seeder = NULL;
+	memcpy(&local_leecher.seeder_addr, &params->seeder_addr, sizeof(struct sockaddr_in));
+	//printf("create leecher: %s:%u\n", inet_ntoa(local_leecher.seeder_addr.sin_addr), ntohs(local_leecher.seeder_addr.sin_port));
+	memcpy(&local_leecher.sha_demanded, params->sha_demanded, 20);
+
+	
+}
+
+
+void ppspp_leecher_run(void)
+{
+	net_leecher_sbs(&local_leecher);
+}
+
+
+// this proc is optional because ppspp_leecher_create() also sets sha_demanded
+void ppspp_leecher_set_sha(leecher_params_t *params)
+{
+	memcpy(&local_leecher.sha_demanded, params->sha_demanded, 20);
+}
+
+
+int ppspp_leecher_get_metadata(metadata_t *meta)
+{
+	int ret;
+	
+	/* ask seeder if he has got a file for our sha stored in local_leecher->sha_demanded[] */
+	preliminary_connection_sbs(&local_leecher);
+	
+	if (local_leecher.seeder_has_file == 1) {
+		ret = 0;
+		if (meta != NULL) {
+			/* prepare returning data for user */
+			strcpy(meta->file_name, local_leecher.fname);
+			meta->file_size = local_leecher.file_size;
+			meta->chunk_size = local_leecher.chunk_size;
+			meta->start_chunk = local_leecher.start_chunk;
+			meta->end_chunk = local_leecher.end_chunk;
+		}
+	} else 
+		ret = -1;	/* file does not exist for demanded SHA on seeder */
+
+	
+	/* response is in local_leecher */
+	return ret;
+}
+
+
+// ta proc zostala zastapiona przez ppspp_leecher_fetch_chunk_to_fd()
+/*
+void ppspp_set_fd_transfer_method(int fd)
+{
+	local_leecher.fd = fd;
+	local_leecher.transfer_method = M_FD;
+}
+*/
+
+// ta proc zostala zastapiona przez ppspp_leecher_fetch_chunk_to_buf()
+/*
+void ppspp_set_buf_transfer_method(void)
+{
+	// tu pobrac od usera adrs bufora do komunkacji, jego wielkosc, i ilosc chunkow, albo raczej index w tab schedule_download
+//	local_leecher.fd = fd;
+	local_leecher.transfer_method = M_BUF;
+}
+*/
+
+
+uint32_t ppspp_prepare_chunk_range(uint32_t start_chunk, uint32_t end_chunk)
+{
+	uint32_t buf_size;
+	// tu utworzyc download_schedule dla podanego przez usera zakresu chunkow
+
+	/* if download_schedule previously allocated - free it now */
+	if (local_leecher.download_schedule != NULL) {
+		free(local_leecher.download_schedule);
+		local_leecher.download_schedule = NULL;
+	}
+
+	local_leecher.download_schedule = malloc(local_leecher.nl * sizeof(struct schedule_entry));
+	memset(local_leecher.download_schedule, 0, local_leecher.nl * sizeof(struct schedule_entry));
+	create_download_schedule_sbs(&local_leecher, start_chunk, end_chunk);
+
+	buf_size = (end_chunk - start_chunk + 1) * local_leecher.chunk_size;
+
+	// tu zwrocic wielkosc bufora w bajtach ktora musi sobie user zaallokowac
+	return buf_size;
+}
+
+
+
+void ppspp_leecher_fetch_chunk_to_fd(int fd)
+{
+	local_leecher.cmd = CMD_FETCH;
+	local_leecher.fd = fd;
+	local_leecher.transfer_method = M_FD;
+	
+	// tu trzebaby poczekac az maszyna stanow zglosi sie w stanie connected
+	// wyslij komende do wszysktich peer-ow poprzez strukture local_peer
+	net_leecher_fetch_chunk(&local_leecher);
+}
+
+
+
+void ppspp_leecher_fetch_chunk_to_buf(uint8_t *transfer_buf)
+{
+	local_leecher.cmd = CMD_FETCH;
+	local_leecher.transfer_buf = transfer_buf;
+	local_leecher.transfer_method = M_BUF;
+	
+	// tu trzebaby poczekac az maszyna stanow zglosi sie w stanie connected
+	// wyslij komende do wszysktich peer-ow poprzez strukture local_peer
+	net_leecher_fetch_chunk(&local_leecher);
+}
+
+
+
+
+
+
+void ppspp_leecher_close(void)
+{
+	local_leecher.cmd = CMD_FINISH;
+	net_leecher_close(&local_leecher);
+}
+

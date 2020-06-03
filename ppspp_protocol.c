@@ -892,10 +892,12 @@ int dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 	}
 
 	if (peer->download_schedule == NULL) {
-		peer->download_schedule = malloc(peer->nl * sizeof(struct schedule_entry));
-		memset(peer->download_schedule, 0, peer->nl * sizeof(struct schedule_entry));
-
-		create_download_schedule(peer);
+		/* don't create download_schedule[] here for step-by-step mode because it will be created in other procedure for sbs */
+		if (peer->sbs_mode == 0) {
+			peer->download_schedule = malloc(peer->nl * sizeof(struct schedule_entry));
+			memset(peer->download_schedule, 0, peer->nl * sizeof(struct schedule_entry));
+			create_download_schedule(peer);
+		}
 	} else {
 		d_printf("%s", "error - peer->download_schedule has already allocated memory, HAVE should be send only once\n");
 	}
@@ -1219,6 +1221,6 @@ void proto_test (struct peer *peer)
 	if (peer->type == SEEDER) {
 		net_seeder(peer);					/* run server sharing file */
 	} else {
-		net_leecher(peer);					/* run client receiving file */
+		net_leecher_continuous(peer);				/* run client receiving file */
 	}
 }
