@@ -59,7 +59,7 @@
  * out params:
  * 	ptr - pointer to buffer where the serialized options will be placed
  */
-int make_handshake_options (char *ptr, struct proto_opt_str *pos)
+INTERNAL_LINKAGE int make_handshake_options (char *ptr, struct proto_opt_str *pos)
 {
 	unsigned char *d;
 	int ret;
@@ -240,7 +240,7 @@ int make_handshake_options (char *ptr, struct proto_opt_str *pos)
  * 	ptr - pointer to buffer where data will be stored
  *
  */
-int make_handshake_request (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len)
+INTERNAL_LINKAGE int make_handshake_request (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len)
 {
 	char *d;
 	int ret;
@@ -280,7 +280,7 @@ int make_handshake_request (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_
  * 	ptr - pointer to buffer where data will be stored
  *
  */
-int make_handshake_have (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len, struct peer *peer)
+INTERNAL_LINKAGE int make_handshake_have (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len, struct peer *peer)
 {
 	char *d;
 	int ret, len;
@@ -329,7 +329,7 @@ int make_handshake_have (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id,
  * 	ptr - pointer to buffer where data will be stored
  *
  */
-int make_handshake_finish (char *ptr, struct peer *peer)
+INTERNAL_LINKAGE int make_handshake_finish (char *ptr, struct peer *peer)
 {
 	unsigned char *d;
 	int ret;
@@ -367,7 +367,7 @@ int make_handshake_finish (char *ptr, struct peer *peer)
  * out params:
  * 	ptr - pointer to buffer where data of this request should be placed
  */
-int make_request (char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32_t end_chunk, struct peer *peer)
+INTERNAL_LINKAGE int make_request (char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32_t end_chunk, struct peer *peer)
 {
 	char *d;
 	int ret;
@@ -401,16 +401,14 @@ int make_request (char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32
  * make packet with data of our seeder which shares complete file
  * list of seeders is taken from commandline with "-l" option
  */
-int make_pex_resp (char *ptr, struct peer *peer, struct peer *we)
+INTERNAL_LINKAGE int make_pex_resp (char *ptr, struct peer *peer, struct peer *we)
 {
 	char *d;
 	int ret, addr_size;
 	uint16_t space, max_pex, pex;
-	//struct peer *c;
 	struct other_seeders_entry *e;
 
 	d = ptr;
-
 
 	*(uint32_t *)d = htobe32(peer->dest_chan_id);
 	d += sizeof(uint32_t);
@@ -426,21 +424,8 @@ int make_pex_resp (char *ptr, struct peer *peer, struct peer *we)
 
 	d_printf("we're sending PEX_RESP to: %s\n", inet_ntoa(peer->leecher_addr.sin_addr));
 
-
 	/* IP addresses taken from "-l" commandline option: -l ip1:port1,ip2:port2,ip3:port3 ...etc */
 	pex = 0;
-#if 0
-	x = 0;
-	while ((x < we->nr_in_addr) && (pex < max_pex)) {
-		if (memcmp(&peer->leecher_addr.sin_addr, &we->other_seeders[x], sizeof(struct in_addr)) != 0) {
-			memcpy(d, &we->other_seeders[x].sin_addr, sizeof(c->leecher_addr.sin_addr));	/* IP */
-			d += sizeof(c->leecher_addr.sin_addr);
-			*(uint16_t *)d = we->other_seeders[x].sin_port;
-			d += sizeof(c->leecher_addr.sin_port);
-		}
-		x++;
-	}
-#endif
 	SLIST_FOREACH(e, &other_seeders_list_head, next) {
 			memcpy(d, &e->sa.sin_addr, sizeof(struct in_addr));	/* IP */
 			d += sizeof(struct in_addr);
@@ -451,12 +436,10 @@ int make_pex_resp (char *ptr, struct peer *peer, struct peer *we)
 			break;
 	}
 
-
 	ret = d - ptr;
 	d_printf("%s: returning %u bytes\n", __func__, ret);
 
 	return ret;
-
 }
 
 
@@ -471,7 +454,7 @@ int make_pex_resp (char *ptr, struct peer *peer, struct peer *we)
  * out params:
  * 	ptr - pointer to buffer where INTEGRITY message should be placed
  */
-int make_integrity (char *ptr, struct peer *peer, struct peer *we)
+INTERNAL_LINKAGE int make_integrity (char *ptr, struct peer *peer, struct peer *we)
 {
 	char *d;
 	int y, ret;
@@ -515,7 +498,7 @@ int make_integrity (char *ptr, struct peer *peer, struct peer *we)
  * out params:
  * 	ptr - pointer to buffer where data will be placed
  */
-int make_data (char *ptr, struct peer *peer)
+INTERNAL_LINKAGE int make_data (char *ptr, struct peer *peer)
 {
 	char *d;
 	int ret, fd, l;
@@ -575,7 +558,7 @@ int make_data (char *ptr, struct peer *peer)
  * out params:
  * 	ptr - pointer to buffer where data shoudl be placed
  */
-int make_ack (char *ptr, struct peer *peer)
+INTERNAL_LINKAGE int make_ack (char *ptr, struct peer *peer)
 {
 	char *d;
 	int ret;
@@ -612,7 +595,7 @@ int make_ack (char *ptr, struct peer *peer)
  * 	peer - structure describing peer (LEECHER or SEEDER)
  * 	ptr - pointer to data buffer which should be parsed
  */
-int dump_options (char *ptr, struct peer *peer)
+INTERNAL_LINKAGE int dump_options (char *ptr, struct peer *peer)
 {
 	char *d, buf[40 + 1];
 	int swarm_len, x, ret, s, y;
@@ -760,7 +743,6 @@ int dump_options (char *ptr, struct peer *peer)
 		buf[40] = '\0';
 		d += 20;
 
-
 		/* find file name for given received SHA1 hash from leecher */
 		if (peer->seeder != NULL) {	/* is this proc called by seeder? */
 			SLIST_FOREACH(fi, &file_list_head, next) {
@@ -799,7 +781,7 @@ int dump_options (char *ptr, struct peer *peer)
  * 	req_len - length of buffer pointed by ptr
  * 	peer - pointer to struct describing LEECHER
  */
-int dump_handshake_request (char *ptr, int req_len, struct peer *peer)
+INTERNAL_LINKAGE int dump_handshake_request (char *ptr, int req_len, struct peer *peer)
 {
 	char *d;
 	uint32_t dest_chan_id, src_chan_id;
@@ -843,7 +825,7 @@ int dump_handshake_request (char *ptr, int req_len, struct peer *peer)
  * 	resp_len - length of buffer pointed by ptr
  * 	peer - pointer to struct describing peer
  */
-int dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
+INTERNAL_LINKAGE int dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 {
 	char *d;
 	int req_len, ret;
@@ -918,7 +900,7 @@ int dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
  * 	req_len - length of buffer pointed by ptr
  * 	peer - pointer to struct describing LEECHER
  */
-int dump_request (char *ptr, int req_len, struct peer *peer)
+INTERNAL_LINKAGE int dump_request (char *ptr, int req_len, struct peer *peer)
 {
 	char *d;
 	int ret;
@@ -969,12 +951,13 @@ int dump_request (char *ptr, int req_len, struct peer *peer)
 	return ret;
 }
 
+
 /*
  * parse PEX_RESV4
  * called by LEECHER
  *
  */
-int dump_pex_resp (char *ptr, int req_len, struct peer *peer, int sockfd)
+INTERNAL_LINKAGE int dump_pex_resp (char *ptr, int req_len, struct peer *peer, int sockfd)
 {
 	char *d;
 	int ret;
@@ -1007,7 +990,10 @@ int dump_pex_resp (char *ptr, int req_len, struct peer *peer, int sockfd)
 		sa.sin_port = peer->seeder_addr.sin_port;
 		c = new_seeder(&sa, BUFSIZE);
 		c->sockfd = sockfd;
-		add_peer_to_list(&peer_list_head, c);
+
+		pthread_mutex_lock(&peer_list_head_mutex);
+		add_peer_to_list(&peers_list_head, c);
+		pthread_mutex_unlock(&peer_list_head_mutex);
 
 		/* initially set current_seeder on primary seeder */
 		peer->current_seeder = c;
@@ -1026,7 +1012,9 @@ int dump_pex_resp (char *ptr, int req_len, struct peer *peer, int sockfd)
 
 			c = new_seeder(&sa, BUFSIZE);
 			c->sockfd = sockfd;
-			add_peer_to_list(&peer_list_head, c);
+			pthread_mutex_lock(&peer_list_head_mutex);
+			add_peer_to_list(&peers_list_head, c);
+			pthread_mutex_unlock(&peer_list_head_mutex);
 
 			pex++;
 		}
@@ -1048,7 +1036,7 @@ int dump_pex_resp (char *ptr, int req_len, struct peer *peer, int sockfd)
  * 	req_len - length of buffer pointed by ptr
  * 	peer - pointer to struct describing LEECHER
  */
-int dump_integrity (char *ptr, int req_len, struct peer *peer)
+INTERNAL_LINKAGE int dump_integrity (char *ptr, int req_len, struct peer *peer)
 {
 	char *d;
 	int ret;
@@ -1083,7 +1071,6 @@ int dump_integrity (char *ptr, int req_len, struct peer *peer)
 		peer->chunk[x].offset = (x - start_chunk) * peer->chunk_size;
 		peer->chunk[x].len = peer->chunk_size;
 
-#if 1
 		int s, y;
 		char sha_buf[40 + 1];
 		s = 0;
@@ -1091,7 +1078,6 @@ int dump_integrity (char *ptr, int req_len, struct peer *peer)
 			s += sprintf(sha_buf + s, "%02x", peer->chunk[x].sha[y] & 0xff);
 		sha_buf[40] = '\0';
 		d_printf("dumping chunk %u:  %s\n", x, sha_buf);
-#endif
 
 		d += 20;
 	}
@@ -1115,7 +1101,7 @@ int dump_integrity (char *ptr, int req_len, struct peer *peer)
  * 	ack_len - length of buffer pointed by ptr
  * 	peer - pointer to struct describing peer
  */
-int dump_ack (char *ptr, int ack_len, struct peer *peer)
+INTERNAL_LINKAGE int dump_ack (char *ptr, int ack_len, struct peer *peer)
 {
 	char *d;
 	int ret;
@@ -1157,7 +1143,7 @@ int dump_ack (char *ptr, int ack_len, struct peer *peer)
 /*
  * return type of message
  */
-uint8_t message_type (char *ptr)
+INTERNAL_LINKAGE uint8_t message_type (char *ptr)
 {
 	return ptr[4];			/* skip first 4 bytes - there is destination channel id */
 }
@@ -1166,7 +1152,7 @@ uint8_t message_type (char *ptr)
 /*
  * return type of HANDSHAKE: INIT, FINISH, ERROR
  */
-uint8_t handshake_type (char *ptr)
+INTERNAL_LINKAGE uint8_t handshake_type (char *ptr)
 {
 	char * d;
 	uint32_t dest_chan_id, src_chan_id;
@@ -1216,7 +1202,7 @@ uint8_t handshake_type (char *ptr)
 /*
  * test procedure
  */
-void proto_test (struct peer *peer)
+INTERNAL_LINKAGE void proto_test (struct peer *peer)
 {
 	if (peer->type == SEEDER) {
 		net_seeder(peer);					/* run server sharing file */

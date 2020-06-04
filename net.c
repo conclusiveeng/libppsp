@@ -50,11 +50,12 @@
 #define SEM_NAME "/ppspp"
 
 extern int h_errno;
-struct peer peer_list_head = { .next = NULL };
+struct slist_peers peers_list_head;
 pthread_mutex_t peer_list_head_mutex;
 uint8_t remove_dead_peers;
 
-sem_t * semaph_init (struct peer *p)
+
+INTERNAL_LINKAGE sem_t * semaph_init (struct peer *p)
 {
 	sem_t *sem;
 
@@ -73,7 +74,7 @@ sem_t * semaph_init (struct peer *p)
 }
 
 
-int semaph_post (sem_t *sem)
+INTERNAL_LINKAGE int semaph_post (sem_t *sem)
 {
 	int s;
 
@@ -87,7 +88,7 @@ int semaph_post (sem_t *sem)
 }
 
 
-int semaph_wait (sem_t *sem)
+INTERNAL_LINKAGE int semaph_wait (sem_t *sem)
 {
 	int s;
 
@@ -101,7 +102,7 @@ int semaph_wait (sem_t *sem)
 }
 
 
-int mutex_init (pthread_mutex_t *mutex)
+INTERNAL_LINKAGE int mutex_init (pthread_mutex_t *mutex)
 {
 	int s;
 
@@ -115,7 +116,7 @@ int mutex_init (pthread_mutex_t *mutex)
 }
 
 
-int mutex_lock (pthread_mutex_t *mutex)
+INTERNAL_LINKAGE int mutex_lock (pthread_mutex_t *mutex)
 {
 	int s;
 
@@ -129,7 +130,7 @@ int mutex_lock (pthread_mutex_t *mutex)
 }
 
 
-int mutex_unlock (pthread_mutex_t *mutex)
+INTERNAL_LINKAGE int mutex_unlock (pthread_mutex_t *mutex)
 {
 	int s;
 
@@ -143,7 +144,7 @@ int mutex_unlock (pthread_mutex_t *mutex)
 }
 
 
-int seeder_cond_lock_init (struct peer *p)
+INTERNAL_LINKAGE int seeder_cond_lock_init (struct peer *p)
 {
 	int s;
 
@@ -163,7 +164,7 @@ int seeder_cond_lock_init (struct peer *p)
 }
 
 
-int seeder_cond_lock (struct peer *p)
+INTERNAL_LINKAGE int seeder_cond_lock (struct peer *p)
 {
 	pthread_mutex_lock(&p->seeder_mutex);
 	p->seeder_cond = S_TODO;
@@ -174,27 +175,24 @@ int seeder_cond_lock (struct peer *p)
 			pthread_cond_wait(&p->seeder_mtx_cond, &p->seeder_mutex);
 
 	} while(1);
-
 	pthread_mutex_unlock(&p->seeder_mutex);
 
 	return 0;
 }
 
 
-int seeder_cond_unlock (struct peer *p)
+INTERNAL_LINKAGE int seeder_cond_unlock (struct peer *p)
 {
 	pthread_mutex_lock(&p->seeder_mutex);
-
 	p->seeder_cond = S_DONE;
 	pthread_cond_signal(&p->seeder_mtx_cond);
-
 	pthread_mutex_unlock(&p->seeder_mutex);
 
 	return 0;
 }
 
 
-int leecher_cond_lock_init (struct peer *p)
+INTERNAL_LINKAGE int leecher_cond_lock_init (struct peer *p)
 {
 	int s;
 
@@ -215,10 +213,9 @@ int leecher_cond_lock_init (struct peer *p)
 }
 
 
-int leecher_cond_sleep (struct peer *p)
+INTERNAL_LINKAGE int leecher_cond_sleep (struct peer *p)
 {
 	pthread_mutex_lock(&p->leecher_mutex);
-//	p->leecher_cond = L_SLEEP;			// tego tu nie moze byc bo moze sie zdazyc ze 
 	do {
 		if (p->leecher_cond == L_WAKE)
 			break;
@@ -226,41 +223,35 @@ int leecher_cond_sleep (struct peer *p)
 			pthread_cond_wait(&p->leecher_mtx_cond, &p->leecher_mutex);
 
 	} while(1);
-
 	pthread_mutex_unlock(&p->leecher_mutex);
 
 	return 0;
 }
 
 
-int leecher_cond_wake (struct peer *p)
+INTERNAL_LINKAGE int leecher_cond_wake (struct peer *p)
 {
 	pthread_mutex_lock(&p->leecher_mutex);
-
 	p->leecher_cond = L_WAKE;
 	pthread_cond_signal(&p->leecher_mtx_cond);
-
 	pthread_mutex_unlock(&p->leecher_mutex);
 
 	return 0;
 }
 
 
-int leecher_cond_set (struct peer *p, int val)
+INTERNAL_LINKAGE int leecher_cond_set (struct peer *p, int val)
 {
 	pthread_mutex_lock(&p->leecher_mutex);
-
 	p->leecher_cond = val;
 	pthread_cond_signal(&p->leecher_mtx_cond);
-
 	pthread_mutex_unlock(&p->leecher_mutex);
 
 	return 0;
 }
 
 
-
-int leecher_cond_lock_init2 (struct peer *p)
+INTERNAL_LINKAGE int leecher_cond_lock_init2 (struct peer *p)
 {
 	int s;
 
@@ -277,60 +268,50 @@ int leecher_cond_lock_init2 (struct peer *p)
 	}
 
 	p->leecher_cond2 = L_TODO;
-//	p->leecher_cond2 = L_DONE;
-
 
 	return 0;
 }
 
 
-int leecher_cond_lock2 (struct peer *p)
+INTERNAL_LINKAGE int leecher_cond_lock2 (struct peer *p)
 {
 	pthread_mutex_lock(&p->leecher_mutex2);
-//	p->leecher_cond2 = L_TODO;
 	do {
 		if (p->leecher_cond2 == L_DONE)
 			break;
 		else
 			pthread_cond_wait(&p->leecher_mtx_cond2, &p->leecher_mutex2);
-
 	} while(1);
-
 	pthread_mutex_unlock(&p->leecher_mutex2);
 
 	return 0;
 }
 
 
-// albo lepiej leecher_cond_done()
-int leecher_cond_unlock2 (struct peer *p)
+INTERNAL_LINKAGE int leecher_cond_unlock2 (struct peer *p)
 {
 	pthread_mutex_lock(&p->leecher_mutex2);
-
 	p->leecher_cond2 = L_DONE;
 	pthread_cond_signal(&p->leecher_mtx_cond2);
-
 	pthread_mutex_unlock(&p->leecher_mutex2);
 
 	return 0;
 }
 
-int leecher_cond_set2 (struct peer *p, int val)
+
+INTERNAL_LINKAGE int leecher_cond_set2 (struct peer *p, int val)
 {
 	pthread_mutex_lock(&p->leecher_mutex2);
-
 	p->leecher_cond2 = val;
 	pthread_cond_signal(&p->leecher_mtx_cond2);
-
 	pthread_mutex_unlock(&p->leecher_mutex2);
 
 	return 0;
 }
-
 
 
 /* thread - seeder worker */
-void * seeder_worker (void *data)
+INTERNAL_LINKAGE void * seeder_worker (void *data)
 {
 	int n, clientlen, sockfd, data_payload_len, h_resp_len, opts_len, s, y;
 	char *data_payload, *bn, buf[40 + 1];
@@ -519,7 +500,7 @@ void * seeder_worker (void *data)
 
 			/* check whether is not a special range of chunks (empty set of chunks )*/
 			/* if yes - don't send INTEGRITY nor DATAx and return to SM_NONE state */
-			/* used by leecher algorithm 5 for first ask for PEX_REQ */
+			/* used by leecher for first ask for PEX_REQ */
 			if ((p->start_chunk == 0xffffffff) && (p->end_chunk == 0xffffffff))
 				p->sm_seeder = SM_NONE;
 			else
@@ -574,11 +555,6 @@ void * seeder_worker (void *data)
 			if ((message_type(p->recv_buf) == ACK) && (p->recv_len > 0))
 				p->sm_seeder = SM_ACK;
 			else {
-#if 0
-				if ((message_type(p->recv_buf) == REQUEST) && (p->recv_len > 0)) {
-					p->sm_seeder = SM_WAIT_REQUEST;
-				}
-#endif
 				seeder_cond_unlock(p);
 				continue;
 			}
@@ -611,7 +587,7 @@ void * seeder_worker (void *data)
 
 
 /* UDP datagram server (SEEDER) */
-int net_seeder(struct peer *seeder)
+INTERNAL_LINKAGE int net_seeder(struct peer *seeder)
 {
 	int sockfd, optval, n, st;
 	char buf[BUFSIZE];
@@ -640,17 +616,18 @@ int net_seeder(struct peer *seeder)
 
 	clientlen = sizeof(clientaddr);
 	remove_dead_peers = 0;
-	
+
+	SLIST_INIT(&peers_list_head);
 	pthread_mutex_init(&peer_list_head_mutex, NULL);
 
 	while (1) {
 		/* invoke garbage collector */
 		if (remove_dead_peers == 1) {
 			pthread_mutex_lock(&peer_list_head_mutex);
-			cleanup_all_dead_peers(&peer_list_head);
+			cleanup_all_dead_peers(&peers_list_head);
 			pthread_mutex_unlock(&peer_list_head_mutex);
 		}
-		
+
 		memset(buf, 0, BUFSIZE);
 		n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &clientlen);
 		if (n < 0)
@@ -658,21 +635,20 @@ int net_seeder(struct peer *seeder)
 
 		/* locate peer basing on IP address and UDP port */
 		pthread_mutex_lock(&peer_list_head_mutex);
-		p = ip_port_to_peer(&peer_list_head, &clientaddr);
+		p = ip_port_to_peer(&peers_list_head, &clientaddr);
 		pthread_mutex_unlock(&peer_list_head_mutex);
-		
+
 		if ((p == NULL) && (message_type(buf) != HANDSHAKE))
                         continue;
 
 		if (message_type(buf) == HANDSHAKE) {
 			d_printf("%s", "OK HANDSHAKE\n");
 			if (handshake_type(buf) == HANDSHAKE_INIT) {
-
 				p = new_peer(&clientaddr, BUFSIZE, sockfd);
 				pthread_mutex_lock(&peer_list_head_mutex);
-				add_peer_to_list(&peer_list_head, p);
+				add_peer_to_list(&peers_list_head, p);
 				pthread_mutex_unlock(&peer_list_head_mutex);
-				
+
 				_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 				memcpy(p->recv_buf, buf, n);
@@ -698,17 +674,18 @@ int net_seeder(struct peer *seeder)
 				if (p == NULL) {
 					d_printf("searched IP: %s:%u  n: %u\n",  inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), n);
 					pthread_mutex_lock(&peer_list_head_mutex);
-					p = peer_list_head.next;
-					while (p != NULL) {
+					SLIST_FOREACH(p, &peers_list_head, snext) {
 						d_printf("    IP: %s:%u\n", inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
-						p = p->next;
 					}
 					pthread_mutex_unlock(&peer_list_head_mutex);
 				}
 
 				if (p != NULL) {
 					p->finishing = 1;	/* set the flag for finishing the thread */
+					p->to_remove = 1;
+					pthread_mutex_lock(&peer_list_head_mutex);
 					cleanup_peer(p);
+					pthread_mutex_unlock(&peer_list_head_mutex);
 				}
 				continue;
 			}
@@ -746,7 +723,7 @@ int net_seeder(struct peer *seeder)
 }
 
 
-void * leecher_worker_continuous(void *data)
+INTERNAL_LINKAGE void * leecher_worker_continuous(void *data)
 {
 	char buffer[BUFSIZE], buf[40 + 1];
 	char swarm_id[] = "swarm_id";
@@ -1063,7 +1040,7 @@ void * leecher_worker_continuous(void *data)
 			SHA1Result(&context, digest);
 
 			/* compare both SHA hashes: calculated locally and remote from SEEDER */
-			cmp = memcmp(local_peer->chunk[p->curr_chunk].sha, digest , 20);
+			cmp = memcmp(local_peer->chunk[p->curr_chunk].sha, digest, 20);
 
 			if (cmp != 0) {
 				/* convert to ASCII calculated locally SHA hash */
@@ -1155,12 +1132,12 @@ void * leecher_worker_continuous(void *data)
 			d_printf("chunks not downloaded yet: begin: %lu  end: %lu  cc: %lu\n", begin, end, cc);
 
 			/* choose new seeder */
-			if (p->current_seeder->next != NULL)	/* select next peer */
-				p->current_seeder = p->current_seeder->next;
+			if (SLIST_NEXT(p->current_seeder, snext) != NULL)	/* select next peer */
+				p->current_seeder = SLIST_NEXT(p, snext);
 			else
-				p->current_seeder = peer_list_head.next; /* select begin of the qeueue */
+				p->current_seeder = SLIST_FIRST(&peers_list_head); /* select begin of the qeueue */
 
-			d_printf("selected new seeder: %s\n", inet_ntoa(p->current_seeder->leecher_addr.sin_addr));
+			d_printf("selected new seeder: %s:%u\n", inet_ntoa(p->current_seeder->leecher_addr.sin_addr), ntohs(p->current_seeder->leecher_addr.sin_port));
 
 			/* change IP address and port for all the new connections */
 			memset(&servaddr, 0, sizeof(servaddr));
@@ -1181,6 +1158,7 @@ exit:
 	pthread_exit(NULL);
 }
 
+
 /*
  * multithread leecher algorithm:
  * 1. connect us (leecher) to the primary seeder
@@ -1190,7 +1168,7 @@ exit:
  * 5. create one thread for every seeder we know (from primary seeder)
  *
  */
-int net_leecher_continuous(struct peer *local_peer)
+INTERNAL_LINKAGE int net_leecher_continuous(struct peer *local_peer)
 {
 	char buffer[BUFSIZE], buf[40 + 1];
 	char swarm_id[] = "swarm_id";
@@ -1207,7 +1185,6 @@ int net_leecher_continuous(struct peer *local_peer)
 	struct timeval tv;
 	pthread_t thread;
 	fd_set fs;
-
 
 	memset(&pos, 0, sizeof(struct proto_opt_str));
 	memset(&opts, 0, sizeof(opts));
@@ -1231,7 +1208,6 @@ int net_leecher_continuous(struct peer *local_peer)
 	memset(pos.file_name, 0, sizeof(pos.file_name));	/* do we need this here? */
 	memcpy(pos.file_name, local_peer->fname, local_peer->fname_len);
 	memcpy(pos.sha_demanded, local_peer->sha_demanded, 20);	/* leecher demands file with hash given in "-s" command line parameter */
-
 
 	/* mark the options we want to pass to make_handshake_options() (which ones are valid) */
 	pos.opt_map = 0;
@@ -1350,7 +1326,6 @@ int net_leecher_continuous(struct peer *local_peer)
 			}
 			local_peer->fd = fd;
 
-
 			z = local_peer->start_chunk;
 			local_peer->sm_leecher = SM_WHILE_REQUEST;
 		}
@@ -1360,8 +1335,6 @@ int net_leecher_continuous(struct peer *local_peer)
 			d_printf("z: %u  local_peer->end_chunk: %u\n", z, local_peer->end_chunk);
 
 			/* special range of chunks - empty set */
-			//begin = 0xffffffffffffffff;
-			//end = 0xffffffffffffffff;
 			begin = 0xffffffff;
 			end = 0xffffffff;
 
@@ -1444,8 +1417,7 @@ int net_leecher_continuous(struct peer *local_peer)
 	xx = 0;
 	/* create as many threads as many seeder peers are in the peer_list_head */
 	pthread_mutex_lock(&peer_list_head_mutex);
-	p = peer_list_head.next;
-	while (p != NULL) {
+	SLIST_FOREACH(p, &peers_list_head, snext) {
 		p->hashes_per_mtu = local_peer->hashes_per_mtu;
 		p->nc = local_peer->nc;
 		p->nl = local_peer->nl;
@@ -1457,18 +1429,17 @@ int net_leecher_continuous(struct peer *local_peer)
 		p->thread = thread;
 
 		p->to_remove = 1;	/* mark flag that every thread created in this loop should be destroyed when his work is done */
-		p = p->next;
 		xx++;
 	}
 	pthread_mutex_unlock(&peer_list_head_mutex);
-	
+
 	d_printf("created %u leecher threads\n", xx);
 
 	/* wait for end of all of the threads and free the allocated memory for them */
 	pthread_mutex_lock(&peer_list_head_mutex);
-	cleanup_all_dead_peers(&peer_list_head);
+	cleanup_all_dead_peers(&peers_list_head);
 	pthread_mutex_unlock(&peer_list_head_mutex);
-	
+
 	d_printf("%s", "chunks that are not downloaded yet:\n");
 	yy = 0;
 	while (yy < local_peer->nc) {
@@ -1488,10 +1459,8 @@ exit:
 }
 
 
-
-
 /* leecher worker in step-by-step version */
-void * leecher_worker_sbs(void *data)
+INTERNAL_LINKAGE void * leecher_worker_sbs(void *data)
 {
 	char buffer[BUFSIZE], buf[40 + 1];
 	char swarm_id[] = "swarm_id";
@@ -1583,7 +1552,6 @@ void * leecher_worker_sbs(void *data)
 	servaddr.sin_addr.s_addr = p->leecher_addr.sin_addr.s_addr;
 	d_printf("pthread %#lx   IP: %s\n", (uint64_t) p->thread, inet_ntoa(servaddr.sin_addr));
 
-
 	p->finishing = 0;
 	p->after_seeder_switch = 0;		/* flag: 0 = we are still connected to first seeder, 1 = we are switched to another seeder at least once */
 	p->pex_required = 0;			/* unmark flag that we want list of other seeders form primary seeder */
@@ -1619,7 +1587,6 @@ void * leecher_worker_sbs(void *data)
 			}
 
 			if (n <= 0) {
-#warning FIXME tutaj spr czy ukonczona jest transmisja ale maszyna stanow probuje dalej sie przelaczac
 				if (all_chunks_downloaded(local_peer) == 1) {
 					p->sm_leecher = SM_SEND_HANDSHAKE_FINISH;
 					continue;
@@ -1631,36 +1598,11 @@ void * leecher_worker_sbs(void *data)
 					p->sm_leecher = SM_SWITCH_SEEDER;
 				continue;
 			} else {
-				
-#if 0
-				/* we are connected with some seeder - so go to sleep and wait for awakening by some other task */
-				printf("przed lock1\n");  //czekaj na komende
-				//leecher_cond_set(p, L_SLEEP);
-				leecher_cond_sleep(p);
-				printf("po lock1\n");
-
-
-				_assert((p->cmd == CMD_FETCH) || (p->cmd == CMD_FINISH), "Command for leecher state machine should be FETCH or FINISH but is: %u\n", p->cmd);
-
-				/* here someone has awakened us - so check the command we need to do */
-				/* other task has set proper command in p->local_leecher->cmd */
-
-				if (p->cmd == CMD_FETCH)
-					p->sm_leecher = SM_PREPARE_REQUEST;
-				else if (p->cmd == CMD_FINISH) {
-					p->sm_leecher = SM_SEND_HANDSHAKE_FINISH;
-					printf("---------------------------------CZEMU_TU_FINISH_JEST?\n");
-				}
-#else
 				p->sm_leecher = SM_PREPARE_REQUEST;
-
-#endif
-
 			}
 		}
 
 		if (p->sm_leecher == SM_PREPARE_REQUEST) {
-			printf("prepare request\n");
 			buffer[n] = '\0';
 			d_printf("server replied with %u bytes\n", n);
 
@@ -1683,32 +1625,26 @@ void * leecher_worker_sbs(void *data)
 				abort();
 			}
 
-			p->sm_leecher = SM_WHILE_REQUEST;
+			p->sm_leecher = SM_SYNC_REQUEST;
 		}
 
-
-		/* external "while" loop, iterator "z" */
-		if (p->sm_leecher == SM_WHILE_REQUEST) {
-#if 1
-			/* we are connected with some seeder - so go to sleep and wait for awakening by some other task */
-			printf("przed lock1\n");  //czekaj na komende
-			//leecher_cond_set(p, L_SLEEP);
+		if (p->sm_leecher == SM_SYNC_REQUEST) {
+			/* we are connected to some seeder - so go to sleep and wait for awakening by some other task */
 			leecher_cond_sleep(p);
-			printf("po lock1\n");
+
+			_assert((p->cmd == CMD_FETCH) || (p->cmd == CMD_FINISH), "Command for leecher state machine should be FETCH or FINISH but is: %u\n", p->cmd);
 
 			/* here someone has awakened us - so check the command we need to do */
 			/* other task has set proper command in p->local_leecher->cmd */
-
 			if (p->cmd == CMD_FETCH)
-				p->sm_leecher = SM_SEND_REQUEST;
+				p->sm_leecher = SM_WHILE_REQUEST;
 			else if (p->cmd == CMD_FINISH) {
 				p->sm_leecher = SM_SEND_HANDSHAKE_FINISH;
-				printf("---------------------------------CZEMU_TU_FINISH_JEST?\n");
 			}
-#endif
-			
-			
+		}
 
+		/* external "while" loop, iterator "z" */
+		if (p->sm_leecher == SM_WHILE_REQUEST) {
 			d_printf("local_peer->end_chunk: %u\n", local_peer->end_chunk);
 
 			if (p->fetch_schedule == 1) {
@@ -1728,7 +1664,7 @@ void * leecher_worker_sbs(void *data)
 			request_len = make_request(request, 0xfeedbabe, begin, end, p);
 
 			_assert((long unsigned int) request_len <= sizeof(request), "%s but request_len has value: %u and sizeof(request): %lu\n", "request_len should be <= sizeof(request)", request_len, sizeof(request));
-			////p->sm_leecher = SM_SEND_REQUEST;
+			p->sm_leecher = SM_SEND_REQUEST;
 		}
 
 		if (p->sm_leecher == SM_SEND_REQUEST) {
@@ -1851,6 +1787,7 @@ void * leecher_worker_sbs(void *data)
 				offset =  cc * local_peer->chunk_size - first_chunk * local_peer->chunk_size;
 				d_printf("buf offset: %lu\n", offset);
 				memcpy(local_peer->transfer_buf + offset, data_buffer + 1 + 4 + 4 + 8 + 4, nr - (1 + 4 + 4 + 8 + 4));
+				local_peer->tx_bytes += nr - (1 + 4 + 4 + 8 + 4);
 			}
 
 			/* calculate SHA hash */
@@ -1915,33 +1852,27 @@ void * leecher_worker_sbs(void *data)
 			} else {
 				/* end of external "while" loop */
 				/* seems like we have just downloaded all the chunks */
-				//p->sm_leecher = SM_SEND_HANDSHAKE_FINISH;
 				p->sm_leecher = SM_WAIT_FOR_NEXT_CMD;
 			}
 		}
 
 		/* given serie of chunks have been fetched - now wait for new command */
 		if (p->sm_leecher == SM_WAIT_FOR_NEXT_CMD) {
-			//leecher_cond_unlock2(p);		/* maszyna jest gotowa (ready) */
+			d_printf("%s", "wakening main leecher process\n");
 			semaph_post(p->local_leecher->sem);
-			
-			printf("czekam1\n");
-			//leecher_cond_set(p, L_SLEEP);
-			
+			d_printf("%s", "main leecher process awakened\n");
+
 			p->cmd = 0;
-			
+
 			leecher_cond_set(p, L_SLEEP);
-			printf("czekam na nastepna komende shedidx: %lu  schedlen: %lu\n", local_peer->download_schedule_idx, local_peer->download_schedule_len);
+			d_printf("%s", "waiting for next command from main leecher process\n");
 			leecher_cond_sleep(p);
-			
-			
-			
+			d_printf("%s", "next command arrived from main leecher process\n");
+
 			if (p->cmd == CMD_FETCH)
-				/////p->sm_leecher = SM_PREPARE_REQUEST;
-				p->sm_leecher = SM_WHILE_REQUEST;
+				p->sm_leecher = SM_SYNC_REQUEST;
 			else if (p->cmd == CMD_FINISH)
 				p->sm_leecher = SM_SEND_HANDSHAKE_FINISH;
-			else printf("ELSE\n");
 		}
 
 		if (p->sm_leecher == SM_SEND_HANDSHAKE_FINISH) {
@@ -1952,18 +1883,16 @@ void * leecher_worker_sbs(void *data)
 				printf("error sending request: %d\n", n);
 				abort();
 			}
-			p->to_remove = 1; /* mark peer to remove by garbage collector */
+			p->to_remove = 1; /* mark peer to be removed by garbage collector */
 
 			p->finishing = 1;
-			
 			semaph_post(p->local_leecher->sem);	/* wake the main process */
-			
 			continue;
 		}
 
-
 		if (p->sm_leecher == SM_SWITCH_SEEDER) {
 			d_printf("%s", "switching seeder state machine\n");
+			printf("%s", "switching seeder state machine\n");
 			/* finish transmission with current seeder */
 
 			n = make_handshake_finish(buffer, p);
@@ -1980,12 +1909,12 @@ void * leecher_worker_sbs(void *data)
 			d_printf("chunks not downloaded yet: begin: %lu  end: %lu  cc: %lu\n", begin, end, cc);
 
 			/* choose new seeder */
-			if (p->current_seeder->next != NULL)	/* select next peer */
-				p->current_seeder = p->current_seeder->next;
+			if (SLIST_NEXT(p->current_seeder, snext) != NULL)
+				p->current_seeder = SLIST_NEXT(p, snext);		/* select next peer */
 			else
-				p->current_seeder = peer_list_head.next; /* select begin of the qeueue */
+				p->current_seeder = SLIST_FIRST(&peers_list_head); /* select begin of the qeueue */
 
-			d_printf("selected new seeder: %s\n", inet_ntoa(p->current_seeder->leecher_addr.sin_addr));
+			d_printf("selected new seeder: %s:%u\n", inet_ntoa(p->current_seeder->leecher_addr.sin_addr), ntohs(p->current_seeder->leecher_addr.sin_port));
 
 			/* change IP address and port for all the new connections */
 			memset(&servaddr, 0, sizeof(servaddr));
@@ -1996,7 +1925,6 @@ void * leecher_worker_sbs(void *data)
 			p->sm_leecher = SM_HANDSHAKE;
 			continue;
 		}
-
 	}
 	d_printf("%s", "HANDSHAKE_FINISH from thread sent\n");
 
@@ -2007,16 +1935,10 @@ exit:
 }
 
 
-
-
-
-
-
-int preliminary_connection_sbs(struct peer *local_peer)
+INTERNAL_LINKAGE int preliminary_connection_sbs(struct peer *local_peer)
 {
 	char buffer[BUFSIZE], buf[40 + 1];
 	char swarm_id[] = "swarm_id";
-	//char fname [256 + 32];
 	char opts[1024];			/* buffer for encoded options */
 	char handshake_req[256], request[256];
 	int sockfd, n, opts_len, h_req_len, request_len, s, y;
@@ -2025,13 +1947,9 @@ int preliminary_connection_sbs(struct peer *local_peer)
 	struct sockaddr_in servaddr;
 	socklen_t len;
 	struct proto_opt_str pos;
-	//struct peer *p;
 	struct timeval tv;
-	//pthread_t thread;
 	fd_set fs;
 
-
-	printf("PRELIMINARY\n");
 	memset(&pos, 0, sizeof(struct proto_opt_str));
 	memset(&opts, 0, sizeof(opts));
 	memset(&handshake_req, 0, sizeof(handshake_req));
@@ -2054,7 +1972,6 @@ int preliminary_connection_sbs(struct peer *local_peer)
 	memset(pos.file_name, 0, sizeof(pos.file_name));	/* do we need this here? */
 	memcpy(pos.file_name, local_peer->fname, local_peer->fname_len);
 	memcpy(pos.sha_demanded, local_peer->sha_demanded, 20);	/* leecher demands file with hash given in "-s" command line parameter */
-
 
 	/* mark the options we want to pass to make_handshake_options() (which ones are valid) */
 	pos.opt_map = 0;
@@ -2158,7 +2075,6 @@ int preliminary_connection_sbs(struct peer *local_peer)
 					s += sprintf(buf + s, "%02x", local_peer->sha_demanded[y] & 0xff);
 				buf[40] = '\0';
 				printf("Primary seeder %s:%u has no file for hash: %s\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port), buf);
-				//goto exit;
 				local_peer->finishing = 1;
 				local_peer->seeder_has_file = 0;	/* seeder has no file for our hash stored in sha_demanded[] */
 				continue;
@@ -2169,16 +2085,6 @@ int preliminary_connection_sbs(struct peer *local_peer)
 			local_peer->tree_root = build_tree(local_peer->nc, &local_peer->tree);
 
 			/* create and open new file only when we are downloading from primary seeder without switching to another one */
-#if 0
-			snprintf(fname, sizeof(fname), "%s", local_peer->fname);
-			unlink(fname);
-			fd = open(fname, O_WRONLY | O_CREAT, 0744);
-			if (fd < 0) {
-				printf("error opening file '%s' for writing: %u %s\n", fname, errno, strerror(errno));
-				abort();
-			}
-			local_peer->fd = fd;
-#endif
 
 			z = local_peer->start_chunk;
 			local_peer->sm_leecher = SM_WHILE_REQUEST;
@@ -2189,8 +2095,6 @@ int preliminary_connection_sbs(struct peer *local_peer)
 			d_printf("z: %u  local_peer->end_chunk: %u\n", z, local_peer->end_chunk);
 
 			/* special range of chunks - empty set */
-			//begin = 0xffffffffffffffff;
-			//end = 0xffffffffffffffff;
 			begin = 0xffffffff;
 			end = 0xffffffff;
 
@@ -2266,156 +2170,100 @@ int preliminary_connection_sbs(struct peer *local_peer)
 
 	d_printf("seeder has demanded file: %u  size: %lu\n", local_peer->seeder_has_file, local_peer->file_size);
 
-	
+	close(sockfd);
 	return 0;
 }
 
 
+INTERNAL_LINKAGE void net_leecher_create(void)
+{
+	SLIST_INIT(&peers_list_head);
+	pthread_mutex_init(&peer_list_head_mutex, NULL);
+}
 
 
-
-/*
- * multithread leecher algorithm:
- * 1. connect us (leecher) to the primary seeder
- * 2. get the list of other seeders from primary seeder
- * 3. disconnect from primary seeder
- * 4. create global schedule of downloading chunks - list of chunk series
- * 5. create one thread for every seeder we know (from primary seeder)
- *
- */
-int net_leecher_sbs(struct peer *local_peer)
+INTERNAL_LINKAGE int net_leecher_sbs(struct peer *local_peer)
 {
 	int xx;
-	//uint32_t yy;
 	struct peer *p;
 	pthread_t thread;
 
-
 	preliminary_connection_sbs(local_peer);
 
-	
 	local_peer->sem = semaph_init(local_peer);
-	
 	mutex_init(&local_peer->fd_mutex);
 
 	xx = 0;
-	
 	/* create as many threads as many seeder peers are in the peer_list_head */
-	// mutex? pthread_mutex_lock(&peer_list_head_mutex);
-	p = peer_list_head.next;
+	pthread_mutex_lock(&peer_list_head_mutex);
+	p = SLIST_FIRST(&peers_list_head);
+
 	/* temporarily we're using only one thread for step-by-step state machine */
-	//while (p != NULL) {
-		p->hashes_per_mtu = local_peer->hashes_per_mtu;
-		p->sbs_mode = local_peer->sbs_mode;
-		p->nc = local_peer->nc;
-		p->nl = local_peer->nl;
-		p->timeout = local_peer->timeout;
-		p->thread_num = xx + 1;
-		p->current_seeder = p;	/* set current_seeder to myself */
-		p->local_leecher = local_peer;
-		leecher_cond_lock_init(p);
-//		leecher_cond_sleep(p);		/* sleep in the beginning */
-		
-		leecher_cond_lock_init2(p);
-//		leecher_cond_unlock2(p);	/* unlocked in the beginning */
+	p->hashes_per_mtu = local_peer->hashes_per_mtu;
+	p->sbs_mode = local_peer->sbs_mode;
+	p->nc = local_peer->nc;
+	p->nl = local_peer->nl;
+	p->timeout = local_peer->timeout;
+	p->thread_num = xx + 1;
+	p->current_seeder = p;	/* set current_seeder to myself */
+	p->local_leecher = local_peer;
+	leecher_cond_lock_init(p);
+	leecher_cond_lock_init2(p);
 
-		(void) pthread_create(&thread, NULL, leecher_worker_sbs, p);
-		p->thread = thread;
+	(void) pthread_create(&thread, NULL, leecher_worker_sbs, p);
+	p->thread = thread;
 
-		p->to_remove = 1;	/* mark flag that every thread created in this loop should be destroyed when his work is done */
-		//p = p->next;
-		xx++;
-	//}
+	p->to_remove = 1;	/* mark flag that every thread created in this loop should be destroyed when his work is done */
+	xx++;
+	pthread_mutex_unlock(&peer_list_head_mutex);
 
 	d_printf("created %u leecher threads\n", xx);
-
-
 
 	return 0;
 }
 
 
-
-
-void net_leecher_fetch_chunk(struct peer *local_peer)
+INTERNAL_LINKAGE void net_leecher_fetch_chunk(struct peer *local_peer)
 {
-//	int xx;
 	struct peer *p;
 
+	pthread_mutex_lock(&peer_list_head_mutex);
+	p = SLIST_FIRST(&peers_list_head);
+	pthread_mutex_unlock(&peer_list_head_mutex);
 
-	// mutex? pthread_mutex_lock(&peer_list_head_mutex);
-	p = peer_list_head.next;
-	
-	/* distribute local_peer->cmd to all of the leecher peers */
-//	while (p != NULL) {
-		//leecher_cond_sleep(p);
+	d_printf("%s", "sending FETCH command\n");
+	p->cmd = local_peer->cmd;
 
-		printf("wysylam rozkaz FETCH\n");
-		//leecher_cond_lock2(p);			// czekaj na stan gotowosci maszyny stanow (ready) /* wait for state machine of given thread */
-		p->cmd = local_peer->cmd;
-		leecher_cond_wake(p);			// obudz maszyne stanow
+	/* wake up the step-by-step state machine - she is waiting in SM_PREPARE_REQUEST state */
+	leecher_cond_wake(p);
 
-		printf("rozkaz FETCH wyslany\n");
-		//leecher_cond_lock2(p);			// czekaj na stan gotowosci maszyny stanow (ready) /* wait for state machine of given thread */
-		semaph_wait(local_peer->sem);
-		
-		printf("koniec oczekiwania na FETCH\n");
-		
-//		p = p->next;
-//	}
-	
-	
+	d_printf("%s", "command FETCH sent\n");
+	semaph_wait(local_peer->sem);
 }
 
 
-
-
-
-
-void net_leecher_close(struct peer *local_peer)
+INTERNAL_LINKAGE void net_leecher_close(struct peer *local_peer)
 {
 	uint32_t yy;
-
 	struct peer *p;
 
+	pthread_mutex_lock(&peer_list_head_mutex);
+	p = SLIST_FIRST(&peers_list_head);
+	pthread_mutex_unlock(&peer_list_head_mutex);
 
-	// mutex? pthread_mutex_lock(&peer_list_head_mutex);
-	p = peer_list_head.next;
-	
-	/* distribute local_peer->cmd to all of the leecher peers */
-//	while (p != NULL) {
-		//leecher_cond_sleep(p);
+	d_printf("%s", "sending FINISH command\n");
+	p->cmd = local_peer->cmd;
+	/* wake up the step-by-step state machine */
+	leecher_cond_wake(p);
 
-		printf("wysylam rozkaz FINISH\n");
-		//leecher_cond_lock2(p);			// czekaj na stan gotowosci maszyny stanow (ready) /* wait for state machine of given thread */
-		p->cmd = local_peer->cmd;
-		leecher_cond_wake(p);			// obudz maszyne stanow
+	d_printf("%s", "command FINISH sent\n");
+	semaph_wait(local_peer->sem);
 
-
-		printf("rozkaz FINISH wyslany\n");
-		//leecher_cond_lock2(p);			// czekaj na stan gotowosci maszyny stanow (ready) /* wait for state machine of given thread */
-		semaph_wait(local_peer->sem);
-
-		printf("koniec oczekiwania na FINISH\n");
-		
-//		p = p->next;
-//	}
-
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
 	/* wait for end of all of the threads and free the allocated memory for them */
 	pthread_mutex_lock(&peer_list_head_mutex);
-	cleanup_all_dead_peers(&peer_list_head);
+	cleanup_all_dead_peers(&peers_list_head);
 	pthread_mutex_unlock(&peer_list_head_mutex);
-	
+
 	d_printf("%s", "chunks that are not downloaded yet:\n");
 	yy = 0;
 	while (yy < local_peer->nc) {
@@ -2425,17 +2273,13 @@ void net_leecher_close(struct peer *local_peer)
 	}
 
 	pthread_mutex_destroy(&local_peer->fd_mutex);
-
 	pthread_mutex_destroy(&p->leecher_mutex);
 	pthread_mutex_destroy(&p->leecher_mutex2);
 	pthread_cond_destroy(&p->leecher_mtx_cond);
 	pthread_cond_destroy(&p->leecher_mtx_cond2);
-	
+
 	if (local_peer->download_schedule != NULL)
 		free(local_peer->download_schedule);
 
-	//close(fd);
 	close(local_peer->fd);
-	printf("END\n");
 }
-

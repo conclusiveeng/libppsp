@@ -29,7 +29,6 @@
 
 #include <pthread.h>
 
-
 extern int debug;
 
 #define _assert(cond, format, ...) do {					\

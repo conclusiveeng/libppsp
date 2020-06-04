@@ -80,7 +80,7 @@ INTERNAL_LINKAGE void process_file(struct file_list_entry *file_entry, int chunk
 	file_entry->start_chunk = 0;
 	file_entry->end_chunk = nc - 1;
 
-	/* allocate array of chunks which will be linked to leaves later*/
+	/* allocate array of chunks which will be linked to leaves later */
 	file_entry->tab_chunk = malloc(nl * sizeof(struct chunk));
 	memset(file_entry->tab_chunk, 0, nl * sizeof(struct chunk));
 
@@ -128,14 +128,13 @@ INTERNAL_LINKAGE void process_file(struct file_list_entry *file_entry, int chunk
 	/* update all the SHAs in the tree */
 	update_sha(ret, nl);
 
-
 	dump_tree(ret, nl);
 
 	free(buf);
 }
 
 
-void ppspp_seeder_create (seeder_params_t *params)
+void ppspp_seeder_create (ppspp_seeder_params_t *params)
 {
 	memset(&local_seeder, 0, sizeof(struct peer));
 
@@ -143,9 +142,8 @@ void ppspp_seeder_create (seeder_params_t *params)
 	local_seeder.timeout = params->timeout;
 	local_seeder.port = params->port;
 	local_seeder.type = SEEDER;
-	
+
 	SLIST_INIT(&file_list_head);
-	// init other_seeders list
 	SLIST_INIT(&other_seeders_list_head);
 }
 
@@ -154,8 +152,6 @@ int ppspp_seeder_add_seeder(struct sockaddr_in *sa)
 {
 	struct other_seeders_entry *ss;
 	int ret;
-
-	// add mutex protection here
 
 	ret = 0;
 
@@ -175,7 +171,6 @@ int ppspp_seeder_remove_seeder(struct sockaddr_in *sa)
 	struct other_seeders_entry *e;
 
 	ret = 0;
-	// add mutex protection here
 	SLIST_FOREACH(e, &other_seeders_list_head, next) {
 		d_printf("%s:%u\n", inet_ntoa(e->sa.sin_addr), ntohs(e->sa.sin_port));
 		if (memcmp(&sa->sin_addr, &e->sa.sin_addr, sizeof(e->sa.sin_addr)) == 0) {
@@ -205,8 +200,6 @@ void ppspp_seeder_add_file_or_directory(char *name)
 	struct stat stat;
 	struct file_list_entry *f;
 
-	// add mutex protection here
-
 	st = lstat(name, &stat);
 	if (st != 0) {
 		printf("Error: %s\n", strerror(errno));
@@ -219,11 +212,11 @@ void ppspp_seeder_add_file_or_directory(char *name)
 	} else if (stat.st_mode & S_IFREG) {		/* filename */
 		d_printf("adding file: %s\n", name);
 		f = malloc(sizeof(struct file_list_entry));
-		SLIST_INSERT_HEAD(&file_list_head, f, next);
 		memset(f->path, 0, sizeof(f->path));
 		strcpy(f->path, name);
 		lstat(f->path, &stat);
 		f->file_size = stat.st_size;
+		SLIST_INSERT_HEAD(&file_list_head, f, next);
 	}
 
 	SLIST_FOREACH(f, &file_list_head, next) {
@@ -241,7 +234,6 @@ void ppspp_seeder_add_file_or_directory(char *name)
 		}
 	}
 }
-
 
 
 INTERNAL_LINKAGE void remove_and_free(struct file_list_entry *f)
@@ -263,9 +255,6 @@ int ppspp_seeder_remove_file_or_directory(char *name)
 	struct file_list_entry *f;
 	struct stat stat;
 
-	// add mutex protection here
-	// add reference counter here
-	
 	ret = 0;
 	lstat(name, &stat);
 	if (stat.st_mode & S_IFREG) {	/* does the user want to remove file? */
@@ -311,7 +300,7 @@ void ppspp_seeder_close(void)
 }
 
 
-void ppspp_leecher_create(leecher_params_t *params)
+void ppspp_leecher_create(ppspp_leecher_params_t *params)
 {
 	memset(&local_leecher, 0, sizeof(struct peer));
 
@@ -320,10 +309,9 @@ void ppspp_leecher_create(leecher_params_t *params)
 	local_leecher.type = LEECHER;
 	local_leecher.current_seeder = NULL;
 	memcpy(&local_leecher.seeder_addr, &params->seeder_addr, sizeof(struct sockaddr_in));
-	//printf("create leecher: %s:%u\n", inet_ntoa(local_leecher.seeder_addr.sin_addr), ntohs(local_leecher.seeder_addr.sin_port));
 	memcpy(&local_leecher.sha_demanded, params->sha_demanded, 20);
 
-	
+	net_leecher_create();
 }
 
 
@@ -333,20 +321,13 @@ void ppspp_leecher_run(void)
 }
 
 
-// this proc is optional because ppspp_leecher_create() also sets sha_demanded
-void ppspp_leecher_set_sha(leecher_params_t *params)
-{
-	memcpy(&local_leecher.sha_demanded, params->sha_demanded, 20);
-}
-
-
-int ppspp_leecher_get_metadata(metadata_t *meta)
+int ppspp_leecher_get_metadata(ppspp_metadata_t *meta)
 {
 	int ret;
-	
+
 	/* ask seeder if he has got a file for our sha stored in local_leecher->sha_demanded[] */
 	preliminary_connection_sbs(&local_leecher);
-	
+
 	if (local_leecher.seeder_has_file == 1) {
 		ret = 0;
 		if (meta != NULL) {
@@ -357,39 +338,17 @@ int ppspp_leecher_get_metadata(metadata_t *meta)
 			meta->start_chunk = local_leecher.start_chunk;
 			meta->end_chunk = local_leecher.end_chunk;
 		}
-	} else 
+	} else
 		ret = -1;	/* file does not exist for demanded SHA on seeder */
 
-	
 	/* response is in local_leecher */
 	return ret;
 }
 
 
-// ta proc zostala zastapiona przez ppspp_leecher_fetch_chunk_to_fd()
-/*
-void ppspp_set_fd_transfer_method(int fd)
-{
-	local_leecher.fd = fd;
-	local_leecher.transfer_method = M_FD;
-}
-*/
-
-// ta proc zostala zastapiona przez ppspp_leecher_fetch_chunk_to_buf()
-/*
-void ppspp_set_buf_transfer_method(void)
-{
-	// tu pobrac od usera adrs bufora do komunkacji, jego wielkosc, i ilosc chunkow, albo raczej index w tab schedule_download
-//	local_leecher.fd = fd;
-	local_leecher.transfer_method = M_BUF;
-}
-*/
-
-
 uint32_t ppspp_prepare_chunk_range(uint32_t start_chunk, uint32_t end_chunk)
 {
 	uint32_t buf_size;
-	// tu utworzyc download_schedule dla podanego przez usera zakresu chunkow
 
 	/* if download_schedule previously allocated - free it now */
 	if (local_leecher.download_schedule != NULL) {
@@ -399,14 +358,11 @@ uint32_t ppspp_prepare_chunk_range(uint32_t start_chunk, uint32_t end_chunk)
 
 	local_leecher.download_schedule = malloc(local_leecher.nl * sizeof(struct schedule_entry));
 	memset(local_leecher.download_schedule, 0, local_leecher.nl * sizeof(struct schedule_entry));
-	create_download_schedule_sbs(&local_leecher, start_chunk, end_chunk);
+	buf_size = create_download_schedule_sbs(&local_leecher, start_chunk, end_chunk);
+	local_leecher.download_schedule_idx = 0;
 
-	buf_size = (end_chunk - start_chunk + 1) * local_leecher.chunk_size;
-
-	// tu zwrocic wielkosc bufora w bajtach ktora musi sobie user zaallokowac
 	return buf_size;
 }
-
 
 
 void ppspp_leecher_fetch_chunk_to_fd(int fd)
@@ -414,28 +370,22 @@ void ppspp_leecher_fetch_chunk_to_fd(int fd)
 	local_leecher.cmd = CMD_FETCH;
 	local_leecher.fd = fd;
 	local_leecher.transfer_method = M_FD;
-	
-	// tu trzebaby poczekac az maszyna stanow zglosi sie w stanie connected
-	// wyslij komende do wszysktich peer-ow poprzez strukture local_peer
+
 	net_leecher_fetch_chunk(&local_leecher);
 }
 
 
-
-void ppspp_leecher_fetch_chunk_to_buf(uint8_t *transfer_buf)
+int32_t ppspp_leecher_fetch_chunk_to_buf(uint8_t *transfer_buf)
 {
 	local_leecher.cmd = CMD_FETCH;
 	local_leecher.transfer_buf = transfer_buf;
 	local_leecher.transfer_method = M_BUF;
-	
-	// tu trzebaby poczekac az maszyna stanow zglosi sie w stanie connected
-	// wyslij komende do wszysktich peer-ow poprzez strukture local_peer
+	local_leecher.tx_bytes = 0;
+
 	net_leecher_fetch_chunk(&local_leecher);
+
+	return local_leecher.tx_bytes;
 }
-
-
-
-
 
 
 void ppspp_leecher_close(void)

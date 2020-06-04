@@ -34,8 +34,14 @@ struct chunk {
 	uint32_t len;					/* length of the chunk */
 	char sha[20 + 1];
 	struct node *node;
-	enum { CH_EMPTY = 0, CH_ACTIVE } state;
-	enum { CH_NO = 0, CH_YES } downloaded;
+	enum {
+		CH_EMPTY = 0,
+		CH_ACTIVE
+	} state;
+	enum {
+		CH_NO = 0,
+		CH_YES
+	} downloaded;
 };
 
 struct node {
@@ -43,9 +49,12 @@ struct node {
 	struct node *left, *right, *parent;		/* if parent == NULL - it is root node of the tree */
 	struct chunk *chunk;				/* pointer to chunk */
 	char sha[20 + 1];
-	enum { EMPTY = 0, INITIALIZED, ACTIVE } state;
+	enum {
+		EMPTY = 0,
+		INITIALIZED,
+		ACTIVE
+	} state;
 };
-
 
 int order2 (uint32_t);
 struct node * build_tree (int, struct node **);

@@ -43,78 +43,78 @@
 struct slisthead file_list_head;
 
 
-/* add peer to end of the list */
-void add_peer_to_list (struct peer *list_head, struct peer *p)
+/*
+ * add element to the end of the list
+ */
+INTERNAL_LINKAGE void add_peer_to_list(struct slist_peers *list_head, struct peer *p)
 {
-	struct peer *l;
+	int s;
+	struct peer *pd, *last;
 
-	/* find last element of the list */
-	l = list_head;
+	s = pthread_mutex_trylock(&peer_list_head_mutex);
+	_assert((s != 0), "%s", "list should be protected by peer_list_head_mutex\n");
 
-	while (l->next != NULL)
-		l = l->next;
+	d_printf("add new peer to list: %#lx  %s:%u\n", (uint64_t) p, inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
 
-	l->next = p;
-	p->next = NULL;
-}
-
-
-int remove_peer_from_list (struct peer *list_head, struct peer *peer)
-{
-	int ret;
-	struct peer *p, *prev, *next;
-
-	p = list_head->next; /* get the first element of the list */
-
-	if (p == NULL)
-		return -1; /* list is empty */
-
-	/* look for peer in the list */
-	prev = list_head;
-	while (p != NULL) {
-		if (p == peer) {
-			break;
+	/* check for possible duplicates */
+	SLIST_FOREACH(pd, list_head, snext) {
+		if (pd == p) {
+			d_printf("%s", "this element already exist in the list\n");
+			return;
 		}
-		prev = p;
-		p = p->next;
 	}
 
-	if (p == peer) { /* peer has been found in the list */
-		next = p->next;
-		prev->next = next;
-		ret = 0;
+	/* check whether the list is empty */
+	if (SLIST_EMPTY(list_head)) {
+		SLIST_INSERT_HEAD(list_head, p, snext);
 	} else {
-		ret = -2; /* peer not found in the list */
-		printf("error: peer to remove: %#lx not found\n", (uint64_t) peer);
+		last = NULL;
+		/* look for last element in the list */
+		SLIST_FOREACH(pd, list_head, snext) {
+			if (SLIST_NEXT(pd, snext) == NULL)
+				last = pd;
+		}
+		if (last == NULL)
+			abort();
+		/* add element to the end of the list */
+		SLIST_INSERT_AFTER(last, p, snext);
 	}
-
-	return ret;
 }
 
 
-struct peer * ip_port_to_peer (struct peer *list_head, struct sockaddr_in *client)
+INTERNAL_LINKAGE int remove_peer_from_list(struct slist_peers *list_head, struct peer *p)
 {
-	struct peer *p;
-	int x;
+	int s;
 
-	x = 0;
-	p = list_head->next; /* get the first element of the list */
-	while (p != NULL) {
+	s = pthread_mutex_trylock(&peer_list_head_mutex);
+	_assert((s != 0), "%s", "list should be protected by peer_list_head_mutex\n");
+
+	SLIST_REMOVE(list_head, p, peer, snext);
+
+	return 0;
+}
+
+
+INTERNAL_LINKAGE struct peer * ip_port_to_peer(struct slist_peers *list_head, struct sockaddr_in *client)
+{
+	int s;
+	struct peer *p;
+
+	s = pthread_mutex_trylock(&peer_list_head_mutex);
+	_assert((s != 0), "%s", "list should be protected by peer_list_head_mutex\n");
+
+	SLIST_FOREACH(p, list_head, snext) {
 		if (memcmp(&p->leecher_addr, client, sizeof(struct sockaddr_in)) == 0) {
 			return p;
 		}
-		p = p->next;
-		x++;
 	}
 
-	printf("x: %u\n", x);
-	
 	return NULL;
 }
 
 
 /* seeder side: create new remote peer (LEECHER) */
-struct peer * new_peer (struct sockaddr_in *sa, int n, int sockfd)
+INTERNAL_LINKAGE struct peer * new_peer(struct sockaddr_in *sa, int n, int sockfd)
 {
 	struct peer *p;
 
@@ -140,8 +140,9 @@ struct peer * new_peer (struct sockaddr_in *sa, int n, int sockfd)
 	return p;
 }
 
+
 /* leecher side: create new remote peer (SEEDER) */
-struct peer * new_seeder (struct sockaddr_in *sa, int n)
+INTERNAL_LINKAGE struct peer * new_seeder(struct sockaddr_in *sa, int n)
 {
 	struct peer *p;
 
@@ -167,8 +168,13 @@ struct peer * new_seeder (struct sockaddr_in *sa, int n)
 }
 
 
-void cleanup_peer (struct peer *p)
+INTERNAL_LINKAGE void cleanup_peer(struct peer *p)
 {
+	int s;
+
+	s = pthread_mutex_trylock(&peer_list_head_mutex);
+	_assert((s != 0), "%s", "list should be protected by peer_list_head_mutex\n");
+
 	d_printf("cleaning up peer[%u]: %#lx   IP: %s:%u\n", p->thread_num, (uint64_t) p, inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
 
 	/* method1 only - wait for pthread, destroy mutex and condition variable */
@@ -176,8 +182,8 @@ void cleanup_peer (struct peer *p)
 		pthread_join(p->thread, NULL);
 
 		d_printf("cleaning up peer: %#lx\n", (uint64_t) p);
-		(void) remove_peer_from_list(&peer_list_head, p);
-		
+		(void) remove_peer_from_list(&peers_list_head, p);
+
 		/* destroy the semaphore */
 		pthread_mutex_destroy(&p->seeder_mutex);
 		pthread_cond_destroy(&p->seeder_mtx_cond);
@@ -189,26 +195,25 @@ void cleanup_peer (struct peer *p)
 	if (p->send_buf)
 		free(p->send_buf);
 	p->recv_buf = p->send_buf = NULL;
+	d_printf("freeing peer: %#lx\n", (uint64_t) p);
 	free(p);
 }
 
 
 /* remove all the marked peers */
-void cleanup_all_dead_peers (struct peer *list_head)
+INTERNAL_LINKAGE void cleanup_all_dead_peers(struct slist_peers *list_head)
 {
-	struct peer *p, *pnext;
+	int s;
+	struct peer *p;
 
-	_assert(list_head->next != NULL, "%s\n", "list_head->next should be != NULL");
-	p = list_head->next;
+	s = pthread_mutex_trylock(&peer_list_head_mutex);
+	_assert((s != 0), "%s", "list should be protected by peer_list_head_mutex\n");
 
-	while (p != NULL) {
-		pnext = p->next;
+	SLIST_FOREACH(p, list_head, snext) {
 		if (p->to_remove != 0) { /* is this peer (leecher) marked to remove? */
 			cleanup_peer(p);
 		}
-		p = pnext;
 	}
-
 	remove_dead_peers = 0;
 }
 
@@ -216,7 +221,7 @@ void cleanup_all_dead_peers (struct peer *list_head)
 /*
  * basing on chunk array - create download schedule (array)
  */
-void create_download_schedule (struct peer *p)
+INTERNAL_LINKAGE void create_download_schedule(struct peer *p)
 {
 	uint64_t o, oldo, y;
 
@@ -241,25 +246,32 @@ void create_download_schedule (struct peer *p)
 		p->download_schedule[p->download_schedule_len].begin = oldo;
 		p->download_schedule[p->download_schedule_len].end = o - 1;
 		p->download_schedule_len++;
-		
+
 		_assert((p->chunk[o].downloaded == CH_NO) || (p->chunk[o].downloaded == CH_YES), "p->chunk[o].downloaded should have CH_NO or CH_YES, but have: %u\n", p->chunk[o].downloaded);
 		_assert(p->download_schedule_len <= p->nc, "p->download_schedule_len should be <= p->nc, but p->download_schedule_len=%lu and p->nc=%u\n", p->download_schedule_len, p->nc);
 	}
-	printf("\n");
 }
 
 
 /*
  * basing on chunk array - create download schedule (array)
  */
-void create_download_schedule_sbs (struct peer *p, uint32_t start_chunk, uint32_t end_chunk)
+INTERNAL_LINKAGE int32_t create_download_schedule_sbs(struct peer *p, uint32_t start_chunk, uint32_t end_chunk)
 {
+	int32_t ret;
+	uint32_t last_chunk;
 	uint64_t o, oldo, y;
 
 	d_printf("creating schedule for %u chunks\n", p->nc);
-
 	p->download_schedule_len = 0;
 	o = start_chunk;
+	last_chunk = start_chunk;
+
+	if (start_chunk > p->end_chunk) {
+		d_printf("error: range: %u-%u is outside of the allowed range (%u-%u)\n", start_chunk, end_chunk, p->start_chunk, p->end_chunk);
+		return -1;
+	}
+
 	while ((o < p->nc) && (o <= end_chunk)) {
 		/* find first/closest not yet downloaded chunk */
 		while ((p->chunk[o].downloaded == CH_YES) && (o < p->nc)) o++;
@@ -273,21 +285,23 @@ void create_download_schedule_sbs (struct peer *p, uint32_t start_chunk, uint32_
 			y++;
 		}
 		d_printf("range of chunks: %lu-%lu   %lu\n", oldo, o - 1, o - oldo);
-		printf("range of chunks: %lu-%lu   %lu\n", oldo, o - 1, o - oldo);
 
+		last_chunk = o - 1;
 		p->download_schedule[p->download_schedule_len].begin = oldo;
 		p->download_schedule[p->download_schedule_len].end = o - 1;
 		p->download_schedule_len++;
-		
+
 		_assert((p->chunk[o].downloaded == CH_NO) || (p->chunk[o].downloaded == CH_YES), "p->chunk[o].downloaded should have CH_NO or CH_YES, but have: %u\n", p->chunk[o].downloaded);
 		_assert(p->download_schedule_len <= p->nc, "p->download_schedule_len should be <= p->nc, but p->download_schedule_len=%lu and p->nc=%u\n", p->download_schedule_len, p->nc);
 	}
-	printf("\n");
+
+	ret = (last_chunk - start_chunk + 1) * p->chunk_size;
+
+	return ret;
 }
 
 
-
-int all_chunks_downloaded (struct peer *p)
+INTERNAL_LINKAGE int all_chunks_downloaded(struct peer *p)
 {
 	int ret;
 	uint64_t x;
@@ -307,7 +321,7 @@ int all_chunks_downloaded (struct peer *p)
 }
 
 
-void list_dir (char *dname)
+INTERNAL_LINKAGE void list_dir(char *dname)
 {
 	DIR *dir;
 	struct dirent *dirent;
@@ -316,7 +330,7 @@ void list_dir (char *dname)
 	struct stat stat;
 
 	dir = opendir(dname);
-	if (dir == NULL) 
+	if (dir == NULL)
 		return;
 
 	while (1) {
@@ -326,11 +340,11 @@ void list_dir (char *dname)
 
 		if (dirent->d_type == DT_REG) {
 			f = malloc(sizeof(struct file_list_entry));
-			SLIST_INSERT_HEAD(&file_list_head, f, next);
 			memset(f->path, 0, sizeof(f->path));
 			sprintf(f->path, "%s/%s", dname, dirent->d_name);
 			lstat(f->path, &stat);
 			f->file_size = stat.st_size;
+			SLIST_INSERT_HEAD(&file_list_head, f, next);
 		}
 
 		if ((dirent->d_type == DT_DIR) && (strcmp(dirent->d_name, ".") != 0) && (strcmp(dirent->d_name, "..") != 0)) {
@@ -342,7 +356,7 @@ void list_dir (char *dname)
 }
 
 
-void create_file_list (char *dname)
+INTERNAL_LINKAGE void create_file_list(char *dname)
 {
 	list_dir(dname);
 }

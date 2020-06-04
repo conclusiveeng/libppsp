@@ -79,7 +79,8 @@ struct peer {
 		SM_WHILE_REQUEST,
 		SM_SEND_HANDSHAKE_FINISH,
 		SM_SWITCH_SEEDER,
-		SM_WAIT_FOR_NEXT_CMD
+		SM_WAIT_FOR_NEXT_CMD,
+		SM_SYNC_REQUEST
 	} sm_leecher;
 
 	uint32_t src_chan_id;
@@ -132,20 +133,32 @@ struct peer {
 	uint8_t to_remove;
 	pthread_mutex_t seeder_mutex;
 	pthread_cond_t seeder_mtx_cond;
-	enum { S_TODO = 1, S_DONE = 2 } seeder_cond;
+	enum {
+		S_TODO = 1,
+		S_DONE = 2
+	} seeder_cond;
 
 	pthread_mutex_t leecher_mutex;
 	pthread_cond_t leecher_mtx_cond;
-	enum { L_SLEEP = 1, L_WAKE } leecher_cond;
+	enum {
+		L_SLEEP = 1,
+		L_WAKE
+	} leecher_cond;
 
 	pthread_mutex_t leecher_mutex2;
 	pthread_cond_t leecher_mtx_cond2;
-	enum { L_TODO = 1, L_DONE } leecher_cond2;
+	enum {
+		L_TODO = 1,
+		L_DONE
+	} leecher_cond2;
 
-	
 	/* controlling leecher step-by-step state machine */
-	enum { CMD_CONNECT = 1, CMD_FETCH = 2, CMD_FINISH = 3 } cmd;
-	
+	enum {
+		CMD_CONNECT = 1,
+		CMD_FETCH = 2,
+		CMD_FINISH = 3
+	} cmd;
+
 	uint8_t sbs_mode;		/* 0 = continuous state machine and old API, 1 = step-by-step state machine and new API */
 	uint32_t chunk_size;
 	uint32_t start_chunk;
@@ -156,15 +169,22 @@ struct peer {
 	char fname_len;
 	uint8_t pex_required;		/* leecher side: 1=we want list of seeders from primary seeder */
 	uint8_t *transfer_buf;
-	enum { M_FD = 1, M_BUF } transfer_method;
+	uint32_t tx_bytes;		/* number of bytes transferred in transfer_buf in current request */
+	enum {
+		M_FD = 1,
+		M_BUF
+	} transfer_method;
 
-	struct peer *current_seeder;	/* leecher side: points to one element of the list seeders in ->next */
+	struct peer *current_seeder;	/* leecher side: points to one element of the list seeders in ->snext */
 
 	struct file_list_entry *file_list_entry;	/* seeder side: pointer to file choosen by leecher using SHA1 hash */
 
-	struct peer *next;		/* list of peers - leechers from seeder point of view or seeders from leecher pov */
+	SLIST_ENTRY(peer) snext;		/* list of peers - leechers from seeder point of view or seeders from leecher pov */
 };
 
+
+SLIST_HEAD(slist_peers, peer);
+extern struct slist_peers peers_list_head;
 
 /* list of files shared by seeder */
 SLIST_HEAD(slisthead, file_list_entry);
@@ -184,7 +204,6 @@ struct file_list_entry {
 	SLIST_ENTRY(file_list_entry) next;
 };
 
-
 /* list of other (alternative) seeders maintained by primary seeder */
 SLIST_HEAD(slist_seeders, other_seeders_entry);
 extern struct slist_seeders other_seeders_list_head;
@@ -193,20 +212,19 @@ struct other_seeders_entry {
 	SLIST_ENTRY(other_seeders_entry) next;
 };
 
-
 extern struct peer peer_list_head;
 extern pthread_mutex_t peer_list_head_mutex;
 extern uint8_t remove_dead_peers;
-
-void add_peer_to_list (struct peer *, struct peer *);
-int remove_peer_from_list (struct peer *, struct peer *);
-struct peer * ip_port_to_peer (struct peer *, struct sockaddr_in *);
+void add_peer_to_list (struct slist_peers *, struct peer *);
+void print_peer_list(struct slist_peers *);
+int remove_peer_from_list (struct slist_peers *, struct peer *);
+struct peer * ip_port_to_peer (struct slist_peers *, struct sockaddr_in *);
 struct peer * new_peer (struct sockaddr_in *, int, int);
 struct peer * new_seeder (struct sockaddr_in *, int);
 void cleanup_peer (struct peer *);
-void cleanup_all_dead_peers (struct peer *);
+void cleanup_all_dead_peers (struct slist_peers *);
 void create_download_schedule (struct peer *);
-void create_download_schedule_sbs (struct peer *, uint32_t, uint32_t);
+int32_t create_download_schedule_sbs (struct peer *, uint32_t, uint32_t);
 int all_chunks_downloaded (struct peer *);
 void create_file_list (char *);
 
