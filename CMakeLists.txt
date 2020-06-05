@@ -15,4 +15,4 @@ configure_file(libppspp.pc.in ${CMAKE_CURRENT_BINARY_DIR}/libppspp.pc @ONLY)
 
 install(TARGETS ppspp PUBLIC_HEADER DESTINATION include)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libppspp.pc
-	DESTINATION ${CMAKE_INSTALL_PREFIX}/share/pkgconfig)
+	DESTINATION /usr/share/pkgconfig)
