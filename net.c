@@ -1741,6 +1741,9 @@ INTERNAL_LINKAGE void * leecher_worker_sbs(void *data)
 			for (x = begin; x < end; x++)
 				memcpy(local_peer->tree[2 * x].sha, local_peer->chunk[x].sha, 20);
 
+			/* correct number of transferred bytes in case of seeder switching */
+			local_peer->tx_bytes -= (cc - begin) * local_peer->chunk_size;
+
 			cc = begin;	/* internal "for" loop, iterator - cc */
 			p->sm_leecher = SM_WAIT_DATA;
 		}
