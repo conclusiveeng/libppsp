@@ -229,6 +229,25 @@ INTERNAL_LINKAGE int leecher_cond_sleep (struct peer *p)
 }
 
 
+INTERNAL_LINKAGE int leecher_cond_set_and_sleep (struct peer *p)
+{
+	pthread_mutex_lock(&p->leecher_mutex);
+	p->leecher_cond = L_SLEEP;
+	do {
+		if (p->leecher_cond == L_WAKE)
+			break;
+		else
+			pthread_cond_wait(&p->leecher_mtx_cond, &p->leecher_mutex);
+
+	} while(1);
+	pthread_mutex_unlock(&p->leecher_mutex);
+
+	return 0;
+}
+
+
+
+
 INTERNAL_LINKAGE int leecher_cond_wake (struct peer *p)
 {
 	pthread_mutex_lock(&p->leecher_mutex);
@@ -1867,11 +1886,9 @@ INTERNAL_LINKAGE void * leecher_worker_sbs(void *data)
 
 			p->cmd = 0;
 
-			leecher_cond_set(p, L_SLEEP);
 			d_printf("%s", "waiting for next command from main leecher process\n");
-			leecher_cond_sleep(p);
+			leecher_cond_set_and_sleep(p);
 			d_printf("%s", "next command arrived from main leecher process\n");
-
 			if (p->cmd == CMD_FETCH)
 				p->sm_leecher = SM_SYNC_REQUEST;
 			else if (p->cmd == CMD_FINISH)
