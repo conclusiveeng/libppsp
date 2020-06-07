@@ -85,7 +85,8 @@ void SHA1ProcessMessageBlock(SHA1Context *);
  *      sha Error Code.
  *
  */
-INTERNAL_LINKAGE int SHA1Reset(SHA1Context *context)
+INTERNAL_LINKAGE int
+SHA1Reset(SHA1Context *context)
 {
     if (!context)
     {
@@ -128,8 +129,8 @@ INTERNAL_LINKAGE int SHA1Reset(SHA1Context *context)
  *      sha Error Code.
  *
  */
-INTERNAL_LINKAGE int SHA1Result( SHA1Context *context,
-                uint8_t Message_Digest[SHA1HashSize])
+INTERNAL_LINKAGE int
+SHA1Result( SHA1Context *context, uint8_t Message_Digest[SHA1HashSize])
 {
     int i;
 
@@ -186,9 +187,8 @@ INTERNAL_LINKAGE int SHA1Result( SHA1Context *context,
  *      sha Error Code.
  *
  */
-INTERNAL_LINKAGE int SHA1Input(    SHA1Context    *context,
-                  const uint8_t  *message_array,
-                  unsigned       length)
+INTERNAL_LINKAGE int
+SHA1Input(SHA1Context *context, const uint8_t  *message_array, unsigned length)
 {
     if (!length)
     {
@@ -258,7 +258,8 @@ INTERNAL_LINKAGE int SHA1Input(    SHA1Context    *context,
  *
  *
  */
-INTERNAL_LINKAGE void SHA1ProcessMessageBlock(SHA1Context *context)
+INTERNAL_LINKAGE void
+SHA1ProcessMessageBlock(SHA1Context *context)
 {
     const uint32_t K[] =    {       /* Constants defined in SHA-1   */
                             0x5A827999,
@@ -368,7 +369,8 @@ INTERNAL_LINKAGE void SHA1ProcessMessageBlock(SHA1Context *context)
  *
  */
 
-INTERNAL_LINKAGE void SHA1PadMessage(SHA1Context *context)
+INTERNAL_LINKAGE void
+SHA1PadMessage(SHA1Context *context)
 {
     /*
      *  Check to see if the current message block is too small to hold

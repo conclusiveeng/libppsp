@@ -227,5 +227,5 @@ void create_download_schedule (struct peer *);
 int32_t create_download_schedule_sbs (struct peer *, uint32_t, uint32_t);
 int all_chunks_downloaded (struct peer *);
 void create_file_list (char *);
-
+void process_file(struct file_list_entry *, int);
 #endif /* _PEER_H_ */

@@ -36,26 +36,24 @@
 #include <arpa/inet.h>
 #include <errno.h>
 
-#include "mt.h"
-#include "sha1.h"
-#include "ppspp_protocol.h"
-#include "net.h"
-#include "peer.h"
-#include "debug.h"
 #include "ppspp.h"
 
+extern int debug;
 
-struct peer local_peer;
+enum {
+	SEEDER_TYPE = 1,
+	LEECHER_TYPE = 2
+};
 
 
-void ascii_sha_to_bin (char *sha_ascii, uint8_t *bin)
+void
+ascii_sha_to_bin (char *sha_ascii, uint8_t *bin)
 {
 	int y;
 	uint8_t b;
 	char buf[2 + 1];
 
 	memset(buf, 0, sizeof(buf));
-	d_printf("scanning SHA1: %s\n", sha_ascii);
 	for (y = 0; y < 40; y += 2) {
 		memcpy(buf, sha_ascii + y, 2);
 		b = strtoul(buf, NULL, 16);
@@ -64,7 +62,8 @@ void ascii_sha_to_bin (char *sha_ascii, uint8_t *bin)
 }
 
 
-int main (int argc, char *argv[])
+int
+main (int argc, char *argv[])
 {
 	char *fname1, *fdname, *fname2, usage, *peer_list, *colon, *comma, *last_char, *ch, *sa;
 	char *sha_demanded;
@@ -83,7 +82,7 @@ int main (int argc, char *argv[])
 	debug = 0;
 	usage = 0;
 	peer_list = NULL;
-	type = LEECHER;
+	type = LEECHER_TYPE;
 	timeout = 3 * 60;	/* 3 minutes timeout as default */
 	sha_demanded = NULL;
 	port = 6778;
@@ -155,16 +154,16 @@ int main (int argc, char *argv[])
 	}
 
 	if (fname1 != NULL) {
-		type = SEEDER;
+		type = SEEDER_TYPE;
 		fname2 = strdup(fname1);
 		fdname = fname2;
 	}
 
 	if (fdname != NULL) {
-		type = SEEDER;
+		type = SEEDER_TYPE;
 	}
 
-	if (type == LEECHER) {
+	if (type == LEECHER_TYPE) {
 		if (sa == NULL) {
 			printf("Error: in LEECHER mode '-a' parameter is obligatory\n");
 			exit(1);
@@ -191,7 +190,7 @@ int main (int argc, char *argv[])
 	}
 
 
-	if (type == SEEDER) {
+	if (type == SEEDER_TYPE) {
 		/* SEEDER mode */
 		printf("Processing data, please wait... \n");
 
@@ -202,9 +201,6 @@ int main (int argc, char *argv[])
 		ppspp_seeder_create(&seeder_params);
 
 		if (peer_list != NULL) {
-
-			d_printf("peer_list: %s   len: %lu\n", peer_list, strlen(peer_list));
-
 			ch = peer_list;
 
 			while (ch < peer_list + strlen(peer_list)) {
@@ -242,6 +238,8 @@ int main (int argc, char *argv[])
 		if (fdname != NULL) {
 			ppspp_seeder_add_file_or_directory(fdname);
 		}
+
+		printf("Ok, ready for sharing\n");
 
 		ppspp_seeder_run();
 

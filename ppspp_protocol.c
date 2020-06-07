@@ -59,7 +59,8 @@
  * out params:
  * 	ptr - pointer to buffer where the serialized options will be placed
  */
-INTERNAL_LINKAGE int make_handshake_options (char *ptr, struct proto_opt_str *pos)
+INTERNAL_LINKAGE int
+make_handshake_options (char *ptr, struct proto_opt_str *pos)
 {
 	unsigned char *d;
 	int ret;
@@ -240,7 +241,8 @@ INTERNAL_LINKAGE int make_handshake_options (char *ptr, struct proto_opt_str *po
  * 	ptr - pointer to buffer where data will be stored
  *
  */
-INTERNAL_LINKAGE int make_handshake_request (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len)
+INTERNAL_LINKAGE int
+make_handshake_request (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len)
 {
 	char *d;
 	int ret;
@@ -280,7 +282,8 @@ INTERNAL_LINKAGE int make_handshake_request (char *ptr, uint32_t dest_chan_id, u
  * 	ptr - pointer to buffer where data will be stored
  *
  */
-INTERNAL_LINKAGE int make_handshake_have (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len, struct peer *peer)
+INTERNAL_LINKAGE int
+make_handshake_have (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len, struct peer *peer)
 {
 	char *d;
 	int ret, len;
@@ -329,7 +332,8 @@ INTERNAL_LINKAGE int make_handshake_have (char *ptr, uint32_t dest_chan_id, uint
  * 	ptr - pointer to buffer where data will be stored
  *
  */
-INTERNAL_LINKAGE int make_handshake_finish (char *ptr, struct peer *peer)
+INTERNAL_LINKAGE int
+make_handshake_finish (char *ptr, struct peer *peer)
 {
 	unsigned char *d;
 	int ret;
@@ -367,7 +371,8 @@ INTERNAL_LINKAGE int make_handshake_finish (char *ptr, struct peer *peer)
  * out params:
  * 	ptr - pointer to buffer where data of this request should be placed
  */
-INTERNAL_LINKAGE int make_request (char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32_t end_chunk, struct peer *peer)
+INTERNAL_LINKAGE int
+make_request (char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32_t end_chunk, struct peer *peer)
 {
 	char *d;
 	int ret;
@@ -401,7 +406,8 @@ INTERNAL_LINKAGE int make_request (char *ptr, uint32_t dest_chan_id, uint32_t st
  * make packet with data of our seeder which shares complete file
  * list of seeders is taken from commandline with "-l" option
  */
-INTERNAL_LINKAGE int make_pex_resp (char *ptr, struct peer *peer, struct peer *we)
+INTERNAL_LINKAGE int
+make_pex_resp (char *ptr, struct peer *peer, struct peer *we)
 {
 	char *d;
 	int ret, addr_size;
@@ -454,7 +460,8 @@ INTERNAL_LINKAGE int make_pex_resp (char *ptr, struct peer *peer, struct peer *w
  * out params:
  * 	ptr - pointer to buffer where INTEGRITY message should be placed
  */
-INTERNAL_LINKAGE int make_integrity (char *ptr, struct peer *peer, struct peer *we)
+INTERNAL_LINKAGE int
+make_integrity (char *ptr, struct peer *peer, struct peer *we)
 {
 	char *d;
 	int y, ret;
@@ -498,7 +505,8 @@ INTERNAL_LINKAGE int make_integrity (char *ptr, struct peer *peer, struct peer *
  * out params:
  * 	ptr - pointer to buffer where data will be placed
  */
-INTERNAL_LINKAGE int make_data (char *ptr, struct peer *peer)
+INTERNAL_LINKAGE int
+make_data (char *ptr, struct peer *peer)
 {
 	char *d;
 	int ret, fd, l;
@@ -558,7 +566,8 @@ INTERNAL_LINKAGE int make_data (char *ptr, struct peer *peer)
  * out params:
  * 	ptr - pointer to buffer where data shoudl be placed
  */
-INTERNAL_LINKAGE int make_ack (char *ptr, struct peer *peer)
+INTERNAL_LINKAGE int
+make_ack (char *ptr, struct peer *peer)
 {
 	char *d;
 	int ret;
@@ -595,7 +604,8 @@ INTERNAL_LINKAGE int make_ack (char *ptr, struct peer *peer)
  * 	peer - structure describing peer (LEECHER or SEEDER)
  * 	ptr - pointer to data buffer which should be parsed
  */
-INTERNAL_LINKAGE int dump_options (char *ptr, struct peer *peer)
+INTERNAL_LINKAGE int
+dump_options (char *ptr, struct peer *peer)
 {
 	char *d, buf[40 + 1];
 	int swarm_len, x, ret, s, y;
@@ -610,7 +620,7 @@ INTERNAL_LINKAGE int dump_options (char *ptr, struct peer *peer)
 		d++;
 		d_printf("version: %u\n", *d);
 		if (*d != 1) {
-			printf("version should be 1 but is: %u\n", *d);
+			d_printf("version should be 1 but is: %u\n", *d);
 			abort();
 		}
 		d++;
@@ -761,7 +771,7 @@ INTERNAL_LINKAGE int dump_options (char *ptr, struct peer *peer)
 		d_printf("%s", "end option\n");
 		d++;
 	} else {
-		printf("error: should be END_OPTION(0xff) but is: d[%lu]: %u\n", d - ptr, *d & 0xff);
+		d_printf("error: should be END_OPTION(0xff) but is: d[%lu]: %u\n", d - ptr, *d & 0xff);
 		abort();
 	}
 
@@ -781,7 +791,8 @@ INTERNAL_LINKAGE int dump_options (char *ptr, struct peer *peer)
  * 	req_len - length of buffer pointed by ptr
  * 	peer - pointer to struct describing LEECHER
  */
-INTERNAL_LINKAGE int dump_handshake_request (char *ptr, int req_len, struct peer *peer)
+INTERNAL_LINKAGE int
+dump_handshake_request (char *ptr, int req_len, struct peer *peer)
 {
 	char *d;
 	uint32_t dest_chan_id, src_chan_id;
@@ -796,7 +807,7 @@ INTERNAL_LINKAGE int dump_handshake_request (char *ptr, int req_len, struct peer
 	if (*d == HANDSHAKE) {
 		d_printf("%s", "ok, HANDSHAKE req\n");
 	} else {
-		printf("error - should be HANDSHAKE req (0) but is: %u\n", *d);
+		d_printf("error - should be HANDSHAKE req (0) but is: %u\n", *d);
 		abort();
 	}
 	d++;
@@ -825,7 +836,8 @@ INTERNAL_LINKAGE int dump_handshake_request (char *ptr, int req_len, struct peer
  * 	resp_len - length of buffer pointed by ptr
  * 	peer - pointer to struct describing peer
  */
-INTERNAL_LINKAGE int dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
+INTERNAL_LINKAGE int
+dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 {
 	char *d;
 	int req_len, ret;
@@ -841,7 +853,7 @@ INTERNAL_LINKAGE int dump_handshake_have (char *ptr, int resp_len, struct peer *
 	if (*d == HAVE) {
 		d_printf("%s", "ok, HAVE header\n");
 	} else {
-		printf("error, should be HAVE header but is: %u\n", *d);
+		d_printf("error, should be HAVE header but is: %u\n", *d);
 		abort();
 	}
 
@@ -900,7 +912,8 @@ INTERNAL_LINKAGE int dump_handshake_have (char *ptr, int resp_len, struct peer *
  * 	req_len - length of buffer pointed by ptr
  * 	peer - pointer to struct describing LEECHER
  */
-INTERNAL_LINKAGE int dump_request (char *ptr, int req_len, struct peer *peer)
+INTERNAL_LINKAGE int
+dump_request (char *ptr, int req_len, struct peer *peer)
 {
 	char *d;
 	int ret;
@@ -915,7 +928,7 @@ INTERNAL_LINKAGE int dump_request (char *ptr, int req_len, struct peer *peer)
 	if (*d == REQUEST) {
 		d_printf("%s", "ok, REQUEST header\n");
 	} else {
-		printf("error, should be REQUEST header but is: %u\n", *d);
+		d_printf("error, should be REQUEST header but is: %u\n", *d);
 		abort();
 	}
 	d++;
@@ -942,7 +955,6 @@ INTERNAL_LINKAGE int dump_request (char *ptr, int req_len, struct peer *peer)
 
 	if (d - ptr < req_len) {
 		d_printf("  here do in the future maintenance of rest of messages: %lu bytes left\n", req_len - (d - ptr));
-		printf("  here do in the future maintenance of rest of messages: %lu bytes left\n", req_len - (d - ptr));
 	}
 
 	ret = d - ptr;
@@ -957,7 +969,8 @@ INTERNAL_LINKAGE int dump_request (char *ptr, int req_len, struct peer *peer)
  * called by LEECHER
  *
  */
-INTERNAL_LINKAGE int dump_pex_resp (char *ptr, int req_len, struct peer *peer, int sockfd)
+INTERNAL_LINKAGE int
+dump_pex_resp (char *ptr, int req_len, struct peer *peer, int sockfd)
 {
 	char *d;
 	int ret;
@@ -975,7 +988,7 @@ INTERNAL_LINKAGE int dump_pex_resp (char *ptr, int req_len, struct peer *peer, i
 	if (*d == PEX_RESV4) {
 		d_printf("%s", "ok, PEX_RESV4 header\n");
 	} else {
-		printf("error, should be PEX_RESV4 header but is: %u\n", *d);
+		d_printf("error, should be PEX_RESV4 header but is: %u\n", *d);
 		abort();
 	}
 	d++;
@@ -1036,7 +1049,8 @@ INTERNAL_LINKAGE int dump_pex_resp (char *ptr, int req_len, struct peer *peer, i
  * 	req_len - length of buffer pointed by ptr
  * 	peer - pointer to struct describing LEECHER
  */
-INTERNAL_LINKAGE int dump_integrity (char *ptr, int req_len, struct peer *peer)
+INTERNAL_LINKAGE int
+dump_integrity (char *ptr, int req_len, struct peer *peer)
 {
 	char *d;
 	int ret;
@@ -1051,7 +1065,7 @@ INTERNAL_LINKAGE int dump_integrity (char *ptr, int req_len, struct peer *peer)
 	if (*d == INTEGRITY) {
 		d_printf("%s", "ok, INTEGRITY header\n");
 	} else {
-		printf("error, should be INTEGRITY header but is: %u\n", *d);
+		d_printf("error, should be INTEGRITY header but is: %u\n", *d);
 		abort();
 	}
 	d++;
@@ -1101,7 +1115,8 @@ INTERNAL_LINKAGE int dump_integrity (char *ptr, int req_len, struct peer *peer)
  * 	ack_len - length of buffer pointed by ptr
  * 	peer - pointer to struct describing peer
  */
-INTERNAL_LINKAGE int dump_ack (char *ptr, int ack_len, struct peer *peer)
+INTERNAL_LINKAGE int
+dump_ack (char *ptr, int ack_len, struct peer *peer)
 {
 	char *d;
 	int ret;
@@ -1143,7 +1158,8 @@ INTERNAL_LINKAGE int dump_ack (char *ptr, int ack_len, struct peer *peer)
 /*
  * return type of message
  */
-INTERNAL_LINKAGE uint8_t message_type (char *ptr)
+INTERNAL_LINKAGE
+uint8_t message_type (char *ptr)
 {
 	return ptr[4];			/* skip first 4 bytes - there is destination channel id */
 }
@@ -1152,7 +1168,8 @@ INTERNAL_LINKAGE uint8_t message_type (char *ptr)
 /*
  * return type of HANDSHAKE: INIT, FINISH, ERROR
  */
-INTERNAL_LINKAGE uint8_t handshake_type (char *ptr)
+INTERNAL_LINKAGE uint8_t
+handshake_type (char *ptr)
 {
 	char * d;
 	uint32_t dest_chan_id, src_chan_id;
@@ -1167,7 +1184,7 @@ INTERNAL_LINKAGE uint8_t handshake_type (char *ptr)
 	if (*d == HANDSHAKE) {
 		d_printf("%s", "ok, HANDSHAKE header\n");
 	} else {
-		printf("error, should be HANDSHAKE header but is: %u\n", *d);
+		d_printf("error, should be HANDSHAKE header but is: %u\n", *d);
 		abort();
 	}
 	d++;
@@ -1196,17 +1213,4 @@ INTERNAL_LINKAGE uint8_t handshake_type (char *ptr)
 	}
 
 	return ret;
-}
-
-
-/*
- * test procedure
- */
-INTERNAL_LINKAGE void proto_test (struct peer *peer)
-{
-	if (peer->type == SEEDER) {
-		net_seeder(peer);					/* run server sharing file */
-	} else {
-		net_leecher_continuous(peer);				/* run client receiving file */
-	}
 }

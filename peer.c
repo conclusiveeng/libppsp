@@ -35,9 +35,12 @@
 #include <dirent.h>
 #include <sys/queue.h>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "peer.h"
 #include "debug.h"
+#include "sha1.h"
 
 
 struct slisthead file_list_head;
@@ -46,7 +49,8 @@ struct slisthead file_list_head;
 /*
  * add element to the end of the list
  */
-INTERNAL_LINKAGE void add_peer_to_list(struct slist_peers *list_head, struct peer *p)
+INTERNAL_LINKAGE void
+add_peer_to_list(struct slist_peers *list_head, struct peer *p)
 {
 	int s;
 	struct peer *pd, *last;
@@ -82,7 +86,8 @@ INTERNAL_LINKAGE void add_peer_to_list(struct slist_peers *list_head, struct pee
 }
 
 
-INTERNAL_LINKAGE int remove_peer_from_list(struct slist_peers *list_head, struct peer *p)
+INTERNAL_LINKAGE int
+remove_peer_from_list(struct slist_peers *list_head, struct peer *p)
 {
 	int s;
 
@@ -95,7 +100,8 @@ INTERNAL_LINKAGE int remove_peer_from_list(struct slist_peers *list_head, struct
 }
 
 
-INTERNAL_LINKAGE struct peer * ip_port_to_peer(struct slist_peers *list_head, struct sockaddr_in *client)
+INTERNAL_LINKAGE struct peer *
+ip_port_to_peer(struct slist_peers *list_head, struct sockaddr_in *client)
 {
 	int s;
 	struct peer *p;
@@ -114,7 +120,8 @@ INTERNAL_LINKAGE struct peer * ip_port_to_peer(struct slist_peers *list_head, st
 
 
 /* seeder side: create new remote peer (LEECHER) */
-INTERNAL_LINKAGE struct peer * new_peer(struct sockaddr_in *sa, int n, int sockfd)
+INTERNAL_LINKAGE struct peer *
+new_peer(struct sockaddr_in *sa, int n, int sockfd)
 {
 	struct peer *p;
 
@@ -142,7 +149,8 @@ INTERNAL_LINKAGE struct peer * new_peer(struct sockaddr_in *sa, int n, int sockf
 
 
 /* leecher side: create new remote peer (SEEDER) */
-INTERNAL_LINKAGE struct peer * new_seeder(struct sockaddr_in *sa, int n)
+INTERNAL_LINKAGE struct peer *
+new_seeder(struct sockaddr_in *sa, int n)
 {
 	struct peer *p;
 
@@ -168,7 +176,8 @@ INTERNAL_LINKAGE struct peer * new_seeder(struct sockaddr_in *sa, int n)
 }
 
 
-INTERNAL_LINKAGE void cleanup_peer(struct peer *p)
+INTERNAL_LINKAGE void
+cleanup_peer(struct peer *p)
 {
 	int s;
 
@@ -201,7 +210,8 @@ INTERNAL_LINKAGE void cleanup_peer(struct peer *p)
 
 
 /* remove all the marked peers */
-INTERNAL_LINKAGE void cleanup_all_dead_peers(struct slist_peers *list_head)
+INTERNAL_LINKAGE void
+cleanup_all_dead_peers(struct slist_peers *list_head)
 {
 	int s;
 	struct peer *p;
@@ -221,7 +231,8 @@ INTERNAL_LINKAGE void cleanup_all_dead_peers(struct slist_peers *list_head)
 /*
  * basing on chunk array - create download schedule (array)
  */
-INTERNAL_LINKAGE void create_download_schedule(struct peer *p)
+INTERNAL_LINKAGE void
+create_download_schedule(struct peer *p)
 {
 	uint64_t o, oldo, y;
 
@@ -256,7 +267,8 @@ INTERNAL_LINKAGE void create_download_schedule(struct peer *p)
 /*
  * basing on chunk array - create download schedule (array)
  */
-INTERNAL_LINKAGE int32_t create_download_schedule_sbs(struct peer *p, uint32_t start_chunk, uint32_t end_chunk)
+INTERNAL_LINKAGE int32_t
+create_download_schedule_sbs(struct peer *p, uint32_t start_chunk, uint32_t end_chunk)
 {
 	int32_t ret;
 	uint32_t last_chunk;
@@ -301,7 +313,8 @@ INTERNAL_LINKAGE int32_t create_download_schedule_sbs(struct peer *p, uint32_t s
 }
 
 
-INTERNAL_LINKAGE int all_chunks_downloaded(struct peer *p)
+INTERNAL_LINKAGE int
+all_chunks_downloaded(struct peer *p)
 {
 	int ret;
 	uint64_t x;
@@ -321,7 +334,8 @@ INTERNAL_LINKAGE int all_chunks_downloaded(struct peer *p)
 }
 
 
-INTERNAL_LINKAGE void list_dir(char *dname)
+INTERNAL_LINKAGE void
+list_dir(char *dname)
 {
 	DIR *dir;
 	struct dirent *dirent;
@@ -356,8 +370,95 @@ INTERNAL_LINKAGE void list_dir(char *dname)
 }
 
 
-INTERNAL_LINKAGE void create_file_list(char *dname)
+INTERNAL_LINKAGE void
+create_file_list(char *dname)
 {
 	list_dir(dname);
 }
 
+
+INTERNAL_LINKAGE void
+process_file(struct file_list_entry *file_entry, int chunk_size)
+{
+	char *buf;
+	unsigned char digest[20 + 1];
+	int fd, r;
+	uint64_t x, nc, nl, c, rd;
+	struct stat stat;
+	SHA1Context context;
+	struct node *ret, *root8;
+
+	fd = open(file_entry->path, O_RDONLY);
+	if (fd < 0) {
+		printf("error opening file: %s\n", file_entry->path);
+		exit(1);
+	}
+	fstat(fd, &stat);
+
+	buf = malloc(chunk_size);
+
+	nc = stat.st_size / chunk_size;
+	if ((stat.st_size - stat.st_size / chunk_size * chunk_size) > 0)
+		nc++;
+	file_entry->nc = nc;
+	d_printf("number of chunks [%u]: %lu\n", chunk_size, nc);
+
+	/* compute number of leaves - it is not the same as number of chunks */
+	nl = 1 << (order2(nc));
+	file_entry->nl = nl;
+
+	file_entry->start_chunk = 0;
+	file_entry->end_chunk = nc - 1;
+
+	/* allocate array of chunks which will be linked to leaves later */
+	file_entry->tab_chunk = malloc(nl * sizeof(struct chunk));
+	memset(file_entry->tab_chunk, 0, nl * sizeof(struct chunk));
+
+	/* initialize array of chunks */
+	for (x = 0; x < nl; x++)
+		file_entry->tab_chunk[x].state = CH_EMPTY;
+
+	root8 = build_tree(nc, &ret);
+	file_entry->tree_root = root8;
+	file_entry->tree = ret;
+
+	/* compute SHA hash for every chunk for given file */
+	rd = 0;
+	c = 0;
+	while (rd < (uint64_t) stat.st_size) {
+		r = read(fd, buf, chunk_size);
+
+		SHA1Reset(&context);
+		SHA1Input(&context, (uint8_t *)buf, r);
+		SHA1Result(&context, digest);
+
+		file_entry->tab_chunk[c].state = CH_ACTIVE;
+		file_entry->tab_chunk[c].offset = c * chunk_size;
+		file_entry->tab_chunk[c].len = r;
+		memcpy(file_entry->tab_chunk[c].sha, digest, 20);
+		memcpy(ret[2 * c].sha, digest, 20);
+		ret[2 * c].state = ACTIVE;
+		rd += r;
+		c++;
+	}
+	close(fd);
+
+	/* link array of chunks to leaves */
+	for (x = 0; x < nl; x++) {
+		ret[x * 2].chunk = &file_entry->tab_chunk[x];
+		file_entry->tab_chunk[x].node = &ret[x * 2];
+	}
+
+	/* print the tree for given file */
+	show_tree_root_based(&ret[root8->number]);
+
+	/* print array tab_chunk */
+	dump_chunk_tab(file_entry->tab_chunk, nl);
+
+	/* update all the SHAs in the tree */
+	update_sha(ret, nl);
+
+	dump_tree(ret, nl);
+
+	free(buf);
+}

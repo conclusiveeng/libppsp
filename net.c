@@ -55,7 +55,8 @@ pthread_mutex_t peer_list_head_mutex;
 uint8_t remove_dead_peers;
 
 
-INTERNAL_LINKAGE sem_t * semaph_init (struct peer *p)
+INTERNAL_LINKAGE sem_t *
+semaph_init (struct peer *p)
 {
 	sem_t *sem;
 
@@ -66,7 +67,7 @@ INTERNAL_LINKAGE sem_t * semaph_init (struct peer *p)
 
 	sem = sem_open(p->sem_name, O_CREAT, 0777, 0);		/* create semaphore initially locked */
 	if (sem == SEM_FAILED) {
-		printf("sem_open error: %s\n", strerror(errno));
+		d_printf("sem_open error: %s\n", strerror(errno));
 		abort();
 	}
 
@@ -74,13 +75,14 @@ INTERNAL_LINKAGE sem_t * semaph_init (struct peer *p)
 }
 
 
-INTERNAL_LINKAGE int semaph_post (sem_t *sem)
+INTERNAL_LINKAGE int
+semaph_post (sem_t *sem)
 {
 	int s;
 
 	s = sem_post(sem);
 	if (s != 0) {
-		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -88,13 +90,14 @@ INTERNAL_LINKAGE int semaph_post (sem_t *sem)
 }
 
 
-INTERNAL_LINKAGE int semaph_wait (sem_t *sem)
+INTERNAL_LINKAGE int
+semaph_wait (sem_t *sem)
 {
 	int s;
 
 	s = sem_wait(sem);
 	if (s != 0) {
-		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -102,13 +105,14 @@ INTERNAL_LINKAGE int semaph_wait (sem_t *sem)
 }
 
 
-INTERNAL_LINKAGE int mutex_init (pthread_mutex_t *mutex)
+INTERNAL_LINKAGE int
+mutex_init (pthread_mutex_t *mutex)
 {
 	int s;
 
 	s = pthread_mutex_init(mutex, NULL);
 	if (s != 0) {
-		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -116,13 +120,14 @@ INTERNAL_LINKAGE int mutex_init (pthread_mutex_t *mutex)
 }
 
 
-INTERNAL_LINKAGE int mutex_lock (pthread_mutex_t *mutex)
+INTERNAL_LINKAGE int
+mutex_lock (pthread_mutex_t *mutex)
 {
 	int s;
 
 	s = pthread_mutex_lock(mutex);
 	if (s != 0) {
-		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -130,13 +135,14 @@ INTERNAL_LINKAGE int mutex_lock (pthread_mutex_t *mutex)
 }
 
 
-INTERNAL_LINKAGE int mutex_unlock (pthread_mutex_t *mutex)
+INTERNAL_LINKAGE int
+mutex_unlock (pthread_mutex_t *mutex)
 {
 	int s;
 
 	s = pthread_mutex_unlock(mutex);
 	if (s != 0) {
-		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -144,19 +150,20 @@ INTERNAL_LINKAGE int mutex_unlock (pthread_mutex_t *mutex)
 }
 
 
-INTERNAL_LINKAGE int seeder_cond_lock_init (struct peer *p)
+INTERNAL_LINKAGE int
+seeder_cond_lock_init (struct peer *p)
 {
 	int s;
 
 	s = pthread_mutex_init(&p->seeder_mutex, NULL);
 	if (s != 0) {
-		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
 	s = pthread_cond_init(&p->seeder_mtx_cond, NULL);
 	if (s != 0) {
-		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -164,7 +171,8 @@ INTERNAL_LINKAGE int seeder_cond_lock_init (struct peer *p)
 }
 
 
-INTERNAL_LINKAGE int seeder_cond_lock (struct peer *p)
+INTERNAL_LINKAGE int
+seeder_cond_lock (struct peer *p)
 {
 	pthread_mutex_lock(&p->seeder_mutex);
 	p->seeder_cond = S_TODO;
@@ -181,7 +189,8 @@ INTERNAL_LINKAGE int seeder_cond_lock (struct peer *p)
 }
 
 
-INTERNAL_LINKAGE int seeder_cond_unlock (struct peer *p)
+INTERNAL_LINKAGE int
+seeder_cond_unlock (struct peer *p)
 {
 	pthread_mutex_lock(&p->seeder_mutex);
 	p->seeder_cond = S_DONE;
@@ -192,19 +201,20 @@ INTERNAL_LINKAGE int seeder_cond_unlock (struct peer *p)
 }
 
 
-INTERNAL_LINKAGE int leecher_cond_lock_init (struct peer *p)
+INTERNAL_LINKAGE int
+leecher_cond_lock_init (struct peer *p)
 {
 	int s;
 
 	s = pthread_mutex_init(&p->leecher_mutex, NULL);
 	if (s != 0) {
-		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
 	s = pthread_cond_init(&p->leecher_mtx_cond, NULL);
 	if (s != 0) {
-		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -213,7 +223,8 @@ INTERNAL_LINKAGE int leecher_cond_lock_init (struct peer *p)
 }
 
 
-INTERNAL_LINKAGE int leecher_cond_sleep (struct peer *p)
+INTERNAL_LINKAGE int
+leecher_cond_sleep (struct peer *p)
 {
 	pthread_mutex_lock(&p->leecher_mutex);
 	do {
@@ -229,7 +240,8 @@ INTERNAL_LINKAGE int leecher_cond_sleep (struct peer *p)
 }
 
 
-INTERNAL_LINKAGE int leecher_cond_set_and_sleep (struct peer *p)
+INTERNAL_LINKAGE int
+leecher_cond_set_and_sleep (struct peer *p)
 {
 	pthread_mutex_lock(&p->leecher_mutex);
 	p->leecher_cond = L_SLEEP;
@@ -246,9 +258,8 @@ INTERNAL_LINKAGE int leecher_cond_set_and_sleep (struct peer *p)
 }
 
 
-
-
-INTERNAL_LINKAGE int leecher_cond_wake (struct peer *p)
+INTERNAL_LINKAGE int
+leecher_cond_wake (struct peer *p)
 {
 	pthread_mutex_lock(&p->leecher_mutex);
 	p->leecher_cond = L_WAKE;
@@ -259,7 +270,8 @@ INTERNAL_LINKAGE int leecher_cond_wake (struct peer *p)
 }
 
 
-INTERNAL_LINKAGE int leecher_cond_set (struct peer *p, int val)
+INTERNAL_LINKAGE int
+leecher_cond_set (struct peer *p, int val)
 {
 	pthread_mutex_lock(&p->leecher_mutex);
 	p->leecher_cond = val;
@@ -270,19 +282,20 @@ INTERNAL_LINKAGE int leecher_cond_set (struct peer *p, int val)
 }
 
 
-INTERNAL_LINKAGE int leecher_cond_lock_init2 (struct peer *p)
+INTERNAL_LINKAGE int
+leecher_cond_lock_init2 (struct peer *p)
 {
 	int s;
 
 	s = pthread_mutex_init(&p->leecher_mutex2, NULL);
 	if (s != 0) {
-		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
 	s = pthread_cond_init(&p->leecher_mtx_cond2, NULL);
 	if (s != 0) {
-		printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -292,7 +305,8 @@ INTERNAL_LINKAGE int leecher_cond_lock_init2 (struct peer *p)
 }
 
 
-INTERNAL_LINKAGE int leecher_cond_lock2 (struct peer *p)
+INTERNAL_LINKAGE int
+leecher_cond_lock2 (struct peer *p)
 {
 	pthread_mutex_lock(&p->leecher_mutex2);
 	do {
@@ -307,7 +321,8 @@ INTERNAL_LINKAGE int leecher_cond_lock2 (struct peer *p)
 }
 
 
-INTERNAL_LINKAGE int leecher_cond_unlock2 (struct peer *p)
+INTERNAL_LINKAGE int
+leecher_cond_unlock2 (struct peer *p)
 {
 	pthread_mutex_lock(&p->leecher_mutex2);
 	p->leecher_cond2 = L_DONE;
@@ -318,7 +333,8 @@ INTERNAL_LINKAGE int leecher_cond_unlock2 (struct peer *p)
 }
 
 
-INTERNAL_LINKAGE int leecher_cond_set2 (struct peer *p, int val)
+INTERNAL_LINKAGE int
+leecher_cond_set2 (struct peer *p, int val)
 {
 	pthread_mutex_lock(&p->leecher_mutex2);
 	p->leecher_cond2 = val;
@@ -330,7 +346,8 @@ INTERNAL_LINKAGE int leecher_cond_set2 (struct peer *p, int val)
 
 
 /* thread - seeder worker */
-INTERNAL_LINKAGE void * seeder_worker (void *data)
+INTERNAL_LINKAGE void *
+seeder_worker (void *data)
 {
 	int n, clientlen, sockfd, data_payload_len, h_resp_len, opts_len, s, y;
 	char *data_payload, *bn, buf[40 + 1];
@@ -440,7 +457,7 @@ INTERNAL_LINKAGE void * seeder_worker (void *data)
 			/* send HANDSHAKE + HAVE */
 			n = sendto(sockfd, handshake_resp, h_resp_len, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
 			if (n < 0) {
-				printf("%s", "ERROR in sendto\n");
+				d_printf("%s", "ERROR in sendto\n");
 				abort();
 			}
 
@@ -507,7 +524,7 @@ INTERNAL_LINKAGE void * seeder_worker (void *data)
 
 			n = sendto(sockfd, p->send_buf, n, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
 			if (n < 0) {
-				printf("%s", "ERROR in sendto\n");
+				d_printf("%s", "ERROR in sendto\n");
 				abort();
 			}
 
@@ -536,7 +553,7 @@ INTERNAL_LINKAGE void * seeder_worker (void *data)
 			/* send INTEGRITY with data */
 			n = sendto(sockfd, p->send_buf, n, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
 			if (n < 0) {
-				printf("%s", "ERROR in sendto\n");
+				d_printf("%s", "ERROR in sendto\n");
 				abort();
 			}
 
@@ -558,7 +575,7 @@ INTERNAL_LINKAGE void * seeder_worker (void *data)
 			/* send DATA datagram with contents of the chunk */
 			n = sendto(sockfd, data_payload, data_payload_len, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
 			if (n < 0) {
-				printf("%s", "ERROR in sendto\n");
+				d_printf("%s", "ERROR in sendto\n");
 				abort();
 			}
 
@@ -606,7 +623,8 @@ INTERNAL_LINKAGE void * seeder_worker (void *data)
 
 
 /* UDP datagram server (SEEDER) */
-INTERNAL_LINKAGE int net_seeder(struct peer *seeder)
+INTERNAL_LINKAGE int
+net_seeder(struct peer *seeder)
 {
 	int sockfd, optval, n, st;
 	char buf[BUFSIZE];
@@ -616,7 +634,6 @@ INTERNAL_LINKAGE int net_seeder(struct peer *seeder)
 	struct peer *p;
 	pthread_t thread;
 
-	printf("Ok, ready for sharing\n");
 
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sockfd < 0)
@@ -679,7 +696,7 @@ INTERNAL_LINKAGE int net_seeder(struct peer *seeder)
 				/* create worker thread for this client (leecher) */
 				st = pthread_create(&thread, NULL, &seeder_worker, p);
 				if (st != 0) {
-					printf("%s", "cannot create new thread\n");
+					d_printf("%s", "cannot create new thread\n");
 					abort();
 				}
 
@@ -741,8 +758,9 @@ INTERNAL_LINKAGE int net_seeder(struct peer *seeder)
 	}
 }
 
-
-INTERNAL_LINKAGE void * leecher_worker_continuous(void *data)
+#if 0
+INTERNAL_LINKAGE void *
+leecher_worker_continuous(void *data)
 {
 	char buffer[BUFSIZE], buf[40 + 1];
 	char swarm_id[] = "swarm_id";
@@ -849,7 +867,7 @@ INTERNAL_LINKAGE void * leecher_worker_continuous(void *data)
 			/* send initial HANDSHAKE and wait for SEEDER's answer */
 			n = sendto(sockfd, handshake_req, h_req_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				printf("error sending handshake: %d\n", n);
+				d_printf("error sending handshake: %d\n", n);
 				abort();
 			}
 			d_printf("%s", "initial message 1/3 sent\n");
@@ -897,7 +915,7 @@ INTERNAL_LINKAGE void * leecher_worker_continuous(void *data)
 				for (y = 0; y < 20; y++)
 					s += sprintf(buf + s, "%02x", local_peer->sha_demanded[y] & 0xff);
 				buf[40] = '\0';
-				printf("Seeder %s:%u has no file for hash: %s\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port), buf);
+				d_printf("Seeder %s:%u has no file for hash: %s\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port), buf);
 				p->to_remove = 1; /* mark peer to remove by garbage collector */
 
 				goto exit;
@@ -905,7 +923,7 @@ INTERNAL_LINKAGE void * leecher_worker_continuous(void *data)
 			}
 
 			if ((p->after_seeder_switch == 1) && (prev_chunk_size != local_peer->chunk_size)) {
-				printf("previous and current seeder have different chunk size: %u vs %u\n", prev_chunk_size, local_peer->chunk_size);
+				d_printf("previous and current seeder have different chunk size: %u vs %u\n", prev_chunk_size, local_peer->chunk_size);
 				abort();
 			}
 
@@ -941,7 +959,7 @@ INTERNAL_LINKAGE void * leecher_worker_continuous(void *data)
 			/* send REQUEST */
 			n = sendto(sockfd, request, request_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				printf("error sending request: %d\n", n);
+				d_printf("error sending request: %d\n", n);
 				abort();
 			}
 			d_printf("%s", "request message 3/3 sent\n");
@@ -1075,7 +1093,7 @@ INTERNAL_LINKAGE void * leecher_worker_continuous(void *data)
 				sha_seeder_buf[40] = '\0';
 
 				printf("error - hashes are different[%lu]: seeder %s vs digest: %s\n", cc, sha_seeder_buf, sha_buf);
-				printf("pthread %#lx   IP: %s\n", (uint64_t) p->thread, inet_ntoa(servaddr.sin_addr));
+				d_printf("pthread %#lx   IP: %s\n", (uint64_t) p->thread, inet_ntoa(servaddr.sin_addr));
 				abort();
 			} else {
 				local_peer->chunk[p->curr_chunk].downloaded = CH_YES;
@@ -1092,7 +1110,7 @@ INTERNAL_LINKAGE void * leecher_worker_continuous(void *data)
 			/* send ACK */
 			n = sendto(sockfd, buffer, ack_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				printf("error sending request: %d\n", n);
+				d_printf("error sending request: %d\n", n);
 				abort();
 			}
 			d_printf("ACK[%lu] sent\n" ,cc);
@@ -1123,7 +1141,7 @@ INTERNAL_LINKAGE void * leecher_worker_continuous(void *data)
 			n = make_handshake_finish(buffer, p);
 			n = sendto(sockfd, buffer, n, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				printf("error sending request: %d\n", n);
+				d_printf("error sending request: %d\n", n);
 				abort();
 			}
 			p->to_remove = 1; /* mark peer to remove by garbage collector */
@@ -1140,7 +1158,7 @@ INTERNAL_LINKAGE void * leecher_worker_continuous(void *data)
 			n = make_handshake_finish(buffer, p);
 			n = sendto(sockfd, buffer, ack_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				printf("error sending request: %d\n", n);
+				d_printf("error sending request: %d\n", n);
 				abort();
 			}
 
@@ -1187,7 +1205,8 @@ exit:
  * 5. create one thread for every seeder we know (from primary seeder)
  *
  */
-INTERNAL_LINKAGE int net_leecher_continuous(struct peer *local_peer)
+INTERNAL_LINKAGE int
+net_leecher_continuous(struct peer *local_peer)
 {
 	char buffer[BUFSIZE], buf[40 + 1];
 	char swarm_id[] = "swarm_id";
@@ -1283,7 +1302,7 @@ INTERNAL_LINKAGE int net_leecher_continuous(struct peer *local_peer)
 			/* send initial HANDSHAKE and wait for SEEDER's answer */
 			n = sendto(sockfd, handshake_req, h_req_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				printf("error sending handshake: %d\n", n);
+				d_printf("error sending handshake: %d\n", n);
 				abort();
 			}
 			d_printf("%s", "initial message 1/3 sent\n");
@@ -1304,7 +1323,8 @@ INTERNAL_LINKAGE int net_leecher_continuous(struct peer *local_peer)
 				n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
 			}
 
-			if (n <= 0) { printf("error: timeout of %u seconds occured\n", local_peer->timeout);
+			if (n <= 0) { 
+				d_printf("error: timeout of %u seconds occured\n", local_peer->timeout);
 				local_peer->sm_leecher = SM_HANDSHAKE;
 				continue;
 			} else {
@@ -1340,7 +1360,7 @@ INTERNAL_LINKAGE int net_leecher_continuous(struct peer *local_peer)
 			unlink(fname);
 			fd = open(fname, O_WRONLY | O_CREAT, 0744);
 			if (fd < 0) {
-				printf("error opening file '%s' for writing: %u %s\n", fname, errno, strerror(errno));
+				d_printf("error opening file '%s' for writing: %u %s\n", fname, errno, strerror(errno));
 				abort();
 			}
 			local_peer->fd = fd;
@@ -1370,7 +1390,7 @@ INTERNAL_LINKAGE int net_leecher_continuous(struct peer *local_peer)
 			/* send REQUEST */
 			n = sendto(sockfd, request, request_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				printf("error sending request: %d\n", n);
+				d_printf("error sending request: %d\n", n);
 				abort();
 			}
 			d_printf("%s", "request message 3/3 sent\n");
@@ -1417,7 +1437,7 @@ INTERNAL_LINKAGE int net_leecher_continuous(struct peer *local_peer)
 			d_printf("%s", "we're sending HANDSHAKE_FINISH\n");
 			n = sendto(sockfd, buffer, n, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				printf("error sending request: %d: %s\n", n, strerror(errno));
+				d_printf("error sending request: %d: %s\n", n, strerror(errno));
 				abort();
 			}
 
@@ -1476,10 +1496,11 @@ exit:
 	close(fd);
 	return 0;
 }
-
+#endif
 
 /* leecher worker in step-by-step version */
-INTERNAL_LINKAGE void * leecher_worker_sbs(void *data)
+INTERNAL_LINKAGE void *
+leecher_worker_sbs(void *data)
 {
 	char buffer[BUFSIZE], buf[40 + 1];
 	char swarm_id[] = "swarm_id";
@@ -1584,7 +1605,7 @@ INTERNAL_LINKAGE void * leecher_worker_sbs(void *data)
 			/* send initial HANDSHAKE and wait for SEEDER's answer */
 			n = sendto(sockfd, handshake_req, h_req_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				printf("error sending handshake: %d\n", n);
+				d_printf("error sending handshake: %d\n", n);
 				abort();
 			}
 			d_printf("%s", "initial message 1/3 sent\n");
@@ -1640,7 +1661,7 @@ INTERNAL_LINKAGE void * leecher_worker_sbs(void *data)
 			}
 
 			if ((p->after_seeder_switch == 1) && (prev_chunk_size != local_peer->chunk_size)) {
-				printf("previous and current seeder have different chunk size: %u vs %u\n", prev_chunk_size, local_peer->chunk_size);
+				d_printf("previous and current seeder have different chunk size: %u vs %u\n", prev_chunk_size, local_peer->chunk_size);
 				abort();
 			}
 
@@ -1690,7 +1711,7 @@ INTERNAL_LINKAGE void * leecher_worker_sbs(void *data)
 			/* send REQUEST */
 			n = sendto(sockfd, request, request_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				printf("error sending request: %d\n", n);
+				d_printf("error sending request: %d\n", n);
 				abort();
 			}
 			d_printf("%s", "request message 3/3 sent\n");
@@ -1834,7 +1855,7 @@ INTERNAL_LINKAGE void * leecher_worker_sbs(void *data)
 				sha_seeder_buf[40] = '\0';
 
 				printf("error - hashes are different[%lu]: seeder %s vs digest: %s\n", cc, sha_seeder_buf, sha_buf);
-				printf("pthread %#lx   IP: %s\n", (uint64_t) p->thread, inet_ntoa(servaddr.sin_addr));
+				d_printf("pthread %#lx   IP: %s\n", (uint64_t) p->thread, inet_ntoa(servaddr.sin_addr));
 				abort();
 			} else {
 				local_peer->chunk[p->curr_chunk].downloaded = CH_YES;
@@ -1851,7 +1872,7 @@ INTERNAL_LINKAGE void * leecher_worker_sbs(void *data)
 			/* send ACK */
 			n = sendto(sockfd, buffer, ack_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				printf("error sending request: %d\n", n);
+				d_printf("error sending request: %d\n", n);
 				abort();
 			}
 			d_printf("ACK[%lu] sent\n" ,cc);
@@ -1900,7 +1921,7 @@ INTERNAL_LINKAGE void * leecher_worker_sbs(void *data)
 			n = make_handshake_finish(buffer, p);
 			n = sendto(sockfd, buffer, n, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				printf("error sending request: %d\n", n);
+				d_printf("error sending request: %d\n", n);
 				abort();
 			}
 			p->to_remove = 1; /* mark peer to be removed by garbage collector */
@@ -1912,13 +1933,12 @@ INTERNAL_LINKAGE void * leecher_worker_sbs(void *data)
 
 		if (p->sm_leecher == SM_SWITCH_SEEDER) {
 			d_printf("%s", "switching seeder state machine\n");
-			printf("%s", "switching seeder state machine\n");
 			/* finish transmission with current seeder */
 
 			n = make_handshake_finish(buffer, p);
 			n = sendto(sockfd, buffer, ack_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				printf("error sending request: %d\n", n);
+				d_printf("error sending request: %d\n", n);
 				abort();
 			}
 
@@ -1955,7 +1975,8 @@ exit:
 }
 
 
-INTERNAL_LINKAGE int preliminary_connection_sbs(struct peer *local_peer)
+INTERNAL_LINKAGE int
+preliminary_connection_sbs(struct peer *local_peer)
 {
 	char buffer[BUFSIZE], buf[40 + 1];
 	char swarm_id[] = "swarm_id";
@@ -2049,7 +2070,7 @@ INTERNAL_LINKAGE int preliminary_connection_sbs(struct peer *local_peer)
 			/* send initial HANDSHAKE and wait for SEEDER's answer */
 			n = sendto(sockfd, handshake_req, h_req_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				printf("error sending handshake: %d\n", n);
+				d_printf("error sending handshake: %d\n", n);
 				abort();
 			}
 			d_printf("%s", "initial message 1/3 sent\n");
@@ -2070,7 +2091,8 @@ INTERNAL_LINKAGE int preliminary_connection_sbs(struct peer *local_peer)
 				n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
 			}
 
-			if (n <= 0) { printf("error: timeout of %u seconds occured\n", local_peer->timeout);
+			if (n <= 0) { 
+				d_printf("error: timeout of %u seconds occured\n", local_peer->timeout);
 				local_peer->sm_leecher = SM_HANDSHAKE;
 				continue;
 			} else {
@@ -2131,7 +2153,7 @@ INTERNAL_LINKAGE int preliminary_connection_sbs(struct peer *local_peer)
 			/* send REQUEST */
 			n = sendto(sockfd, request, request_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				printf("error sending request: %d\n", n);
+				d_printf("error sending request: %d\n", n);
 				abort();
 			}
 			d_printf("%s", "request message 3/3 sent\n");
@@ -2178,7 +2200,7 @@ INTERNAL_LINKAGE int preliminary_connection_sbs(struct peer *local_peer)
 			d_printf("%s", "we're sending HANDSHAKE_FINISH\n");
 			n = sendto(sockfd, buffer, n, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
-				printf("error sending request: %d: %s\n", n, strerror(errno));
+				d_printf("error sending request: %d: %s\n", n, strerror(errno));
 				abort();
 			}
 
@@ -2195,14 +2217,16 @@ INTERNAL_LINKAGE int preliminary_connection_sbs(struct peer *local_peer)
 }
 
 
-INTERNAL_LINKAGE void net_leecher_create(void)
+INTERNAL_LINKAGE void
+net_leecher_create(void)
 {
 	SLIST_INIT(&peers_list_head);
 	pthread_mutex_init(&peer_list_head_mutex, NULL);
 }
 
 
-INTERNAL_LINKAGE int net_leecher_sbs(struct peer *local_peer)
+INTERNAL_LINKAGE int
+net_leecher_sbs(struct peer *local_peer)
 {
 	int xx;
 	struct peer *p;
@@ -2243,7 +2267,8 @@ INTERNAL_LINKAGE int net_leecher_sbs(struct peer *local_peer)
 }
 
 
-INTERNAL_LINKAGE void net_leecher_fetch_chunk(struct peer *local_peer)
+INTERNAL_LINKAGE void
+net_leecher_fetch_chunk(struct peer *local_peer)
 {
 	struct peer *p;
 
@@ -2262,7 +2287,8 @@ INTERNAL_LINKAGE void net_leecher_fetch_chunk(struct peer *local_peer)
 }
 
 
-INTERNAL_LINKAGE void net_leecher_close(struct peer *local_peer)
+INTERNAL_LINKAGE void
+net_leecher_close(struct peer *local_peer)
 {
 	uint32_t yy;
 	struct peer *p;

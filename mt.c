@@ -49,7 +49,8 @@ extern int debug;
  * returns rounded order of 32-bit variable
  * simplified log2() function
  */
-INTERNAL_LINKAGE int order2 (uint32_t val)
+INTERNAL_LINKAGE int
+order2 (uint32_t val)
 {
 	int o, bits;
 	int32_t b;
@@ -78,7 +79,8 @@ INTERNAL_LINKAGE int order2 (uint32_t val)
  * 	as "**ret" parameter - pointer to new created tree - 0 index of the leaf
  *
  */
-INTERNAL_LINKAGE struct node * build_tree (int num_chunks, struct node **ret)
+INTERNAL_LINKAGE struct node *
+build_tree (int num_chunks, struct node **ret)
 {
 	int x, l, si, h, first_idx, nc;
 	int left, right, parent, root_idx;
@@ -149,7 +151,8 @@ INTERNAL_LINKAGE struct node * build_tree (int num_chunks, struct node **ret)
  * out params:
  * 	ret - pointer to index [0] of he new created tree
  */
-INTERNAL_LINKAGE struct node * extend_tree (struct node *orig_tree, int orig_num_chunks, struct node **ret)
+INTERNAL_LINKAGE struct node *
+extend_tree (struct node *orig_tree, int orig_num_chunks, struct node **ret)
 {
 	int x, l, si, h, first_idx, nc;
 	int left, right, parent, root_idx;
@@ -238,7 +241,8 @@ INTERNAL_LINKAGE struct node * extend_tree (struct node *orig_tree, int orig_num
 }
 
 
-INTERNAL_LINKAGE int update_chunk (struct node *t, unsigned int cn, struct chunk *c)
+INTERNAL_LINKAGE int
+update_chunk (struct node *t, unsigned int cn, struct chunk *c)
 {
 	return 0;
 }
@@ -247,7 +251,8 @@ INTERNAL_LINKAGE int update_chunk (struct node *t, unsigned int cn, struct chunk
 /*
  * print tree - root node at top, leaves at bottom
  */
-INTERNAL_LINKAGE void show_tree_root_based (struct node *t)
+INTERNAL_LINKAGE void
+show_tree_root_based (struct node *t)
 {
 	int l, si, nl, h, ti, first_idx;
 	int center, iw, m, sp, is;
@@ -290,7 +295,8 @@ INTERNAL_LINKAGE void show_tree_root_based (struct node *t)
 /*
  * find uncle for node "n" in tree with root "t"
  */
-INTERNAL_LINKAGE struct node * find_uncle (struct node *t, struct node *n)
+INTERNAL_LINKAGE struct node *
+find_uncle (struct node *t, struct node *n)
 {
 	struct node *p, *gp, *u;
 
@@ -316,7 +322,8 @@ INTERNAL_LINKAGE struct node * find_uncle (struct node *t, struct node *n)
  * looks for min and max index going through the tree - extremely left and right
  *
  */
-INTERNAL_LINKAGE void list_interval (struct node *i)
+INTERNAL_LINKAGE void
+list_interval (struct node *i)
 {
 	struct node *c, *min, *max;
 
@@ -339,7 +346,8 @@ INTERNAL_LINKAGE void list_interval (struct node *i)
 /*
  * for given node find min and max child node numbers
  */
-INTERNAL_LINKAGE void interval_min_max (struct node *i, struct node *min, struct node *max)
+INTERNAL_LINKAGE void
+interval_min_max (struct node *i, struct node *min, struct node *max)
 {
 	struct node *c;
 
@@ -365,7 +373,8 @@ INTERNAL_LINKAGE void interval_min_max (struct node *i, struct node *min, struct
  * 	t - pointer to array of tree
  * 	l - number of leaves
  */
-INTERNAL_LINKAGE void dump_tree (struct node *t, int l)
+INTERNAL_LINKAGE void
+dump_tree (struct node *t, int l)
 {
 	char shas[40 + 1];
 	int x, y, s;
@@ -389,7 +398,8 @@ INTERNAL_LINKAGE void dump_tree (struct node *t, int l)
  * 	l - number of leaves
  *
  */
-INTERNAL_LINKAGE void dump_chunk_tab (struct chunk *c, int l)
+INTERNAL_LINKAGE void
+dump_chunk_tab (struct chunk *c, int l)
 {
 	char buf[40 + 1];
 	int x, y, s;
@@ -406,7 +416,8 @@ INTERNAL_LINKAGE void dump_chunk_tab (struct chunk *c, int l)
 }
 
 
-INTERNAL_LINKAGE void update_sha (struct node *t, int num_chunks)
+INTERNAL_LINKAGE void
+update_sha (struct node *t, int num_chunks)
 {
 	char sha_left[40 + 1], sha_right[40 + 1], sha_parent[40 + 1];
 	uint8_t concat[80 + 1];

@@ -47,11 +47,10 @@ typedef struct {
 	uint32_t end_chunk;
 } ppspp_metadata_t;
 
-void process_file(struct file_list_entry *, int);
+
 void ppspp_seeder_create(ppspp_seeder_params_t *);
 int ppspp_seeder_add_seeder(struct sockaddr_in *);
 int ppspp_seeder_remove_seeder(struct sockaddr_in *);
-void ppspp_seeder_list_seeders(void);
 void ppspp_seeder_add_file_or_directory(char *);
 int ppspp_seeder_remove_file_or_directory(char *);
 void ppspp_seeder_run(void);

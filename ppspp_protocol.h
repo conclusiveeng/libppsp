@@ -109,6 +109,5 @@ int dump_integrity (char *, int, struct peer *);
 int dump_ack (char *, int, struct peer *);
 uint8_t message_type (char *);
 uint8_t handshake_type (char *);
-void proto_test (struct peer *);
 
 #endif /* _PPSPP_PROTOCOL_H_ */
