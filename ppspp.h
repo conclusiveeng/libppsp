@@ -47,19 +47,20 @@ typedef struct {
 	uint32_t end_chunk;
 } ppspp_metadata_t;
 
+typedef uint64_t ppspp_handle_t;
 
-void ppspp_seeder_create(ppspp_seeder_params_t *);
-int ppspp_seeder_add_seeder(struct sockaddr_in *);
-int ppspp_seeder_remove_seeder(struct sockaddr_in *);
-void ppspp_seeder_add_file_or_directory(char *);
-int ppspp_seeder_remove_file_or_directory(char *);
-void ppspp_seeder_run(void);
-void ppspp_seeder_close(void);
-void ppspp_leecher_create(ppspp_leecher_params_t *);
-int ppspp_leecher_get_metadata(ppspp_metadata_t *);
-uint32_t ppspp_prepare_chunk_range(uint32_t, uint32_t);
-void ppspp_leecher_fetch_chunk_to_fd(int);
-int32_t ppspp_leecher_fetch_chunk_to_buf(uint8_t *);
-void ppspp_leecher_close(void);
-void ppspp_leecher_run(void);
+ppspp_handle_t ppspp_seeder_create(ppspp_seeder_params_t *);
+int ppspp_seeder_add_seeder(ppspp_handle_t, struct sockaddr_in *);
+int ppspp_seeder_remove_seeder(ppspp_handle_t, struct sockaddr_in *);
+void ppspp_seeder_add_file_or_directory(ppspp_handle_t, char *);
+int ppspp_seeder_remove_file_or_directory(ppspp_handle_t, char *);
+void ppspp_seeder_run(ppspp_handle_t);
+void ppspp_seeder_close(ppspp_handle_t);
+ppspp_handle_t ppspp_leecher_create(ppspp_leecher_params_t *);
+int ppspp_leecher_get_metadata(ppspp_handle_t handle, ppspp_metadata_t *);
+uint32_t ppspp_prepare_chunk_range(ppspp_handle_t, uint32_t, uint32_t);
+void ppspp_leecher_fetch_chunk_to_fd(ppspp_handle_t, int);
+int32_t ppspp_leecher_fetch_chunk_to_buf(ppspp_handle_t, uint8_t *);
+void ppspp_leecher_close(ppspp_handle_t);
+void ppspp_leecher_run(ppspp_handle_t handle);
 #endif /* _PPSPP_H_ */

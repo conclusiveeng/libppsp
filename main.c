@@ -76,6 +76,7 @@ main (int argc, char *argv[])
 	ppspp_seeder_params_t seeder_params;
 	ppspp_leecher_params_t leecher_params;
 	ppspp_metadata_t meta;
+	ppspp_handle_t seeder_handle, leecher_handle;
 
 	chunk_size = 1024;
 	fdname = fname1 = NULL;
@@ -198,7 +199,7 @@ main (int argc, char *argv[])
 		seeder_params.timeout = timeout;
 		seeder_params.port = port;
 
-		ppspp_seeder_create(&seeder_params);
+		seeder_handle = ppspp_seeder_create(&seeder_params);
 
 		if (peer_list != NULL) {
 			ch = peer_list;
@@ -229,19 +230,21 @@ main (int argc, char *argv[])
 				sa_in.sin_port = htons(atoi(colon + 1));
 
 				if (sia == 1) { /* if conversion succeeded */
-					ppspp_seeder_add_seeder(&sa_in);
+					ppspp_seeder_add_seeder(seeder_handle, &sa_in);
 				}
 				ch = last_char + 2;
 			}
 		}
 
 		if (fdname != NULL) {
-			ppspp_seeder_add_file_or_directory(fdname);
+			ppspp_seeder_add_file_or_directory(seeder_handle, fdname);
 		}
 
 		printf("Ok, ready for sharing\n");
 
-		ppspp_seeder_run();
+		ppspp_seeder_run(seeder_handle);
+
+		ppspp_seeder_close(seeder_handle);
 
 		free(fname2);
 
@@ -249,10 +252,10 @@ main (int argc, char *argv[])
 		/* prepare data for step-by-step leecher version */
 		leecher_params.timeout = timeout;
 		ascii_sha_to_bin(sha_demanded, leecher_params.sha_demanded);
-		ppspp_leecher_create(&leecher_params);
+		leecher_handle = ppspp_leecher_create(&leecher_params);
 
 		/* get metadata for demanded sha file */
-		file_exist = ppspp_leecher_get_metadata(&meta);
+		file_exist = ppspp_leecher_get_metadata(leecher_handle, &meta);
 		if (file_exist == 0) {
 			printf("seeder has demanded by us file: %s  size: %lu  chunks: %u-%u\n", meta.file_name, meta.file_size, meta.start_chunk, meta.end_chunk);
 
@@ -264,34 +267,34 @@ main (int argc, char *argv[])
 			}
 #if 0
 			/* run 1 (non-blocking) leecher thread with state machine */
-			ppspp_leecher_run();
+			ppspp_leecher_run(leecher_handle);
 
 			/* let the library prepare itself for transfer */
-			ppspp_prepare_chunk_range(meta.start_chunk, meta.end_chunk);
+			ppspp_prepare_chunk_range(leecher_handle, meta.start_chunk, meta.end_chunk);
 
-			ppspp_leecher_fetch_chunk_to_fd(fd);
+			ppspp_leecher_fetch_chunk_to_fd(leecher_handle, fd);
 
-			ppspp_leecher_close();
+			ppspp_leecher_close(leecher_handle);
 #else
 			/* transfering buffer transfer method */
 
 			/* run 1 (non-blocking) leecher thread with state machine */
-			ppspp_leecher_run();
+			ppspp_leecher_run(leecher_handle);
 
 			x = meta.start_chunk;
 			/* let the library prepare itself for transfer */
-			buf_size = ppspp_prepare_chunk_range(x, x + 1000 - 1);
+			buf_size = ppspp_prepare_chunk_range(leecher_handle, x, x + 1000 - 1);
 			transfer_buf = malloc(buf_size);
 
 			while ((x <= meta.end_chunk) && (buf_size > 0)) {
-				size = ppspp_leecher_fetch_chunk_to_buf(transfer_buf);
+				size = ppspp_leecher_fetch_chunk_to_buf(leecher_handle, transfer_buf);
 				write(fd, transfer_buf, size);
 				x += 1000;
-				buf_size = ppspp_prepare_chunk_range(x, x + 1000 - 1);
+				buf_size = ppspp_prepare_chunk_range(leecher_handle, x, x + 1000 - 1);
 			}
 
 			close(fd);
-			ppspp_leecher_close();
+			ppspp_leecher_close(leecher_handle);
 			free(transfer_buf);
 #endif
 		}

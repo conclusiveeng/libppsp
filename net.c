@@ -1323,7 +1323,7 @@ net_leecher_continuous(struct peer *local_peer)
 				n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
 			}
 
-			if (n <= 0) { 
+			if (n <= 0) {
 				d_printf("error: timeout of %u seconds occured\n", local_peer->timeout);
 				local_peer->sm_leecher = SM_HANDSHAKE;
 				continue;
@@ -2091,7 +2091,7 @@ preliminary_connection_sbs(struct peer *local_peer)
 				n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
 			}
 
-			if (n <= 0) { 
+			if (n <= 0) {
 				d_printf("error: timeout of %u seconds occured\n", local_peer->timeout);
 				local_peer->sm_leecher = SM_HANDSHAKE;
 				continue;

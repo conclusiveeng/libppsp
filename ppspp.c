@@ -43,28 +43,33 @@
 #include "ppspp.h"
 
 struct slist_seeders other_seeders_list_head;
-
 int debug;
-struct peer local_seeder, local_leecher;
 
 
-void
+ppspp_handle_t
 ppspp_seeder_create(ppspp_seeder_params_t *params)
 {
-	memset(&local_seeder, 0, sizeof(struct peer));
+	ppspp_handle_t handle;
+	struct peer *local_seeder;
 
-	local_seeder.chunk_size = params->chunk_size;
-	local_seeder.timeout = params->timeout;
-	local_seeder.port = params->port;
-	local_seeder.type = SEEDER;
+	local_seeder = malloc(sizeof(struct peer));
+	memset(local_seeder, 0, sizeof(struct peer));
+
+	local_seeder->chunk_size = params->chunk_size;
+	local_seeder->timeout = params->timeout;
+	local_seeder->port = params->port;
+	local_seeder->type = SEEDER;
 
 	SLIST_INIT(&file_list_head);
 	SLIST_INIT(&other_seeders_list_head);
+
+	handle = (uint64_t) local_seeder;
+	return handle;
 }
 
 
 int
-ppspp_seeder_add_seeder(struct sockaddr_in *sa)
+ppspp_seeder_add_seeder(ppspp_handle_t handle, struct sockaddr_in *sa)
 {
 	struct other_seeders_entry *ss;
 	int ret;
@@ -72,7 +77,6 @@ ppspp_seeder_add_seeder(struct sockaddr_in *sa)
 	ret = 0;
 
 	ss = malloc(sizeof(struct other_seeders_entry));
-
 	memcpy(&ss->sa, sa, sizeof(struct sockaddr_in));
 
 	SLIST_INSERT_HEAD(&other_seeders_list_head, ss, next);
@@ -82,7 +86,7 @@ ppspp_seeder_add_seeder(struct sockaddr_in *sa)
 
 
 int
-ppspp_seeder_remove_seeder(struct sockaddr_in *sa)
+ppspp_seeder_remove_seeder(ppspp_handle_t handle, struct sockaddr_in *sa)
 {
 	int ret;
 	struct other_seeders_entry *e;
@@ -101,12 +105,15 @@ ppspp_seeder_remove_seeder(struct sockaddr_in *sa)
 
 
 void
-ppspp_seeder_add_file_or_directory(char *name)
+ppspp_seeder_add_file_or_directory(ppspp_handle_t handle, char *name)
 {
 	char sha[40 + 1];
 	int st, s, y;
 	struct stat stat;
 	struct file_list_entry *f;
+	struct peer *local_seeder;
+
+	local_seeder = (struct peer *)handle;
 
 	st = lstat(name, &stat);
 	if (st != 0) {
@@ -132,7 +139,7 @@ ppspp_seeder_add_file_or_directory(char *name)
 		if (f->tree_root == NULL) {		/* no - so create tree for it */
 			printf("processing: %s  ", f->path);
 			fflush(stdout);
-			process_file(f, local_seeder.chunk_size);
+			process_file(f, local_seeder->chunk_size);
 
 			memset(sha, 0, sizeof(sha));
 			s = 0;
@@ -158,7 +165,7 @@ remove_and_free(struct file_list_entry *f)
 
 
 int
-ppspp_seeder_remove_file_or_directory(char *name)
+ppspp_seeder_remove_file_or_directory(ppspp_handle_t handle, char *name)
 {
 	char *c, *buf;
 	int ret;
@@ -200,58 +207,80 @@ ppspp_seeder_remove_file_or_directory(char *name)
 
 
 void
-ppspp_seeder_run(void)
+ppspp_seeder_run(ppspp_handle_t handle)
 {
-	net_seeder(&local_seeder);
+	struct peer *local_seeder;
+
+	local_seeder = (struct peer *)handle;
+	net_seeder(local_seeder);
 }
 
 
 void
-ppspp_seeder_close(void)
+ppspp_seeder_close(ppspp_handle_t handle)
 {
+	struct peer *local_seeder;
+
+	local_seeder = (struct peer *)handle;
+
+	free(local_seeder);
 }
 
 
-void
+ppspp_handle_t
 ppspp_leecher_create(ppspp_leecher_params_t *params)
 {
-	memset(&local_leecher, 0, sizeof(struct peer));
+	ppspp_handle_t handle;
+	struct peer *local_leecher;
 
-	local_leecher.sbs_mode = 1;
-	local_leecher.timeout = params->timeout;
-	local_leecher.type = LEECHER;
-	local_leecher.current_seeder = NULL;
-	memcpy(&local_leecher.seeder_addr, &params->seeder_addr, sizeof(struct sockaddr_in));
-	memcpy(&local_leecher.sha_demanded, params->sha_demanded, 20);
+	local_leecher = malloc(sizeof(struct peer));
+	memset(local_leecher, 0, sizeof(struct peer));
+
+	local_leecher->sbs_mode = 1;
+	local_leecher->timeout = params->timeout;
+	local_leecher->type = LEECHER;
+	local_leecher->current_seeder = NULL;
+	memcpy(&local_leecher->seeder_addr, &params->seeder_addr, sizeof(struct sockaddr_in));
+	memcpy(&local_leecher->sha_demanded, params->sha_demanded, 20);
 
 	net_leecher_create();
+
+	handle = (uint64_t) local_leecher;
+
+	return handle;
 }
 
 
 void
-ppspp_leecher_run(void)
+ppspp_leecher_run(ppspp_handle_t handle)
 {
-	net_leecher_sbs(&local_leecher);
+	struct peer *local_leecher;
+
+	local_leecher = (struct peer *)handle;
+	net_leecher_sbs(local_leecher);
 }
 
 
 int
-ppspp_leecher_get_metadata(ppspp_metadata_t *meta)
+ppspp_leecher_get_metadata(ppspp_handle_t handle, ppspp_metadata_t *meta)
 {
 	int ret;
+	struct peer *local_leecher;
+
+	local_leecher = (struct peer *)handle;
 
 	/* ask seeder if he has got a file for our sha stored in local_leecher->sha_demanded[] */
-	preliminary_connection_sbs(&local_leecher);
+	preliminary_connection_sbs(local_leecher);
 
-	if (local_leecher.seeder_has_file == 1) {
+	if (local_leecher->seeder_has_file == 1) {
 		ret = 0;
 		if (meta != NULL) {
 			/* prepare returning data for user */
-			strcpy(meta->file_name, local_leecher.fname);
-			meta->file_size = local_leecher.file_size;
-			meta->chunk_size = local_leecher.chunk_size;
-			meta->start_chunk = local_leecher.start_chunk;
-			meta->end_chunk = local_leecher.end_chunk;
+			strcpy(meta->file_name, local_leecher->fname);
+			meta->file_size = local_leecher->file_size;
+			meta->chunk_size = local_leecher->chunk_size;
+			meta->start_chunk = local_leecher->start_chunk;
+			meta->end_chunk = local_leecher->end_chunk;
 		}
 	} else
 		ret = -1;	/* file does not exist for demanded SHA on seeder */
@@ -262,53 +291,67 @@ ppspp_leecher_get_metadata(ppspp_metadata_t *meta)
 
 
 uint32_t
-ppspp_prepare_chunk_range(uint32_t start_chunk, uint32_t end_chunk)
+ppspp_prepare_chunk_range(ppspp_handle_t handle, uint32_t start_chunk, uint32_t end_chunk)
 {
 	uint32_t buf_size;
+	struct peer *local_leecher;
+
+	local_leecher = (struct peer *)handle;
 
 	/* if download_schedule previously allocated - free it now */
-	if (local_leecher.download_schedule != NULL) {
-		free(local_leecher.download_schedule);
-		local_leecher.download_schedule = NULL;
+	if (local_leecher->download_schedule != NULL) {
+		free(local_leecher->download_schedule);
+		local_leecher->download_schedule = NULL;
 	}
 
-	local_leecher.download_schedule = malloc(local_leecher.nl * sizeof(struct schedule_entry));
-	memset(local_leecher.download_schedule, 0, local_leecher.nl * sizeof(struct schedule_entry));
-	buf_size = create_download_schedule_sbs(&local_leecher, start_chunk, end_chunk);
-	local_leecher.download_schedule_idx = 0;
+	local_leecher->download_schedule = malloc(local_leecher->nl * sizeof(struct schedule_entry));
+	memset(local_leecher->download_schedule, 0, local_leecher->nl * sizeof(struct schedule_entry));
+	buf_size = create_download_schedule_sbs(local_leecher, start_chunk, end_chunk);
+	local_leecher->download_schedule_idx = 0;
 
 	return buf_size;
 }
 
 
 void
-ppspp_leecher_fetch_chunk_to_fd(int fd)
+ppspp_leecher_fetch_chunk_to_fd(ppspp_handle_t handle, int fd)
 {
-	local_leecher.cmd = CMD_FETCH;
-	local_leecher.fd = fd;
-	local_leecher.transfer_method = M_FD;
+	struct peer *local_leecher;
 
-	net_leecher_fetch_chunk(&local_leecher);
+	local_leecher = (struct peer *)handle;
+
+	local_leecher->cmd = CMD_FETCH;
+	local_leecher->fd = fd;
+	local_leecher->transfer_method = M_FD;
+
+	net_leecher_fetch_chunk(local_leecher);
 }
 
 
 int32_t
-ppspp_leecher_fetch_chunk_to_buf(uint8_t *transfer_buf)
+ppspp_leecher_fetch_chunk_to_buf(ppspp_handle_t handle, uint8_t *transfer_buf)
 {
-	local_leecher.cmd = CMD_FETCH;
-	local_leecher.transfer_buf = transfer_buf;
-	local_leecher.transfer_method = M_BUF;
-	local_leecher.tx_bytes = 0;
+	struct peer *local_leecher;
 
-	net_leecher_fetch_chunk(&local_leecher);
+	local_leecher = (struct peer *)handle;
 
-	return local_leecher.tx_bytes;
+	local_leecher->cmd = CMD_FETCH;
+	local_leecher->transfer_buf = transfer_buf;
+	local_leecher->transfer_method = M_BUF;
+	local_leecher->tx_bytes = 0;
+
+	net_leecher_fetch_chunk(local_leecher);
+
+	return local_leecher->tx_bytes;
 }
 
 
 void
-ppspp_leecher_close(void)
+ppspp_leecher_close(ppspp_handle_t handle)
 {
-	local_leecher.cmd = CMD_FINISH;
-	net_leecher_close(&local_leecher);
+	struct peer *local_leecher;
+
+	local_leecher = (struct peer *)handle;
+	local_leecher->cmd = CMD_FINISH;
+	net_leecher_close(local_leecher);
 }
