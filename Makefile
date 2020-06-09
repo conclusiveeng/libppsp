@@ -7,7 +7,6 @@ LIB_CFLAGS += -ggdb3
 EXE_CFLAGS = -L. -lppspp -lpthread -ggdb3 -lrt
 
 LDFLAGS = -shared
-#all: libppspp.so ppspp new
 all: libppspp.so ppspp
 
 %.o: %.c %.h
@@ -18,13 +17,6 @@ libppspp.so: mt.o sha1.o ppspp_protocol.o net.o peer.o ppspp.o
 
 ppspp: main.c
 	$(CC) main.c -o $@ $(EXE_CFLAGS)
-
-
-new: new_main.c
-	$(CC) new_main.c -o $@ $(EXE_CFLAGS)
-
-
-
 
 clean:
 	rm -f ppspp new *.o libppspp.so
