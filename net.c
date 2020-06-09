@@ -39,6 +39,7 @@
 #include <inttypes.h>
 #include <semaphore.h>
 #include <libgen.h>
+#include <mqueue.h>
 
 #include "mt.h"
 #include "net.h"
@@ -47,7 +48,13 @@
 #include "sha1.h"
 #include "debug.h"
 
+#define MQ_SYNC 0
+
 #define SEM_NAME "/ppspp"
+
+#if MQ_SYNC
+#define MQ_NAME "/mq"
+#endif
 
 extern int h_errno;
 struct slist_peers peers_list_head;
@@ -175,7 +182,6 @@ INTERNAL_LINKAGE int
 seeder_cond_lock (struct peer *p)
 {
 	pthread_mutex_lock(&p->seeder_mutex);
-	p->seeder_cond = S_TODO;
 	do {
 		if (p->seeder_cond == S_DONE)
 			break;
@@ -183,6 +189,7 @@ seeder_cond_lock (struct peer *p)
 			pthread_cond_wait(&p->seeder_mtx_cond, &p->seeder_mutex);
 
 	} while(1);
+	p->seeder_cond = S_TODO;
 	pthread_mutex_unlock(&p->seeder_mutex);
 
 	return 0;
@@ -344,6 +351,35 @@ leecher_cond_set2 (struct peer *p, int val)
 	return 0;
 }
 
+#if MQ_SYNC
+INTERNAL_LINKAGE mqd_t
+mq_init_main_process_sender(void)
+{
+	mqd_t q;
+	char mq_name[64];
+	struct mq_attr attr;
+
+	attr.mq_flags = 0;
+	attr.mq_maxmsg = 10;
+	attr.mq_msgsize = BUFSIZE;		/* must be shorter than mq_receive length arg */
+	attr.mq_curmsgs = 0;
+
+	memset(mq_name, 0, sizeof(mq_name));
+	snprintf(mq_name, sizeof(mq_name) - 1, "%s_%x_%lx", MQ_NAME, (uint32_t) getpid(), random());
+
+	mq_unlink(mq_name);
+
+	q = mq_open(mq_name, O_RDWR | O_CREAT, 0666, &attr);
+
+	if (q == -1) {
+		printf("error creating sender (process) mq: %s\n", strerror(errno));
+		exit(1);
+	}
+
+	return q;
+}
+#endif
+
 
 /* thread - seeder worker */
 INTERNAL_LINKAGE void *
@@ -357,6 +393,10 @@ seeder_worker (void *data)
 	struct peer *p, *we;
 	struct proto_opt_str pos;
 	struct timespec ts;
+	char mq_buf[BUFSIZE + 1];
+	int wait_for_cmd;
+	char *recv_buf;
+	uint16_t recv_len;
 
 	clientlen = sizeof(struct sockaddr_in);
 	p = (struct peer *) data;			/* data of remote host (leecher) connecting to us (seeder)*/
@@ -409,6 +449,8 @@ seeder_worker (void *data)
 
 	data_payload = malloc(we->chunk_size + 4 + 1 + 4 + 4 + 8);	/* chunksize + headers */
 
+	wait_for_cmd = 1;   /* 1 = wait for next message from main seeder process (from router) */
+
 	while (p->finishing == 0) {
 		/* check how long ago we received anything from LEECHER */
 		clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -421,17 +463,30 @@ seeder_worker (void *data)
 			continue;
 		}
 
-		if ((p->sm_seeder == SM_NONE) && (message_type(p->recv_buf) == HANDSHAKE) && (p->recv_len > 0))
+		if (wait_for_cmd) {
+#if MQ_SYNC
+			st = mq_receive(p->mq, mq_buf, BUFSIZE + 1, NULL);  /* must be longer than attr.mq_msgsize */
+			recv_len = st;
+			recv_buf = mq_buf;
+#else
+			semaph_wait(p->sem);
+			recv_len = p->recv_len;
+			memcpy(mq_buf, p->recv_buf, p->recv_len);
+			recv_buf = mq_buf;
+#endif
+			wait_for_cmd = 0;	/* we are not interested in next command from router in next while loop iteration */
+		}
+
+		if ((p->sm_seeder == SM_NONE) && (message_type(recv_buf) == HANDSHAKE) && (recv_len > 0))
 			p->sm_seeder = SM_HANDSHAKE_INIT;
 
 		if (p->sm_seeder == SM_HANDSHAKE_INIT) {
 			clock_gettime(CLOCK_MONOTONIC, &p->ts_last_recv);
 			p->d_last_recv = HANDSHAKE;
 
-			dump_handshake_request(p->recv_buf, p->recv_len, p);
+			dump_handshake_request(recv_buf, recv_len, p);
 
 			/* we've just received hash of the file from LEECHER so update "pos" structure */
-
 			pos.file_size = p->file_size;
 
 			pos.file_name_len = p->fname_len;
@@ -447,12 +502,10 @@ seeder_worker (void *data)
 			_assert((unsigned long int) h_resp_len <= sizeof(handshake_resp), "%s but has value: %u\n", "h_resp_len should be <= 256", h_resp_len);
 
 			p->sm_seeder = SM_SEND_HANDSHAKE_HAVE;
-			seeder_cond_unlock(p);
-			continue;
 		}
 
 		if (p->sm_seeder == SM_SEND_HANDSHAKE_HAVE) {
-			_assert(p->recv_len != 0, "%s but has value: %u\n", "p->recv_len should be != 0", p->recv_len);
+			_assert(recv_len != 0, "%s but has value: %u\n", "recv_len should be != 0", recv_len);
 
 			/* send HANDSHAKE + HAVE */
 			n = sendto(sockfd, handshake_resp, h_resp_len, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
@@ -487,34 +540,30 @@ seeder_worker (void *data)
 			p->chunk_size = we->chunk_size;
 			p->recv_len = 0;
 			p->sm_seeder = SM_WAIT_REQUEST;
+			wait_for_cmd = 1;
 			seeder_cond_unlock(p);
 			continue;
 		}
 
 		if (p->sm_seeder == SM_WAIT_REQUEST) {
-			if ((message_type(p->recv_buf) == REQUEST) && (p->recv_len > 0))
+			if ((message_type(recv_buf) == REQUEST) && (recv_len > 0))
 				p->sm_seeder = SM_REQUEST;
-
-			seeder_cond_unlock(p);
-			continue;
 		}
 
 		if (p->sm_seeder == SM_REQUEST) {
-			_assert(p->recv_len != 0, "%s but has value: %u\n", "p->recv_len should be != 0", p->recv_len);
+			_assert(recv_len != 0, "%s but has value: %u\n", "recv_len should be != 0", recv_len);
 
 			clock_gettime(CLOCK_MONOTONIC, &p->ts_last_recv);
 			p->d_last_recv = REQUEST;
 
 			d_printf("%s", "REQ\n");
 
-			dump_request(p->recv_buf, p->recv_len, p);
+			dump_request(recv_buf, recv_len, p);
 
 			if (p->pex_required == 1)		/* does the leecher want PEX? */
 				p->sm_seeder = SM_SEND_PEX_RESP;
 			else
 				p->sm_seeder = SM_SEND_INTEGRITY;
-			seeder_cond_unlock(p);
-			continue;
 		}
 
 		if (p->sm_seeder == SM_SEND_PEX_RESP) {
@@ -537,12 +586,11 @@ seeder_worker (void *data)
 			/* check whether is not a special range of chunks (empty set of chunks )*/
 			/* if yes - don't send INTEGRITY nor DATAx and return to SM_NONE state */
 			/* used by leecher for first ask for PEX_REQ */
-			if ((p->start_chunk == 0xffffffff) && (p->end_chunk == 0xffffffff))
+			if ((p->start_chunk == 0xffffffff) && (p->end_chunk == 0xffffffff)) {
 				p->sm_seeder = SM_NONE;
-			else
+			} else  {
 				p->sm_seeder = SM_SEND_INTEGRITY;
-			seeder_cond_unlock(p);
-			continue;
+			}
 		}
 
 		if (p->sm_seeder == SM_SEND_INTEGRITY) {
@@ -562,9 +610,6 @@ seeder_worker (void *data)
 			p->recv_len = 0;
 			p->curr_chunk = p->start_chunk;		/* set beginning number of chunk for DATA0 */
 			p->sm_seeder = SM_SEND_DATA;
-
-			seeder_cond_unlock(p);
-			continue;
 		}
 
 		if (p->sm_seeder == SM_SEND_DATA) {
@@ -583,15 +628,15 @@ seeder_worker (void *data)
 			p->d_last_send = DATA;
 			p->sm_seeder = SM_WAIT_ACK;
 
+			wait_for_cmd = 1;
 			seeder_cond_unlock(p);
 			continue;
 		}
 
 		if (p->sm_seeder == SM_WAIT_ACK) {
-			if ((message_type(p->recv_buf) == ACK) && (p->recv_len > 0))
+			if ((message_type(recv_buf) == ACK) && (recv_len > 0)) {
 				p->sm_seeder = SM_ACK;
-			else {
-				seeder_cond_unlock(p);
+			} else {
 				continue;
 			}
 		}
@@ -599,17 +644,18 @@ seeder_worker (void *data)
 		if (p->sm_seeder == SM_ACK) {
 			clock_gettime(CLOCK_MONOTONIC, &p->ts_last_recv);
 
-			dump_ack(p->recv_buf, p->recv_len, p);
+			dump_ack(recv_buf, recv_len, p);
 
 			p->curr_chunk++;
 			p->recv_len = 0;
 
-			if (p->curr_chunk <= p->end_chunk)		/* if this is not ACK for our last sent DATA then go to DATA state */
+			if (p->curr_chunk <= p->end_chunk) {		/* if this is not ACK for our last sent DATA then go to DATA state */
 				p->sm_seeder = SM_SEND_DATA;
-			else if (p->curr_chunk > p->end_chunk)
+			} else if (p->curr_chunk > p->end_chunk) {
 				p->sm_seeder = SM_WAIT_REQUEST;		/* that was ACK for last DATA in serie so wait for REQUEST */
-
-			seeder_cond_unlock(p);
+				wait_for_cmd = 1;
+				seeder_cond_unlock(p);
+			}
 			continue;
 		}
 	}
@@ -633,7 +679,6 @@ net_seeder(struct peer *seeder)
 	struct sockaddr_in clientaddr;
 	struct peer *p;
 	pthread_t thread;
-
 
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sockfd < 0)
@@ -693,20 +738,36 @@ net_seeder(struct peer *seeder)
 				/* create new conditional variable */
 				seeder_cond_lock_init(p);
 
+				p->sem = semaph_init(p);
+#if MQ_SYNC
+				p->mq = mq_init_main_process_sender();
+#endif
 				/* create worker thread for this client (leecher) */
 				st = pthread_create(&thread, NULL, &seeder_worker, p);
 				if (st != 0) {
-					d_printf("%s", "cannot create new thread\n");
+					d_printf("cannot create new thread: %s\n", strerror(errno));
 					abort();
 				}
 
 				d_printf("new pthread created: %#lx\n", (uint64_t) thread);
 
 				p->thread = thread;
+
+#if MQ_SYNC
+				sm = mq_send(p->mq, buf, n, 0);
+#else
+				semaph_post(p->sem);			/* wake up seeder worker */
+#endif
+
 				continue;
-			} else if (handshake_type(buf) == HANDSHAKE_FINISH) {	/* does the seeder want to close connection ? */
+			} else if (handshake_type(buf) == HANDSHAKE_FINISH) {	/* does the seeder want to close connection? */
 				d_printf("%s", "FINISH\n");
 
+#if MQ_SYNC
+				sm = mq_send(p->mq, buf, n, 0);		/* send finishing message */
+#else
+				semaph_post(p->sem);		/* wake up seeder worker and allow him finish his work */
+#endif
 				if (p == NULL) {
 					d_printf("searched IP: %s:%u  n: %u\n",  inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), n);
 					pthread_mutex_lock(&peer_list_head_mutex);
@@ -739,6 +800,12 @@ net_seeder(struct peer *seeder)
 
 			memcpy(p->recv_buf, buf, n);
 			p->recv_len = n;
+
+#if MQ_SYNC
+			sm = mq_send(p->mq, buf, n, 0);
+#else
+			semaph_post(p->sem);			/* wake up seeder worker */
+#endif
 			continue;
 		}
 
@@ -753,6 +820,12 @@ net_seeder(struct peer *seeder)
 
 			memcpy(p->recv_buf, buf, n);
 			p->recv_len = n;
+
+#if MQ_SYNC
+			sm = mq_send(p->mq, buf, n, 0);
+#else
+			semaph_post(p->sem);			/* wake up seeder worker */
+#endif
 			continue;
 		}
 	}
@@ -1497,6 +1570,7 @@ exit:
 	return 0;
 }
 #endif
+
 
 /* leecher worker in step-by-step version */
 INTERNAL_LINKAGE void *

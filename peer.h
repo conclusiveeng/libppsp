@@ -34,6 +34,7 @@
 #include <dirent.h>
 #include <string.h>
 #include <sys/queue.h>
+#include <mqueue.h>
 
 #include "mt.h"
 
@@ -137,6 +138,7 @@ struct peer {
 		S_TODO = 1,
 		S_DONE = 2
 	} seeder_cond;
+	mqd_t mq;
 
 	pthread_mutex_t leecher_mutex;
 	pthread_cond_t leecher_mtx_cond;
