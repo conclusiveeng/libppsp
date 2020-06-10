@@ -42,13 +42,24 @@
 #include "debug.h"
 #include "ppspp.h"
 
+
+/**
+ * @file ppspp.c
+ */
+
 struct slist_seeders other_seeders_list_head;
 int debug;
 
 
+/**
+ * @brief Create instance of seeder
+ *
+ * @param[in] params Initial parameters for seeder
+ *
+ * @return Handle of just created seeder
+ */
 ppspp_handle_t
-ppspp_seeder_create(ppspp_seeder_params_t *params)
-{
+ppspp_seeder_create(ppspp_seeder_params_t *params) {
 	ppspp_handle_t handle;
 	struct peer *local_seeder;
 
@@ -68,6 +79,14 @@ ppspp_seeder_create(ppspp_seeder_params_t *params)
 }
 
 
+/**
+ * @brief Add new seeder to list of alternative seeders
+ *
+ * @param[in] handle Handle of seeder
+ * @param[in] sa Structure with IP address and UDP port number of added seeder
+ *
+ * @return Return status of adding new seeder
+ */
 int
 ppspp_seeder_add_seeder(ppspp_handle_t handle, struct sockaddr_in *sa)
 {
@@ -85,6 +104,14 @@ ppspp_seeder_add_seeder(ppspp_handle_t handle, struct sockaddr_in *sa)
 }
 
 
+/**
+ * @brief Remove seeder from list of alternative seeders
+ *
+ * @param[in] handle Handle of seeder
+ * @param[in] sa Structure with IP address and UDP port number of added seeder
+ *
+ * @return Return status of removing seeder
+ */
 int
 ppspp_seeder_remove_seeder(ppspp_handle_t handle, struct sockaddr_in *sa)
 {
@@ -104,6 +131,12 @@ ppspp_seeder_remove_seeder(ppspp_handle_t handle, struct sockaddr_in *sa)
 }
 
 
+/**
+ * @brief Add file or directory to set of seeded files
+ *
+ * @param[in] handle Handle of seeder
+ * @param[in] name Path to the file or directory
+ */
 void
 ppspp_seeder_add_file_or_directory(ppspp_handle_t handle, char *name)
 {
@@ -151,6 +184,11 @@ ppspp_seeder_add_file_or_directory(ppspp_handle_t handle, char *name)
 }
 
 
+/*
+ * @brief Remove given file entry from seeded file list
+ *
+ * @param[in] f File entry to remove
+ */
 INTERNAL_LINKAGE void
 remove_and_free(struct file_list_entry *f)
 {
@@ -164,6 +202,14 @@ remove_and_free(struct file_list_entry *f)
 }
 
 
+/**
+ * @brief Remove file or directory from seeded file list
+ *
+ * @param[in] handle Handle of seeder
+ * @param[in] name Path to the file or directory
+ *
+ * @return Return status of removing file or directory
+ */
 int
 ppspp_seeder_remove_file_or_directory(ppspp_handle_t handle, char *name)
 {
@@ -206,6 +252,11 @@ ppspp_seeder_remove_file_or_directory(ppspp_handle_t handle, char *name)
 }
 
 
+/**
+ * @brief Run seeder pointed by handle parameter
+ *
+ * @param[in] handle Handle of seeder
+ */
 void
 ppspp_seeder_run(ppspp_handle_t handle)
 {
@@ -216,6 +267,11 @@ ppspp_seeder_run(ppspp_handle_t handle)
 }
 
 
+/**
+ * @brief Close of opened seeder handle
+ *
+ * @param[in] handle Handle of seeder
+ */
 void
 ppspp_seeder_close(ppspp_handle_t handle)
 {
@@ -227,6 +283,13 @@ ppspp_seeder_close(ppspp_handle_t handle)
 }
 
 
+/**
+ * @brief Create instance of leecher
+ *
+ * @param[in] params Initial parameters for leecher
+ *
+ * @return Handle of just created leecher
+ */
 ppspp_handle_t
 ppspp_leecher_create(ppspp_leecher_params_t *params)
 {
@@ -251,6 +314,11 @@ ppspp_leecher_create(ppspp_leecher_params_t *params)
 }
 
 
+/**
+ * @brief Run leecher pointed by handle parameter
+ *
+ * @param[in] handle Handle of leecher
+ */
 void
 ppspp_leecher_run(ppspp_handle_t handle)
 {
@@ -261,6 +329,18 @@ ppspp_leecher_run(ppspp_handle_t handle)
 }
 
 
+/**
+ * @brief Get metadata for hash demanded by user
+ * Hash of demanded file is given by user in "params" parameter passed to
+ * "ppspp_leecher_create" procedure
+ *
+ * @param[in] handle Handle of leecher
+ * @param[out] meta Pointer to structure where meta data will be returned
+ *
+ * @return Return status of fetching metadata
+ * On success return 0
+ * On error returns value below 0
+ */
 int
 ppspp_leecher_get_metadata(ppspp_handle_t handle, ppspp_metadata_t *meta)
 {
@@ -290,6 +370,18 @@ ppspp_leecher_get_metadata(ppspp_handle_t handle, ppspp_metadata_t *meta)
 }
 
 
+/**
+ * @brief Prepare range of chunks for fetching in next fetch invocation
+ *
+ * @param[in] handle Handle of seeder
+ * @param[in] start_chunk Number of first chunk to fetch
+ * @param[in] end_chunk Number of last chunk to fetch
+ *
+ * @return Return size of buffer needed for fetching given chunk range
+ * User should allocate that number of bytes for buffer and pass it to
+ * ppspp_leecher_fetch_chunk_to_buf() procedure if he/she choosen
+ * transferring buffer method instead of transferring vie file descriptor
+ */
 uint32_t
 ppspp_prepare_chunk_range(ppspp_handle_t handle, uint32_t start_chunk, uint32_t end_chunk)
 {
@@ -313,6 +405,12 @@ ppspp_prepare_chunk_range(ppspp_handle_t handle, uint32_t start_chunk, uint32_t 
 }
 
 
+/**
+ * @brief Fetch range of chunks to file descriptor
+ *
+ * @param[in] handle Handle of leecher
+ * @param[in] fd File descriptor of opened by user file
+ */
 void
 ppspp_leecher_fetch_chunk_to_fd(ppspp_handle_t handle, int fd)
 {
@@ -328,6 +426,14 @@ ppspp_leecher_fetch_chunk_to_fd(ppspp_handle_t handle, int fd)
 }
 
 
+/**
+ * @brief Fetch range of chunks to user buffer
+ *
+ * @param[in] handle Handle of leecher
+ * @param[out] transfer_buf Pointer to user buffer for selected chunk range
+ *
+ * @return Return number of returned valid bytes in passed by user buffer
+ */
 int32_t
 ppspp_leecher_fetch_chunk_to_buf(ppspp_handle_t handle, uint8_t *transfer_buf)
 {
@@ -346,6 +452,11 @@ ppspp_leecher_fetch_chunk_to_buf(ppspp_handle_t handle, uint8_t *transfer_buf)
 }
 
 
+/**
+ * @brief Close of opened leecher handle
+ *
+ * @param[in] handle Handle of leecher
+ */
 void
 ppspp_leecher_close(ppspp_handle_t handle)
 {

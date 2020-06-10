@@ -26,28 +26,33 @@
 #ifndef _PPSPP_H_
 #define _PPSPP_H_
 
+/**
+ * @file ppspp.h
+ */
+
+
 typedef struct {
-	uint32_t chunk_size;
-	uint32_t timeout;
-	uint16_t port;					/* seeder: udp port number to bind to */
+	uint32_t chunk_size;		/**< Size of the chunk for seeded files */
+	uint32_t timeout;		/**< Timeout for network communication */
+	uint16_t port;			/**< UDP port number to bind to */
 } ppspp_seeder_params_t;
 
 typedef struct {
-	uint32_t timeout;
-	uint8_t sha_demanded[20];
-	struct sockaddr_in seeder_addr;			/* primary seeder IP/PORT address from leecher point of view */
+	uint32_t timeout;		/**< Timeout for network communication */
+	uint8_t sha_demanded[20];	/**< SHA1 of demanded file */
+	struct sockaddr_in seeder_addr;	/**< Primary seeder IP/PORT address from leecher point of view */
 } ppspp_leecher_params_t;
 
 /* metadata of the file published for user of library */
 typedef struct {
-	char file_name[256];
-	uint64_t file_size;
-	uint32_t chunk_size;
-	uint32_t start_chunk;
-	uint32_t end_chunk;
+	char file_name[256];		/**< File name for demanded SHA1 hash */
+	uint64_t file_size;		/**< Size of the file */
+	uint32_t chunk_size;		/**< Size of the chunk */
+	uint32_t start_chunk;		/**< Number of first chunk in file */
+	uint32_t end_chunk;		/**< Number of last chunk in file */
 } ppspp_metadata_t;
 
-typedef uint64_t ppspp_handle_t;
+typedef uint64_t ppspp_handle_t;	/**< seeder or leecher handle */
 
 ppspp_handle_t ppspp_seeder_create(ppspp_seeder_params_t *);
 int ppspp_seeder_add_seeder(ppspp_handle_t, struct sockaddr_in *);
@@ -57,10 +62,11 @@ int ppspp_seeder_remove_file_or_directory(ppspp_handle_t, char *);
 void ppspp_seeder_run(ppspp_handle_t);
 void ppspp_seeder_close(ppspp_handle_t);
 ppspp_handle_t ppspp_leecher_create(ppspp_leecher_params_t *);
-int ppspp_leecher_get_metadata(ppspp_handle_t handle, ppspp_metadata_t *);
+int ppspp_leecher_get_metadata(ppspp_handle_t, ppspp_metadata_t *);
 uint32_t ppspp_prepare_chunk_range(ppspp_handle_t, uint32_t, uint32_t);
 void ppspp_leecher_fetch_chunk_to_fd(ppspp_handle_t, int);
 int32_t ppspp_leecher_fetch_chunk_to_buf(ppspp_handle_t, uint8_t *);
 void ppspp_leecher_close(ppspp_handle_t);
-void ppspp_leecher_run(ppspp_handle_t handle);
+void ppspp_leecher_run(ppspp_handle_t);
+
 #endif /* _PPSPP_H_ */
