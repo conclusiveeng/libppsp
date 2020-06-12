@@ -45,6 +45,36 @@ struct schedule_entry {
 };
 
 
+/* list of files shared by seeder */
+SLIST_HEAD(slisthead, file_list_entry);
+struct file_list_entry {
+	char path[1024];		/* full path to file: directory name + file name */
+	char sha[20];			/* do we need this? */
+	uint64_t file_size;
+	uint32_t nl;			/* number of leaves */
+	uint32_t nc;			/* number of chunks */
+	struct chunk *tab_chunk;	/* array of chunks for this file */
+	struct node *tree;		/* tree of the file */
+	struct node *tree_root;		/* pointer to root node of the tree */
+	uint32_t start_chunk;
+	uint32_t end_chunk;
+
+	SLIST_ENTRY(file_list_entry) next;
+};
+
+/* list of other (alternative) seeders maintained by primary seeder */
+SLIST_HEAD(slist_seeders, other_seeders_entry);
+struct other_seeders_entry {
+	struct sockaddr_in sa;
+	SLIST_ENTRY(other_seeders_entry) next;
+};
+
+
+SLIST_HEAD(slist_peers, peer);
+
+extern uint8_t remove_dead_peers;
+
+
 struct peer {
 	enum {
 		LEECHER,
@@ -179,48 +209,20 @@ struct peer {
 
 	struct peer *current_seeder;	/* leecher side: points to one element of the list seeders in ->snext */
 
+	pthread_mutex_t peers_list_head_mutex;		/* mutex for protecting peers_list_head */
+	struct slist_peers peers_list_head;  		/* seeder: list of connected leechers, leecher: ? */
+	struct slist_seeders other_seeders_list_head;	/* seeder: list of other (alternative) seeders maintained by primary seeder */
+	struct slisthead file_list_head;		/* seeder: head of list of files shared by seeder */
 	struct file_list_entry *file_list_entry;	/* seeder side: pointer to file choosen by leecher using SHA1 hash */
 
 	SLIST_ENTRY(peer) snext;		/* list of peers - leechers from seeder point of view or seeders from leecher pov */
 };
 
 
-SLIST_HEAD(slist_peers, peer);
-extern struct slist_peers peers_list_head;
-
-/* list of files shared by seeder */
-SLIST_HEAD(slisthead, file_list_entry);
-extern struct slisthead file_list_head;
-struct file_list_entry {
-	char path[1024];		/* full path to file: directory name + file name */
-	char sha[20];			/* do we need this? */
-	uint64_t file_size;
-	uint32_t nl;			/* number of leaves */
-	uint32_t nc;			/* number of chunks */
-	struct chunk *tab_chunk;	/* array of chunks for this file */
-	struct node *tree;		/* tree of the file */
-	struct node *tree_root;		/* pointer to root node of the tree */
-	uint32_t start_chunk;
-	uint32_t end_chunk;
-
-	SLIST_ENTRY(file_list_entry) next;
-};
-
-/* list of other (alternative) seeders maintained by primary seeder */
-SLIST_HEAD(slist_seeders, other_seeders_entry);
-extern struct slist_seeders other_seeders_list_head;
-struct other_seeders_entry {
-	struct sockaddr_in sa;
-	SLIST_ENTRY(other_seeders_entry) next;
-};
-
-extern struct peer peer_list_head;
-extern pthread_mutex_t peer_list_head_mutex;
-extern uint8_t remove_dead_peers;
 void add_peer_to_list (struct slist_peers *, struct peer *);
 void print_peer_list(struct slist_peers *);
 int remove_peer_from_list (struct slist_peers *, struct peer *);
-struct peer * ip_port_to_peer (struct slist_peers *, struct sockaddr_in *);
+struct peer * ip_port_to_peer (struct peer *, struct slist_peers *, struct sockaddr_in *);
 struct peer * new_peer (struct sockaddr_in *, int, int);
 struct peer * new_seeder (struct sockaddr_in *, int);
 void cleanup_peer (struct peer *);
@@ -228,6 +230,7 @@ void cleanup_all_dead_peers (struct slist_peers *);
 void create_download_schedule (struct peer *);
 int32_t create_download_schedule_sbs (struct peer *, uint32_t, uint32_t);
 int all_chunks_downloaded (struct peer *);
-void create_file_list (char *);
-void process_file(struct file_list_entry *, int);
+void create_file_list(struct peer *, char *);
+void process_file(struct file_list_entry *, struct peer *);
+
 #endif /* _PEER_H_ */

@@ -35,7 +35,7 @@
 int net_seeder(struct peer *);
 int net_leecher_continuous(struct peer *);
 int preliminary_connection_sbs(struct peer *);
-void net_leecher_create(void);
+void net_leecher_create(struct peer *);
 int net_leecher_sbs(struct peer *);
 void net_leecher_fetch_chunk(struct peer *);
 void net_leecher_close(struct peer *);

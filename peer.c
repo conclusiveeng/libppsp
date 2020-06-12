@@ -43,20 +43,13 @@
 #include "sha1.h"
 
 
-struct slisthead file_list_head;
-
-
 /*
  * add element to the end of the list
  */
 INTERNAL_LINKAGE void
 add_peer_to_list(struct slist_peers *list_head, struct peer *p)
 {
-	int s;
 	struct peer *pd, *last;
-
-	s = pthread_mutex_trylock(&peer_list_head_mutex);
-	_assert((s != 0), "%s", "list should be protected by peer_list_head_mutex\n");
 
 	d_printf("add new peer to list: %#lx  %s:%u\n", (uint64_t) p, inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
 
@@ -89,11 +82,6 @@ add_peer_to_list(struct slist_peers *list_head, struct peer *p)
 INTERNAL_LINKAGE int
 remove_peer_from_list(struct slist_peers *list_head, struct peer *p)
 {
-	int s;
-
-	s = pthread_mutex_trylock(&peer_list_head_mutex);
-	_assert((s != 0), "%s", "list should be protected by peer_list_head_mutex\n");
-
 	SLIST_REMOVE(list_head, p, peer, snext);
 
 	return 0;
@@ -101,13 +89,9 @@ remove_peer_from_list(struct slist_peers *list_head, struct peer *p)
 
 
 INTERNAL_LINKAGE struct peer *
-ip_port_to_peer(struct slist_peers *list_head, struct sockaddr_in *client)
+ip_port_to_peer(struct peer *seeder, struct slist_peers *list_head, struct sockaddr_in *client)
 {
-	int s;
 	struct peer *p;
-
-	s = pthread_mutex_trylock(&peer_list_head_mutex);
-	_assert((s != 0), "%s", "list should be protected by peer_list_head_mutex\n");
 
 	SLIST_FOREACH(p, list_head, snext) {
 		if (memcmp(&p->leecher_addr, client, sizeof(struct sockaddr_in)) == 0) {
@@ -179,11 +163,6 @@ new_seeder(struct sockaddr_in *sa, int n)
 INTERNAL_LINKAGE void
 cleanup_peer(struct peer *p)
 {
-	int s;
-
-	s = pthread_mutex_trylock(&peer_list_head_mutex);
-	_assert((s != 0), "%s", "list should be protected by peer_list_head_mutex\n");
-
 	d_printf("cleaning up peer[%u]: %#lx   IP: %s:%u\n", p->thread_num, (uint64_t) p, inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
 
 	/* method1 only - wait for pthread, destroy mutex and condition variable */
@@ -191,7 +170,11 @@ cleanup_peer(struct peer *p)
 		pthread_join(p->thread, NULL);
 
 		d_printf("cleaning up peer: %#lx\n", (uint64_t) p);
-		(void) remove_peer_from_list(&peers_list_head, p);
+		if (p->seeder != NULL) {	/* are we seeder? */
+			(void) remove_peer_from_list(&p->seeder->peers_list_head, p);
+		} else if (p->local_leecher != NULL) {	/* are we leecher? */
+			(void) remove_peer_from_list(&p->local_leecher->peers_list_head, p);
+		}
 
 		/* destroy the semaphore */
 		pthread_mutex_destroy(&p->seeder_mutex);
@@ -213,11 +196,7 @@ cleanup_peer(struct peer *p)
 INTERNAL_LINKAGE void
 cleanup_all_dead_peers(struct slist_peers *list_head)
 {
-	int s;
 	struct peer *p;
-
-	s = pthread_mutex_trylock(&peer_list_head_mutex);
-	_assert((s != 0), "%s", "list should be protected by peer_list_head_mutex\n");
 
 	SLIST_FOREACH(p, list_head, snext) {
 		if (p->to_remove != 0) { /* is this peer (leecher) marked to remove? */
@@ -335,7 +314,7 @@ all_chunks_downloaded(struct peer *p)
 
 
 INTERNAL_LINKAGE void
-list_dir(char *dname)
+list_dir(struct peer *peer, char *dname)
 {
 	DIR *dir;
 	struct dirent *dirent;
@@ -358,12 +337,12 @@ list_dir(char *dname)
 			sprintf(f->path, "%s/%s", dname, dirent->d_name);
 			lstat(f->path, &stat);
 			f->file_size = stat.st_size;
-			SLIST_INSERT_HEAD(&file_list_head, f, next);
+			SLIST_INSERT_HEAD(&peer->file_list_head, f, next);
 		}
 
 		if ((dirent->d_type == DT_DIR) && (strcmp(dirent->d_name, ".") != 0) && (strcmp(dirent->d_name, "..") != 0)) {
 			snprintf(newdir, sizeof(newdir) - 1, "%s/%s", dname, dirent->d_name);
-			list_dir(newdir);
+			list_dir(peer, newdir);
 		}
 	}
 	closedir(dir);
@@ -371,14 +350,14 @@ list_dir(char *dname)
 
 
 INTERNAL_LINKAGE void
-create_file_list(char *dname)
+create_file_list(struct peer *peer, char *dname)
 {
-	list_dir(dname);
+	list_dir(peer, dname);
 }
 
 
 INTERNAL_LINKAGE void
-process_file(struct file_list_entry *file_entry, int chunk_size)
+process_file(struct file_list_entry *file_entry, struct peer *peer)
 {
 	char *buf;
 	unsigned char digest[20 + 1];
@@ -387,7 +366,9 @@ process_file(struct file_list_entry *file_entry, int chunk_size)
 	struct stat stat;
 	SHA1Context context;
 	struct node *ret, *root8;
+	uint32_t chunk_size;
 
+	chunk_size = peer->chunk_size;
 	fd = open(file_entry->path, O_RDONLY);
 	if (fd < 0) {
 		printf("error opening file: %s\n", file_entry->path);

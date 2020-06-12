@@ -432,7 +432,7 @@ make_pex_resp (char *ptr, struct peer *peer, struct peer *we)
 
 	/* IP addresses taken from "-l" commandline option: -l ip1:port1,ip2:port2,ip3:port3 ...etc */
 	pex = 0;
-	SLIST_FOREACH(e, &other_seeders_list_head, next) {
+	SLIST_FOREACH(e, &we->other_seeders_list_head, next) {
 			memcpy(d, &e->sa.sin_addr, sizeof(struct in_addr));	/* IP */
 			d += sizeof(struct in_addr);
 			*(uint16_t *)d = e->sa.sin_port;			/* UDP port */
@@ -755,7 +755,7 @@ dump_options (char *ptr, struct peer *peer)
 
 		/* find file name for given received SHA1 hash from leecher */
 		if (peer->seeder != NULL) {	/* is this proc called by seeder? */
-			SLIST_FOREACH(fi, &file_list_head, next) {
+			SLIST_FOREACH(fi, &peer->seeder->file_list_head, next) {
 				if (memcmp(fi->tree_root->sha, peer->sha_demanded, 20) == 0) {
 					strcpy(peer->fname, basename(fi->path));
 					peer->fname_len = strlen(peer->fname);
@@ -1004,9 +1004,9 @@ dump_pex_resp (char *ptr, int req_len, struct peer *peer, int sockfd)
 		c = new_seeder(&sa, BUFSIZE);
 		c->sockfd = sockfd;
 
-		pthread_mutex_lock(&peer_list_head_mutex);
-		add_peer_to_list(&peers_list_head, c);
-		pthread_mutex_unlock(&peer_list_head_mutex);
+		pthread_mutex_lock(&peer->peers_list_head_mutex);
+		add_peer_to_list(&peer->peers_list_head, c);
+		pthread_mutex_unlock(&peer->peers_list_head_mutex);
 
 		/* initially set current_seeder on primary seeder */
 		peer->current_seeder = c;
@@ -1025,9 +1025,9 @@ dump_pex_resp (char *ptr, int req_len, struct peer *peer, int sockfd)
 
 			c = new_seeder(&sa, BUFSIZE);
 			c->sockfd = sockfd;
-			pthread_mutex_lock(&peer_list_head_mutex);
-			add_peer_to_list(&peers_list_head, c);
-			pthread_mutex_unlock(&peer_list_head_mutex);
+			pthread_mutex_lock(&peer->peers_list_head_mutex);
+			add_peer_to_list(&peer->peers_list_head, c);
+			pthread_mutex_unlock(&peer->peers_list_head_mutex);
 
 			pex++;
 		}

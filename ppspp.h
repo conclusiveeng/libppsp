@@ -52,7 +52,7 @@ typedef struct {
 	uint32_t end_chunk;		/**< Number of last chunk in file */
 } ppspp_metadata_t;
 
-typedef uint64_t ppspp_handle_t;	/**< seeder or leecher handle */
+typedef int64_t ppspp_handle_t;	/**< seeder or leecher handle */
 
 ppspp_handle_t ppspp_seeder_create(ppspp_seeder_params_t *);
 int ppspp_seeder_add_seeder(ppspp_handle_t, struct sockaddr_in *);

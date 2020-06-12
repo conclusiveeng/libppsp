@@ -47,7 +47,6 @@
  * @file ppspp.c
  */
 
-struct slist_seeders other_seeders_list_head;
 int debug;
 
 
@@ -59,22 +58,24 @@ int debug;
  * @return Handle of just created seeder
  */
 ppspp_handle_t
-ppspp_seeder_create(ppspp_seeder_params_t *params) {
+ppspp_seeder_create(ppspp_seeder_params_t *params)
+{
 	ppspp_handle_t handle;
 	struct peer *local_seeder;
 
 	local_seeder = malloc(sizeof(struct peer));
-	memset(local_seeder, 0, sizeof(struct peer));
+	if (local_seeder != NULL) {
+		memset(local_seeder, 0, sizeof(struct peer));
 
-	local_seeder->chunk_size = params->chunk_size;
-	local_seeder->timeout = params->timeout;
-	local_seeder->port = params->port;
-	local_seeder->type = SEEDER;
+		local_seeder->chunk_size = params->chunk_size;
+		local_seeder->timeout = params->timeout;
+		local_seeder->port = params->port;
+		local_seeder->type = SEEDER;
 
-	SLIST_INIT(&file_list_head);
-	SLIST_INIT(&other_seeders_list_head);
-
-	handle = (uint64_t) local_seeder;
+		SLIST_INIT(&local_seeder->file_list_head);
+		SLIST_INIT(&local_seeder->other_seeders_list_head);
+	}
+	handle = (int64_t) local_seeder;
 	return handle;
 }
 
@@ -90,15 +91,21 @@ ppspp_seeder_create(ppspp_seeder_params_t *params) {
 int
 ppspp_seeder_add_seeder(ppspp_handle_t handle, struct sockaddr_in *sa)
 {
-	struct other_seeders_entry *ss;
 	int ret;
+	struct other_seeders_entry *ss;
+	struct peer *local_seeder;
+
+	local_seeder = (struct peer *)handle;
 
 	ret = 0;
 
 	ss = malloc(sizeof(struct other_seeders_entry));
-	memcpy(&ss->sa, sa, sizeof(struct sockaddr_in));
-
-	SLIST_INSERT_HEAD(&other_seeders_list_head, ss, next);
+	if (ss != NULL) {
+		memcpy(&ss->sa, sa, sizeof(struct sockaddr_in));
+		SLIST_INSERT_HEAD(&local_seeder->other_seeders_list_head, ss, next);
+	} else {
+		ret = -ENOMEM;
+	}
 
 	return ret;
 }
@@ -117,13 +124,16 @@ ppspp_seeder_remove_seeder(ppspp_handle_t handle, struct sockaddr_in *sa)
 {
 	int ret;
 	struct other_seeders_entry *e;
+	struct peer *local_seeder;
+
+	local_seeder = (struct peer *)handle;
 
 	ret = 0;
-	SLIST_FOREACH(e, &other_seeders_list_head, next) {
+	SLIST_FOREACH(e, &local_seeder->other_seeders_list_head, next) {
 		d_printf("%s:%u\n", inet_ntoa(e->sa.sin_addr), ntohs(e->sa.sin_port));
 		if (memcmp(&sa->sin_addr, &e->sa.sin_addr, sizeof(e->sa.sin_addr)) == 0) {
 			d_printf("entry to remove found - removing: %s:%u\n", inet_ntoa(e->sa.sin_addr), ntohs(e->sa.sin_port));
-			SLIST_REMOVE(&other_seeders_list_head, e, other_seeders_entry, next);
+			SLIST_REMOVE(&local_seeder->other_seeders_list_head, e, other_seeders_entry, next);
 		}
 	}
 
@@ -156,7 +166,7 @@ ppspp_seeder_add_file_or_directory(ppspp_handle_t handle, char *name)
 	/* is "name" directory name or filename? */
 	if (stat.st_mode & S_IFDIR) {			/* directory */
 		d_printf("adding files from directory: %s\n", name);
-		create_file_list(name);
+		create_file_list(local_seeder, name);
 	} else if (stat.st_mode & S_IFREG) {		/* filename */
 		d_printf("adding file: %s\n", name);
 		f = malloc(sizeof(struct file_list_entry));
@@ -164,15 +174,15 @@ ppspp_seeder_add_file_or_directory(ppspp_handle_t handle, char *name)
 		strcpy(f->path, name);
 		lstat(f->path, &stat);
 		f->file_size = stat.st_size;
-		SLIST_INSERT_HEAD(&file_list_head, f, next);
+		SLIST_INSERT_HEAD(&local_seeder->file_list_head, f, next);
 	}
 
-	SLIST_FOREACH(f, &file_list_head, next) {
+	SLIST_FOREACH(f, &local_seeder->file_list_head, next) {
 		/* does the tree already exist for given file? */
 		if (f->tree_root == NULL) {		/* no - so create tree for it */
 			printf("processing: %s  ", f->path);
 			fflush(stdout);
-			process_file(f, local_seeder->chunk_size);
+			process_file(f, local_seeder);
 
 			memset(sha, 0, sizeof(sha));
 			s = 0;
@@ -190,14 +200,17 @@ ppspp_seeder_add_file_or_directory(ppspp_handle_t handle, char *name)
  * @param[in] f File entry to remove
  */
 INTERNAL_LINKAGE void
-remove_and_free(struct file_list_entry *f)
+remove_and_free(ppspp_handle_t handle, struct file_list_entry *f)
 {
+	struct peer *local_seeder;
+
+	local_seeder = (struct peer *)handle;
 	free(f->tab_chunk);
 	free(f->tree);
 	f->tab_chunk = NULL;
 	f->tree = f->tree_root = NULL;
 
-	SLIST_REMOVE(&file_list_head, f, file_list_entry, next);
+	SLIST_REMOVE(&local_seeder->file_list_head, f, file_list_entry, next);
 	free(f);
 }
 
@@ -217,14 +230,17 @@ ppspp_seeder_remove_file_or_directory(ppspp_handle_t handle, char *name)
 	int ret;
 	struct file_list_entry *f;
 	struct stat stat;
+	struct peer *local_seeder;
+
+	local_seeder = (struct peer *)handle;
 
 	ret = 0;
 	lstat(name, &stat);
 	if (stat.st_mode & S_IFREG) {	/* does the user want to remove file? */
-		SLIST_FOREACH(f, &file_list_head, next) {
+		SLIST_FOREACH(f, &local_seeder->file_list_head, next) {
 			if (strcmp(f->path, name) == 0) {
 				d_printf("file to remove found: %s\n", name);
-				remove_and_free(f);
+				remove_and_free(handle, f);
 			}
 		}
 	} else if (stat.st_mode & S_IFDIR) {	/* does the user want to remove files from specific directory? */
@@ -238,11 +254,11 @@ ppspp_seeder_remove_file_or_directory(ppspp_handle_t handle, char *name)
 			d_printf("adding / to dir name: %s => %s\n", name, buf);
 		}
 
-		SLIST_FOREACH(f, &file_list_head, next) {
+		SLIST_FOREACH(f, &local_seeder->file_list_head, next) {
 			c = strstr(f->path, buf);	/* compare current file entry with directory name to remove */
 			if (c == f->path) {		/* if both matches */
 				d_printf("removing file: %s\n", f->path);
-				remove_and_free(f);
+				remove_and_free(handle, f);
 			}
 		}
 		free(buf);
@@ -297,18 +313,19 @@ ppspp_leecher_create(ppspp_leecher_params_t *params)
 	struct peer *local_leecher;
 
 	local_leecher = malloc(sizeof(struct peer));
-	memset(local_leecher, 0, sizeof(struct peer));
+	if (local_leecher != NULL) {
+		memset(local_leecher, 0, sizeof(struct peer));
 
-	local_leecher->sbs_mode = 1;
-	local_leecher->timeout = params->timeout;
-	local_leecher->type = LEECHER;
-	local_leecher->current_seeder = NULL;
-	memcpy(&local_leecher->seeder_addr, &params->seeder_addr, sizeof(struct sockaddr_in));
-	memcpy(&local_leecher->sha_demanded, params->sha_demanded, 20);
+		local_leecher->sbs_mode = 1;
+		local_leecher->timeout = params->timeout;
+		local_leecher->type = LEECHER;
+		local_leecher->current_seeder = NULL;
+		memcpy(&local_leecher->seeder_addr, &params->seeder_addr, sizeof(struct sockaddr_in));
+		memcpy(&local_leecher->sha_demanded, params->sha_demanded, 20);
 
-	net_leecher_create();
-
-	handle = (uint64_t) local_leecher;
+		net_leecher_create(local_leecher);
+	}
+	handle = (int64_t) local_leecher;
 
 	return handle;
 }
@@ -363,7 +380,7 @@ ppspp_leecher_get_metadata(ppspp_handle_t handle, ppspp_metadata_t *meta)
 			meta->end_chunk = local_leecher->end_chunk;
 		}
 	} else
-		ret = -1;	/* file does not exist for demanded SHA on seeder */
+		ret = -ENOENT;	/* file does not exist for demanded SHA on seeder */
 
 	/* response is in local_leecher */
 	return ret;
