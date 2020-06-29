@@ -372,8 +372,15 @@ make_handshake_finish (char *ptr, struct peer *peer)
  * 	ptr - pointer to buffer where data of this request should be placed
  */
 INTERNAL_LINKAGE int
-make_request (char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32_t end_chunk, struct peer *peer)
+make_request (void *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32_t end_chunk, struct peer *peer)
 {
+	struct ppsp_msg *req;
+
+	req = ptr;
+	req->message_type = REQUEST;
+	req->request.start_chunk = htobe32(start_chunk);
+	req->request.end_chunk = htobe32(end_chunk);
+	return (sizeof(uint32_t) + sizeof(req->request));
 	char *d;
 	int ret;
 

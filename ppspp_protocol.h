@@ -91,6 +91,74 @@ struct proto_opt_str {
 	uint32_t opt_map;				/* bitmap - which of the fields above have any data */
 };
 
+struct ppsp_msg_handshake
+{
+	uint32_t src_channel_id;
+	uint8_t protocol_options[];
+} __attribute__((packed));
+
+struct ppsp_msg_have
+{
+	uint32_t start_chunk;
+	uint32_t end_chunk;
+} __attribute__((packed));
+
+struct ppsp_msg_data
+{
+	uint32_t start_chunk;
+	uint32_t end_chunk;
+	uint64_t timestamp;
+	uint8_t data[];
+} __attribute__((packed));
+
+struct ppsp_msg_ack
+{
+	uint32_t start_chunk;
+	uint32_t end_chunk;
+	uint64_t sample;
+};
+
+struct ppsp_msg_integrity
+{
+	uint32_t end_chunk;
+	uint8_t hash[256];
+} __attribute__((packed));
+
+struct ppsp_msg_signed_integrity
+{
+	uint32_t start_chunk;
+	uint32_t end_chunk;
+	uint64_t timestamp;
+	uint8_t signature[];
+} __attribute__((packed));
+
+struct ppsp_msg_request
+{
+	uint32_t start_chunk;
+	uint32_t end_chunk;
+} __attribute__((packed));
+
+struct ppsp_msg_cancel
+{
+	uint32_t start_chunk;
+	uint32_t end_chunk;
+} __attribute__((packed));
+
+struct ppsp_msg
+{
+	uint32_t dst_channel_id; /* ??? */
+	uint8_t message_type;
+	union {
+		struct ppsp_msg_handshake handshake;
+		struct ppsp_msg_have have;
+		struct ppsp_msg_data data;
+		struct ppsp_msg_ack ack;
+		struct ppsp_msg_integrity integrity;
+		struct ppsp_msg_request request;
+		struct ppsp_msg_cancel cancel;
+	};
+} __attribute__((packed));
+
 int make_handshake_options (char *, struct proto_opt_str *);
 int make_handshake_request (char *, uint32_t, uint32_t, char *, int);
 int make_handshake_have (char *, uint32_t, uint32_t, char *, int, struct peer *);
