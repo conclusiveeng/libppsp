@@ -267,8 +267,6 @@ main (int argc, char *argv[])
 			/* get metadata for demanded sha file */
 			file_exist = ppspp_leecher_get_metadata(leecher_handle, &meta);
 			if (file_exist == 0) {
-				printf("seeder has demanded by us file: %s  size: %lu  chunks: %u-%u\n", meta.file_name, meta.file_size, meta.start_chunk, meta.end_chunk);
-
 				unlink(meta.file_name);
 				fd = open(meta.file_name, O_WRONLY | O_CREAT, 0744);
 				if (fd < 0) {
@@ -376,11 +374,7 @@ main (int argc, char *argv[])
 			/* get metadata for demanded sha file */
 			file_exist = swift_leecher_get_metadata(leecher_handle, &meta);
 			if (file_exist == 0) {
-
 				sprintf(meta.file_name, sha_demanded);
-
-				printf("seeder has demanded by us file: %s  size: %lu  chunks: %u-%u\n", meta.file_name, meta.file_size, meta.start_chunk, meta.end_chunk);
-
 				unlink(meta.file_name);
 				fd = open(meta.file_name, O_WRONLY | O_CREAT, 0644);
 				if (fd < 0) {

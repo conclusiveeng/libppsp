@@ -815,7 +815,7 @@ dump_options (char *ptr, struct peer *peer)
 	}
 
 	if ((peer->type == LEECHER) && (peer->chunk_size == 0)) {
-		printf("SEEDER didn't send chunk_size option - setting it locally to default value of 1024\n");
+		d_printf("%s", "SEEDER didn't send chunk_size option - setting it locally to default value of 1024\n");
 		peer->chunk_size = 1024;
 	}
 
