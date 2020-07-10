@@ -12,9 +12,9 @@ make
 ## Usage
 
 ```
-Peer-to-Peer Streaming Peer Protocol proof of concept
+Peer-to-Peer Streaming Peer Protocol
 usage:
-./ppspp: -acfhlpstv
+./ppspp: -acfhlpstvw
 -a ip_address:port:	numeric IP address and udp port of the remote SEEDER, enables LEECHER mode
 			example: -a 192.168.1.1:6778
 -c:			chunk size in bytes valid only on the SEEDER side, default: 1024 bytes
@@ -33,6 +33,7 @@ usage:
 -t:			timeout of network communication in seconds, default: 180 seconds
 			example: -t 10
 -v:			enables debugging messages
+-w:			enables libswift compatibility, valid only on LEECHER side
 
 Invocation examples:
 SEEDER mode:
@@ -42,4 +43,7 @@ SEEDER mode:
 
 LEECHER mode:
 ./ppspp -a 192.168.1.1:6778 -s 82da6c1c7ac0de27c3fedf1dd52560323e7b1758 -t 10
+
+LEECHER mode compatible with libswift SEEDER:
+./ppspp -a 192.168.1.1:6778 -s 82da6c1c7ac0de27c3fedf1dd52560323e7b1758 -t 10 -w
 ```
