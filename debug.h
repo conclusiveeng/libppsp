@@ -28,9 +28,13 @@
 #define _DEBUG_H_
 
 #include <pthread.h>
+#include <signal.h>
 
 extern int debug;
 
+#define DEBUG 1
+
+#if DEBUG
 #define _assert(cond, format, ...) do {					\
 	if (!(cond)) {							\
 		printf("*** %s:%u %s() [%#lx] Assertion failed: " format,	\
@@ -43,4 +47,10 @@ extern int debug;
 		printf(format, __VA_ARGS__);				\
 } while(0)
 
+#else
+
+#define _assert(cond, format, ...) do {} while(0)
+#define d_printf(format, ...) do {} while(0)
+
+#endif
 #endif /* _DEBUG_H_ */

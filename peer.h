@@ -75,6 +75,16 @@ SLIST_HEAD(slist_peers, peer);
 extern uint8_t remove_dead_peers;
 
 
+
+/* node cache for verifying SHA-1 in swift compatibility mode */
+SLIST_HEAD(slist_node_cache, node_cache_entry);
+struct node_cache_entry {
+	struct node node;
+	SLIST_ENTRY(node_cache_entry) next;
+//	struct slist_node_cache next;
+};
+
+
 struct peer {
 	enum {
 		LEECHER,
@@ -111,7 +121,12 @@ struct peer {
 		SM_SEND_HANDSHAKE_FINISH,
 		SM_SWITCH_SEEDER,
 		SM_WAIT_FOR_NEXT_CMD,
-		SM_SYNC_REQUEST
+		SM_SYNC_REQUEST,
+		
+		// SWIFT compatibility mode state machine states
+		SW_SEND_HANDSHAKE_INIT,
+		SW_WAIT_HANDSHAKE_RESP,
+		SW_SEND_HAVE_ACK,
 	} sm_leecher;
 
 	uint32_t src_chan_id;
@@ -215,6 +230,7 @@ struct peer {
 	struct slisthead file_list_head;		/* seeder: head of list of files shared by seeder */
 	struct file_list_entry *file_list_entry;	/* seeder side: pointer to file choosen by leecher using SHA1 hash */
 
+	struct slist_node_cache cache;
 	SLIST_ENTRY(peer) snext;		/* list of peers - leechers from seeder point of view or seeders from leecher pov */
 };
 

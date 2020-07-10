@@ -318,6 +318,25 @@ find_uncle (struct node *t, struct node *n)
 }
 
 
+INTERNAL_LINKAGE struct node *
+find_sibling (struct node *n)
+{
+	struct node *p, *s;
+
+	p = n->parent;
+	if (p == NULL)
+		return NULL;
+
+	if (n == p->left)		/* if node 'n' is left child of parent - then sibling is right child of parent */
+		s = p->right;
+	if (n == p->right)		/* if node 'n' is right child of parent - then sibling is left child of parent */
+		s = p->left;
+
+	d_printf("node: %u   parent: %u  sibling: %u\n", n->number, p->number, s->number);
+
+	return s;
+}
+
 /*
  * looks for min and max index going through the tree - extremely left and right
  *

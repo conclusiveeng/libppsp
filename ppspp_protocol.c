@@ -160,7 +160,7 @@ make_handshake_options (char *ptr, struct proto_opt_str *pos)
 		d += sizeof(pos->chunk_size);
 	} else {
 		d_printf("%s", "no chunk_size specified - it's obligatory!\n");
-		return -1;
+	/*	return -1; */
 	}
 
 	/*
@@ -177,7 +177,7 @@ make_handshake_options (char *ptr, struct proto_opt_str *pos)
 		d += sizeof(uint64_t);
 	} else {
 		d_printf("%s", "no file_size specified - it's obligatory!\n");
-		return -1;
+		/* return -1; */
 	}
 
 	/*
@@ -198,7 +198,7 @@ make_handshake_options (char *ptr, struct proto_opt_str *pos)
 		d += pos->file_name_len;
 	} else {
 		d_printf("%s", "no file_name specified - it's obligatory!\n");
-		return -1;
+		/* return -1; */
 	}
 
 	/*
@@ -216,7 +216,7 @@ make_handshake_options (char *ptr, struct proto_opt_str *pos)
 		d += 20;
 	} else {
 		d_printf("%s", "no file_hash specified - it's obligatory!\n");
-		return -1;
+		/* return -1; */
 	}
 
 	*d = END_OPTION;				/* end the list of options with 0xff marker */
@@ -379,7 +379,7 @@ make_request (char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32_t e
 
 	d = ptr;
 
-	*(uint32_t *)d = htobe32(dest_chan_id);
+	*(uint32_t *)d = htobe32(peer->dest_chan_id);	/* set target channel id */
 	d += sizeof(uint32_t);
 
 	*d = REQUEST;
@@ -597,6 +597,45 @@ make_ack (char *ptr, struct peer *peer)
 }
 
 
+INTERNAL_LINKAGE int
+swift_make_have_ack (char *ptr, struct peer *peer)
+{
+	char *d;
+	int ret;
+	uint64_t delay_sample;
+
+	d = ptr;
+
+	*(uint32_t *)d = htobe32(peer->dest_chan_id);
+	d += sizeof(uint32_t);
+
+	*d = HAVE;
+	d++;
+
+	*(uint32_t *)d = htobe32(peer->curr_chunk);
+	d += sizeof(uint32_t);
+	*(uint32_t *)d = htobe32(peer->curr_chunk);
+	d += sizeof(uint32_t);
+
+	*d = ACK;
+	d++;
+
+	*(uint32_t *)d = htobe32(peer->curr_chunk);
+	d += sizeof(uint32_t);
+	*(uint32_t *)d = htobe32(peer->curr_chunk);
+	d += sizeof(uint32_t);
+
+	delay_sample = 0x12345678ABCDEF;		/* temporarily */
+	*(uint64_t *)d = htobe64(delay_sample);
+	d += sizeof(uint64_t);
+
+	ret = d - ptr;
+	/* d_printf("%s: returning %u bytes\n", __func__, ret); */
+
+	return ret;
+}
+
+
 /*
  * parse list of encoded options
  *
@@ -636,7 +675,7 @@ dump_options (char *ptr, struct peer *peer)
 		d++;
 		swarm_len = be16toh(*((uint16_t *)d) & 0xffff);
 		d += 2;
-		d_printf("swarm_id[%u]: %s\n", swarm_len, d);
+		/* d_printf("swarm_id[%u]: %s\n", swarm_len, d); 	swarm_id are binary data so don't print them */
 		d += swarm_len;
 	}
 
@@ -775,6 +814,11 @@ dump_options (char *ptr, struct peer *peer)
 		abort();
 	}
 
+	if ((peer->type == LEECHER) && (peer->chunk_size == 0)) {
+		printf("SEEDER didn't send chunk_size option - setting it locally to default value of 1024\n");
+		peer->chunk_size = 1024;
+	}
+
 	d_printf("parsed: %lu bytes\n", d - ptr);
 
 	ret = d - ptr;
@@ -802,7 +846,8 @@ dump_handshake_request (char *ptr, int req_len, struct peer *peer)
 
 	dest_chan_id = be32toh(*(uint32_t *)d);
 	d_printf("Destination Channel ID: %#x\n", dest_chan_id);
-	d += sizeof(uint32_t);
+
+	d += sizeof(uint32_t);				/* it should be our chan id - verify it */
 
 	if (*d == HANDSHAKE) {
 		d_printf("%s", "ok, HANDSHAKE req\n");
@@ -814,6 +859,7 @@ dump_handshake_request (char *ptr, int req_len, struct peer *peer)
 
 	src_chan_id = be32toh(*(uint32_t *)d);
 	d_printf("Source Channel ID: %#x\n", src_chan_id);
+	peer->dest_chan_id = src_chan_id;		/* set remote peer's channel id - take it from seeders's handshake response */
 	d += sizeof(uint32_t);
 
 	d_printf("%s", "\n");
@@ -881,6 +927,94 @@ dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 	if (peer->chunk == NULL) {
 		peer->chunk = malloc(peer->nl * sizeof(struct chunk));
 		memset(peer->chunk, 0, peer->nl * sizeof(struct chunk));
+	} else {
+		d_printf("%s", "error - peer->chunk has already allocated memory, HAVE should be send only once\n");
+	}
+
+	if (peer->download_schedule == NULL) {
+		/* don't create download_schedule[] here for step-by-step mode because it will be created in other procedure for sbs */
+		if (peer->sbs_mode == 0) {
+			peer->download_schedule = malloc(peer->nl * sizeof(struct schedule_entry));
+			memset(peer->download_schedule, 0, peer->nl * sizeof(struct schedule_entry));
+			create_download_schedule(peer);
+		}
+	} else {
+		d_printf("%s", "error - peer->download_schedule has already allocated memory, HAVE should be send only once\n");
+	}
+
+	ret = d - ptr;
+	d_printf("%s returning: %u bytes\n", __func__, ret);
+
+	return ret;
+}
+
+
+INTERNAL_LINKAGE int
+swift_dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
+{
+	char *d;
+	int req_len, ret;
+	uint32_t start_chunk, end_chunk, num_chunks, nr_chunk;
+
+	/* dump HANDSHAKE header and protocol options */
+	d = ptr;
+	req_len = dump_handshake_request(ptr, resp_len, peer);
+
+	d += req_len;
+
+	end_chunk = 0;
+	while ((*d == HAVE) && (d - ptr < resp_len)) {
+		/* dump HAVE header */
+		d_printf("%s", "HAVE header:\n");
+		if (*d == HAVE) {
+			d_printf("%s", "ok, HAVE header\n");
+		} else {
+			d_printf("error, should be HAVE header but is: %u\n", *d);
+			abort();
+		}
+
+		d++;
+
+		nr_chunk = be32toh(*(uint32_t *)d);
+		d_printf("start chunk: %u\n", nr_chunk);
+		if (nr_chunk < start_chunk)
+			start_chunk = nr_chunk;
+		d += sizeof(uint32_t);
+
+		nr_chunk = be32toh(*(uint32_t *)d);
+		d_printf("end chunk: %u\n", nr_chunk);
+		if (nr_chunk > end_chunk)
+			end_chunk = nr_chunk;
+		d += sizeof(uint32_t);
+	}
+
+	peer->start_chunk = start_chunk;
+	d_printf("start chunk: %u\n", start_chunk);
+	peer->end_chunk = end_chunk;
+	d_printf("end chunk: %u\n", end_chunk);
+
+	/* calculate how many chunks seeder has */
+	num_chunks = end_chunk - start_chunk + 1;
+	d_printf("seeder has %u chunks\n", num_chunks);
+	peer->nc = num_chunks;
+	peer->local_leecher->nc = num_chunks;
+
+	/* calculate number of leaves */
+	peer->nl = 1 << order2(peer->nc);
+	peer->local_leecher->nl = peer->nl;
+	d_printf("nc: %u nl: %u\n", peer->nc, peer->nl);
+
+
+	if (peer->local_leecher->chunk_size == 0)
+		peer->local_leecher->chunk_size = peer->chunk_size;
+
+	if (peer->chunk == NULL) {
+		peer->chunk = malloc(peer->nl * sizeof(struct chunk));
+		memset(peer->chunk, 0, peer->nl * sizeof(struct chunk));
+
+		/* do we really need this allocation? */
+		peer->local_leecher->chunk = malloc(peer->nl * sizeof(struct chunk));
+		memset(peer->local_leecher->chunk, 0, peer->nl * sizeof(struct chunk));
 	} else {
 		d_printf("%s", "error - peer->chunk has already allocated memory, HAVE should be send only once\n");
 	}
@@ -1094,6 +1228,69 @@ dump_integrity (char *ptr, int req_len, struct peer *peer)
 		d_printf("dumping chunk %u:  %s\n", x, sha_buf);
 
 		d += 20;
+	}
+
+	if (req_len - (d - ptr) > 0)
+		d_printf("  %lu bytes left, parse them\n", req_len - (d - ptr));
+
+	ret = d - ptr;
+	d_printf("%s returning: %u bytes\n", __func__, ret);
+
+	return ret;
+}
+
+
+INTERNAL_LINKAGE int
+swift_dump_integrity (char *ptr, int req_len, struct peer *peer)
+{
+	char *d;
+	char sha_buf[40 + 1];
+	int ret, s, y;
+	uint32_t dest_chan_id, start_chunk, end_chunk, node;
+
+	d = ptr;
+
+	dest_chan_id = be32toh(*(uint32_t *)d);
+	d_printf("Destination Channel ID: %#x\n", dest_chan_id);
+	d += sizeof(uint32_t);
+
+	end_chunk = 0;
+	while ((*d == INTEGRITY) && (d - ptr < req_len)) {
+		if (*d == INTEGRITY) {
+			d_printf("%s", "ok, INTEGRITY header\n");
+		} else {
+			d_printf("error, should be INTEGRITY header but is: %u\n", *d);
+			abort();
+		}
+		d++;
+
+		start_chunk = be32toh(*(uint32_t *)d);
+		d_printf("  start chunk: %u\n", start_chunk);
+		d += sizeof(uint32_t);
+
+		end_chunk = be32toh(*(uint32_t *)d);
+		d_printf("  end chunk: %u\n", end_chunk);
+		d += sizeof(uint32_t);
+
+		/* for example tree: 0,2,4,6 (indexes: 0,1,2,3) and range (start_chunk==0 and end_chunk==3) root node is 3
+		 * root node for given subtree is a sum of start_chunk and end_chunk
+		 */
+		node = start_chunk + end_chunk;		/* calculate root node */
+
+		d_printf("setting up node: %u\n", node);
+
+		memcpy(peer->tree[node].sha, d, 20);
+		peer->tree[node].state = ACTIVE;
+
+		if (debug) {
+			s = 0;
+			for (y = 0; y < 20; y++)
+				s += sprintf(sha_buf + s, "%02x", peer->tree[node].sha[y] & 0xff);
+			sha_buf[40] = '\0';
+			d_printf("dumping node %u:  %s\n", node, sha_buf);
+		}
+
+		d += 20;		/* jump over SHA-1 hash */
 	}
 
 	if (req_len - (d - ptr) > 0)

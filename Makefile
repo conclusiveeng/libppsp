@@ -12,7 +12,7 @@ all: libppspp.so ppspp
 %.o: %.c %.h
 	$(CC) $< -o $@ -c $(LIB_CFLAGS)
 
-libppspp.so: mt.o sha1.o ppspp_protocol.o net.o peer.o ppspp.o
+libppspp.so: mt.o sha1.o ppspp_protocol.o net.o net_swift.o peer.o ppspp.o ppspp_swift.o
 	$(CC) $^ -o $@ $(LDFLAGS)
 
 ppspp: main.c

@@ -263,6 +263,8 @@ create_download_schedule_sbs(struct peer *p, uint32_t start_chunk, uint32_t end_
 		return -1;
 	}
 
+	p->hashes_per_mtu = 256;
+
 	while ((o < p->nc) && (o <= end_chunk)) {
 		/* find first/closest not yet downloaded chunk */
 		while ((p->chunk[o].downloaded == CH_YES) && (o < p->nc)) o++;
@@ -282,8 +284,10 @@ create_download_schedule_sbs(struct peer *p, uint32_t start_chunk, uint32_t end_
 		p->download_schedule[p->download_schedule_len].end = o - 1;
 		p->download_schedule_len++;
 
+#if 0
 		_assert((p->chunk[o].downloaded == CH_NO) || (p->chunk[o].downloaded == CH_YES), "p->chunk[o].downloaded should have CH_NO or CH_YES, but have: %u\n", p->chunk[o].downloaded);
 		_assert(p->download_schedule_len <= p->nc, "p->download_schedule_len should be <= p->nc, but p->download_schedule_len=%lu and p->nc=%u\n", p->download_schedule_len, p->nc);
+#endif
 	}
 
 	ret = (last_chunk - start_chunk + 1) * p->chunk_size;
