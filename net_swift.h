@@ -33,11 +33,14 @@
 #define BUFSIZE 1500
 
 int swift_net_seeder(struct peer *);
+int swift_net_seeder_mq(struct peer *);
 int swift_net_leecher_continuous(struct peer *);
 int swift_preliminary_connection_sbs(struct peer *);
 void swift_net_leecher_create(struct peer *);
 int swift_net_leecher_sbs(struct peer *);
 void swift_net_leecher_fetch_chunk(struct peer *);
 void swift_net_leecher_close(struct peer *);
+
+void verify2(int);
 
 #endif /* _NET_SWIFT_H_ */

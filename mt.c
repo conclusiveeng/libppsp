@@ -370,6 +370,7 @@ interval_min_max (struct node *i, struct node *min, struct node *max)
 {
 	struct node *c;
 
+	if (i == NULL) abort();
 	c = i;
 	while (c->left != NULL)
 		c = c->left;
@@ -434,9 +435,9 @@ dump_chunk_tab (struct chunk *c, int l)
 	}
 }
 
-
+#if 0
 INTERNAL_LINKAGE void
-update_sha (struct node *t, int num_chunks)
+update_sha_orig (struct node *t, int num_chunks)
 {
 	char sha_left[40 + 1], sha_right[40 + 1], sha_parent[40 + 1];
 	uint8_t concat[80 + 1];
@@ -488,6 +489,59 @@ update_sha (struct node *t, int num_chunks)
 			/* d_printf(" p: %s\n", sha_parent); */
 			sha_parent[40] = '\0';
 
+			t[parent].state = ACTIVE;
+		}
+		d_printf("%s", "\n");
+	}
+}
+#endif
+
+
+INTERNAL_LINKAGE void
+update_sha (struct node *t, int num_chunks)
+{
+	char sha_parent[40 + 1];
+	char zero[20];
+	uint8_t concat[80 + 1];
+	unsigned char digest[20 + 1];
+	int h, nc, l, si, first_idx, y, s, left, right, parent;
+	SHA1Context context;
+
+	memset(zero, 0, sizeof(zero));
+
+	h = order2(num_chunks);							/* "h" - height of the tree */
+	nc = 1 << h;
+
+	for (l = 1; l <= h; l++) {		/* go through levels of the tree starting from bottom of the tree */
+		first_idx = (1 << (l - 1)) -1;  /* first index on given level starting from left: 0, 1, 3, 7, 15, etc */
+		for (si = first_idx; si < 2 * nc; si += (2 << l)) {   /* si - sibling index */
+			left = si;
+			right = (si | (1 << l));
+			parent = (left + right) / 2;
+
+			/* check if both children are empty */
+			if ((memcmp(zero, t[left].sha, sizeof(zero)) == 0) && (memcmp(zero, t[right].sha, sizeof(zero)) == 0)) {
+				memcpy(t[parent].sha, zero, 20);
+			} else {
+				memcpy(concat, t[left].sha, 20);
+				memcpy(concat + 20, t[right].sha, 20);
+
+				/* calculate SHA1 for concatenated both SHA (left and right) */
+				SHA1Reset(&context);
+				SHA1Input(&context, concat, 40);
+				SHA1Result(&context, digest);
+
+				/* copy generated SHA hash to parent node */
+				memcpy(t[parent].sha, digest, 20);
+			}
+			/* generate ASCII SHA for parent node */
+			if (debug) {
+				s = 0;
+				for (y = 0; y < 20; y++)
+					s += sprintf(sha_parent + s, "%02x", digest[y] & 0xff);
+				sha_parent[40] = '\0';
+				d_printf(" p[%u]: %s\n", t[parent].number, sha_parent);
+			}
 			t[parent].state = ACTIVE;
 		}
 		d_printf("%s", "\n");

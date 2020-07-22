@@ -60,7 +60,8 @@ struct node {
 	enum {
 		EMPTY = 0,
 		INITIALIZED,
-		ACTIVE
+		ACTIVE,
+		SENT					/* seeder already sent this sha to leecher */
 	} state;
 };
 

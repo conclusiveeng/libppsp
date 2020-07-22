@@ -278,7 +278,7 @@ swift_seeder_run(ppspp_handle_t handle)
 	struct peer *local_seeder;
 
 	local_seeder = (struct peer *)handle;
-	net_seeder(local_seeder);
+	swift_net_seeder_mq(local_seeder);
 }
 
 
@@ -417,7 +417,7 @@ swift_prepare_chunk_range(ppspp_handle_t handle, uint32_t start_chunk, uint32_t 
 
 	local_leecher->download_schedule = malloc(local_leecher->nl * sizeof(struct schedule_entry));
 	memset(local_leecher->download_schedule, 0, local_leecher->nl * sizeof(struct schedule_entry));
-	buf_size = create_download_schedule_sbs(local_leecher, start_chunk, end_chunk);
+	buf_size = swift_create_download_schedule_sbs(local_leecher, start_chunk, end_chunk);
 	local_leecher->download_schedule_idx = 0;
 
 	return buf_size;

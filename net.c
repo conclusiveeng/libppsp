@@ -443,6 +443,7 @@ seeder_worker (void *data)
 	pos.opt_map |= (1 << FILE_NAME);
 	pos.opt_map |= (1 << FILE_HASH);
 
+
 	p->sm_seeder = SM_NONE;
 
 	data_payload = malloc(we->chunk_size + 4 + 1 + 4 + 4 + 8);	/* chunksize + headers */

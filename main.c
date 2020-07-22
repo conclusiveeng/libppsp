@@ -92,7 +92,7 @@ main (int argc, char *argv[])
 	port = 6778;
 	sa = NULL;
 	swift = 0;
-	while ((opt = getopt(argc, argv, "a:c:f:hl:p:s:t:vw")) != -1) {
+	while ((opt = getopt(argc, argv, "a:c:f:hp:s:t:v")) != -1) {
 		switch (opt) {
 			case 'a':				/* remote address of seeder */
 				sa = optarg;
@@ -106,9 +106,11 @@ main (int argc, char *argv[])
 			case 'h':				/* help/usage */
 				usage = 1;
 				break;
+#if 0
 			case 'l':				/* peer IP list separated by ':' */
 				peer_list = optarg;
 				break;
+#endif
 			case 'p':				/* UDP port number of seeder */
 				port = atoi(optarg);
 				break;
@@ -121,9 +123,6 @@ main (int argc, char *argv[])
 			case 'v':				/* debug */
 				debug = 1;
 				break;
-			case 'w':				/* swift compatibility mode on (only for local leecher) */
-				swift = 1;
-				break;
 			default:
 				usage = 1;
 		}
@@ -132,7 +131,7 @@ main (int argc, char *argv[])
 	if (usage || (argc == 1)) {
 		printf("Peer-to-Peer Streaming Peer Protocol\n");
 		printf("usage:\n");
-		printf("%s: -acfhlpstvw\n", argv[0]);
+		printf("%s: -acfhpstv\n", argv[0]);
 		printf("-a ip_address:port:	numeric IP address and udp port of the remote SEEDER, enables LEECHER mode\n");
 		printf("			example: -a 192.168.1.1:6778\n");
 		printf("-c:			chunk size in bytes valid only on the SEEDER side, default: 1024 bytes\n");
@@ -141,9 +140,11 @@ main (int argc, char *argv[])
 		printf("			example: -f ./filename\n");
 		printf("			example: -f /path/to/directory\n");
 		printf("-h:			this help\n");
+#if 0
 		printf("-l:			list of pairs of IP address and udp port of other seeders, separated by comma ','\n");
 		printf("			valid only for SEEDER\n");
 		printf("			example: -l 192.168.1.1:6778,192.168.1.2:6778,192.168.1.4:6778\n");
+#endif
 		printf("-p port:		UDP listening port number, valid only on SEEDER side, default 6778\n");
 		printf("			example: -p 7777\n");
 		printf("-s sha1:		SHA1 of the file for downloading, valid only on LEECHER side\n");
@@ -151,18 +152,16 @@ main (int argc, char *argv[])
 		printf("-t:			timeout of network communication in seconds, default: 180 seconds\n");
 		printf("			example: -t 10\n");
 		printf("-v:			enables debugging messages\n");
-		printf("-w:			enables libswift compatibility, valid only on LEECHER side\n");
 		printf("\nInvocation examples:\n");
 		printf("SEEDER mode:\n");
 		printf("%s -f filename -c 1024\n", argv[0]);
-		printf("%s -f filename -c 1024 -t 5 -l 192.168.1.1:6778\n", argv[0]);
-		printf("%s -f /tmp/test -c 1024 -t 5 -l 192.168.1.1:6778,192.168.1.2:6778 -p 6778\n\n", argv[0]);
+		printf("%s -f /tmp/directory -c 1024 -t 5\n", argv[0]);
 		printf("LEECHER mode:\n");
 		printf("%s -a 192.168.1.1:6778 -s 82da6c1c7ac0de27c3fedf1dd52560323e7b1758 -t 10\n\n", argv[0]);
-		printf("LEECHER mode compatible with libswift SEEDER:\n");
-		printf("%s -a 192.168.1.1:6778 -s 82da6c1c7ac0de27c3fedf1dd52560323e7b1758 -t 10 -w\n\n", argv[0]);
 		exit(0);
 	}
+
+	swift = 1;	/* set libswift mode compatibility for good */
 
 	if (fname1 != NULL) {
 		type = SEEDER_TYPE;

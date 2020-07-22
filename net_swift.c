@@ -47,14 +47,15 @@
 #include "peer.h"
 #include "sha1.h"
 #include "debug.h"
+#include "wqueue.h"
 
 #define MQ_SYNC 0
 
 #define SEM_NAME "/ppspp"
 
-#if MQ_SYNC
+/* #if MQ_SYNC */
 #define MQ_NAME "/mq"
-#endif
+/* #endif */
 
 extern int h_errno;
 
@@ -378,6 +379,39 @@ mq_init_main_process_sender(void)
 #endif
 
 
+INTERNAL_LINKAGE mqd_t
+mq_init(int non_block)
+{
+	mqd_t q;
+	char mq_name[64];
+	struct mq_attr attr;
+	int flag;
+
+	attr.mq_flags = 0;
+	attr.mq_maxmsg = 10;			/* max is in /proc/sys/fs/mqueue/msg_max and equals 10 in Linux*/
+	attr.mq_msgsize = BUFSIZE;		/* must be shorter than mq_receive length arg */
+	attr.mq_curmsgs = 0;
+
+	memset(mq_name, 0, sizeof(mq_name));
+	snprintf(mq_name, sizeof(mq_name) - 1, "%s_%x_%lx", MQ_NAME, (uint32_t) getpid(), random());
+
+	mq_unlink(mq_name);
+
+	flag = O_RDWR | O_CREAT;
+	if (non_block)
+		flag |= O_NONBLOCK;
+
+	q = mq_open(mq_name, flag, 0666, &attr);
+
+	if (q == -1) {
+		printf("error creating sender (process) mq: %s\n", strerror(errno));
+		exit(1);
+	}
+
+	return q;
+}
+
+
 /* thread - seeder worker */
 INTERNAL_LINKAGE void *
 swift_seeder_worker (void *data)
@@ -394,6 +428,7 @@ swift_seeder_worker (void *data)
 	int wait_for_cmd;
 	char *recv_buf;
 	uint16_t recv_len;
+	char dest_chan_id_temp[4 + 1], request_temp[BUFSIZE];
 
 	clientlen = sizeof(struct sockaddr_in);
 	p = (struct peer *) data;			/* data of remote host (leecher) connecting to us (seeder)*/
@@ -412,7 +447,7 @@ swift_seeder_worker (void *data)
 	pos.swarm_id = (uint8_t *)swarm_id;
 	pos.content_prot_method = 1;			/* merkle hash tree */
 	pos.merkle_hash_func = 0;			/* 0 = sha-1 */
-	pos.live_signature_alg = 0;			/* should be taken from DNSSEC */
+	pos.live_signature_alg = 5;			/* should be taken from DNSSEC */
 	pos.chunk_addr_method = 2;			/* 2 = 32 bit chunk ranges */
 	*(unsigned int *)pos.live_disc_wind = 0x12345678;
 	pos.supported_msgs_len = 2;			/* bitmap of supported messages consists of 2 bytes */
@@ -430,18 +465,14 @@ swift_seeder_worker (void *data)
 	pos.opt_map = 0;
 	pos.opt_map |= (1 << VERSION);
 	pos.opt_map |= (1 << MINIMUM_VERSION);
-	pos.opt_map |= (1 << SWARM_ID);
 	pos.opt_map |= (1 << CONTENT_PROT_METHOD);
 	pos.opt_map |= (1 << MERKLE_HASH_FUNC);
-	pos.opt_map |= (1 << LIVE_SIGNATURE_ALG);
 	pos.opt_map |= (1 << CHUNK_ADDR_METHOD);
-	pos.opt_map |= (1 << LIVE_DISC_WIND);
-	pos.opt_map |= (1 << SUPPORTED_MSGS);
-	pos.opt_map |= (1 << CHUNK_SIZE);
+/*
 	pos.opt_map |= (1 << FILE_SIZE);
 	pos.opt_map |= (1 << FILE_NAME);
 	pos.opt_map |= (1 << FILE_HASH);
-
+*/
 	p->sm_seeder = SM_NONE;
 
 	data_payload = malloc(we->chunk_size + 4 + 1 + 4 + 4 + 8);	/* chunksize + headers */
@@ -481,7 +512,7 @@ swift_seeder_worker (void *data)
 			clock_gettime(CLOCK_MONOTONIC, &p->ts_last_recv);
 			p->d_last_recv = HANDSHAKE;
 
-			dump_handshake_request(recv_buf, recv_len, p);
+			swift_dump_handshake_request(recv_buf, recv_len, p);
 
 			/* we've just received hash of the file from LEECHER so update "pos" structure */
 			pos.file_size = p->file_size;
@@ -494,7 +525,7 @@ swift_seeder_worker (void *data)
 
 			_assert((unsigned long int) opts_len <= sizeof(opts), "%s but has value: %u\n", "opts_len should be <= 1024", opts_len);
 
-			h_resp_len = make_handshake_have(handshake_resp, 0, 0xfeedbabe, opts, opts_len, p);
+			h_resp_len = swift_make_handshake_have(handshake_resp, p->dest_chan_id, 0xfeedbabe, opts, opts_len, p);
 
 			_assert((unsigned long int) h_resp_len <= sizeof(handshake_resp), "%s but has value: %u\n", "h_resp_len should be <= 256", h_resp_len);
 
@@ -560,18 +591,19 @@ swift_seeder_worker (void *data)
 			if (p->pex_required == 1)		/* does the leecher want PEX? */
 				p->sm_seeder = SM_SEND_PEX_RESP;
 			else
-				p->sm_seeder = SM_SEND_INTEGRITY;
+				p->sm_seeder = SW_SEND_INTEGRITY_DATA;
 		}
 
 		if (p->sm_seeder == SM_SEND_PEX_RESP) {
 			n = make_pex_resp(p->send_buf, p, we);
 
 			_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
-
-			n = sendto(sockfd, p->send_buf, n, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
-			if (n < 0) {
-				d_printf("%s", "ERROR in sendto\n");
-				abort();
+			if (n > 0) {	/* wyslij cokolwiek tylko jesli mamy cos do wyslania */
+				n = sendto(sockfd, p->send_buf, n, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
+				if (n < 0) {
+					d_printf("%s", "ERROR in sendto\n");
+					abort();
+				}
 			}
 
 			clock_gettime(CLOCK_MONOTONIC, &p->ts_last_send);
@@ -586,36 +618,23 @@ swift_seeder_worker (void *data)
 			if ((p->start_chunk == 0xffffffff) && (p->end_chunk == 0xffffffff)) {
 				p->sm_seeder = SM_NONE;
 			} else  {
-				p->sm_seeder = SM_SEND_INTEGRITY;
+				p->sm_seeder = SW_SEND_INTEGRITY_DATA;
 			}
 		}
 
-		if (p->sm_seeder == SM_SEND_INTEGRITY) {
-			n = make_integrity(p->send_buf, p, we);
-
+		if (p->sm_seeder == SW_SEND_INTEGRITY_DATA) {
+			n = swift_make_integrity_reverse(p->send_buf, p, we);
 			_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 			/* send INTEGRITY with data */
-			n = sendto(sockfd, p->send_buf, n, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
-			if (n < 0) {
-				d_printf("%s", "ERROR in sendto\n");
-				abort();
-			}
-
-			clock_gettime(CLOCK_MONOTONIC, &p->ts_last_send);
-			p->d_last_send = INTEGRITY;
-			p->recv_len = 0;
 			p->curr_chunk = p->start_chunk;		/* set beginning number of chunk for DATA0 */
-			p->sm_seeder = SM_SEND_DATA;
-		}
 
-		if (p->sm_seeder == SM_SEND_DATA) {
-			data_payload_len = make_data(data_payload, p);
+			data_payload_len = swift_make_data_no_chanid(p->send_buf + n, p);
 
 			_assert((uint32_t) data_payload_len <= we->chunk_size + 4 + 1 + 4 + 4 + 8, "%s but data_payload_len has value: %d and we->chunk_size: %u\n", "data_payload_len should be <= we->chunk_size", data_payload_len, we->chunk_size);
 
 			/* send DATA datagram with contents of the chunk */
-			n = sendto(sockfd, data_payload, data_payload_len, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
+			n = sendto(sockfd, p->send_buf, n + data_payload_len, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
 			if (n < 0) {
 				d_printf("%s", "ERROR in sendto\n");
 				abort();
@@ -623,31 +642,47 @@ swift_seeder_worker (void *data)
 
 			clock_gettime(CLOCK_MONOTONIC, &p->ts_last_send);
 			p->d_last_send = DATA;
-			p->sm_seeder = SM_WAIT_ACK;
+			p->sm_seeder = SW_WAIT_HAVE_ACK;
 
 			wait_for_cmd = 1;
 			swift_seeder_cond_unlock(p);
 			continue;
 		}
 
-		if (p->sm_seeder == SM_WAIT_ACK) {
-			if ((message_type(recv_buf) == ACK) && (recv_len > 0)) {
-				p->sm_seeder = SM_ACK;
+		if (p->sm_seeder == SW_WAIT_HAVE_ACK) {
+			if (((message_type(recv_buf) == ACK) || (message_type(recv_buf) == HAVE)) && (recv_len > 0)) {
+				p->sm_seeder = SW_HAVE_ACK;
+			} else if ((message_type(recv_buf) == REQUEST) && (recv_len > 0)) {
+				p->sm_seeder = SM_WAIT_REQUEST;
 			} else {
 				continue;
 			}
 		}
 
-		if (p->sm_seeder == SM_ACK) {
+		if (p->sm_seeder == SW_HAVE_ACK) {
 			clock_gettime(CLOCK_MONOTONIC, &p->ts_last_recv);
 
-			dump_ack(recv_buf, recv_len, p);
+			n = swift_dump_have_ack(recv_buf, recv_len, p);
 
-			p->curr_chunk++;
-			p->recv_len = 0;
+			if (n != recv_len) {
+				if (n > recv_len) abort();
+
+				memcpy(dest_chan_id_temp, recv_buf, 4);
+				memcpy(request_temp, recv_buf + n, recv_len - n);
+				memcpy(recv_buf, dest_chan_id_temp, 4);
+				memcpy(recv_buf + 4, request_temp, recv_len - n);
+				recv_len = recv_len - n + 4;			/* we have added here manually dest_chan_id */
+				p->sm_seeder = SM_WAIT_REQUEST;		/* that was ACK for last DATA in serie so wait for REQUEST */
+				wait_for_cmd = 1;
+				swift_seeder_cond_unlock(p);
+				continue;
+			}
+
 
 			if (p->curr_chunk <= p->end_chunk) {		/* if this is not ACK for our last sent DATA then go to DATA state */
-				p->sm_seeder = SM_SEND_DATA;
+				p->curr_chunk++;
+				p->recv_len = 0;
+				p->sm_seeder = SW_SEND_INTEGRITY_DATA;
 			} else if (p->curr_chunk > p->end_chunk) {
 				p->sm_seeder = SM_WAIT_REQUEST;		/* that was ACK for last DATA in serie so wait for REQUEST */
 				wait_for_cmd = 1;
@@ -807,13 +842,12 @@ swift_net_seeder(struct peer *seeder)
 			continue;
 		}
 
-		if (message_type(buf) == ACK) {
+		if (message_type(buf) == HAVE) {
 			_assert(p != NULL, "%s but p has value: %lu\n", "p should be != NULL", (uint64_t)p);
-
 			/* wait until seeder_worker finishes his job to not overwrite his p->recv_buf buffer */
 			swift_seeder_cond_lock(p);
 
-			d_printf("%s", "OK ACK\n");
+			d_printf("%s", "OK HAVE+ACK\n");
 			_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 			memcpy(p->recv_buf, buf, n);
@@ -825,6 +859,404 @@ swift_net_seeder(struct peer *seeder)
 			swift_semaph_post(p->sem);			/* wake up seeder worker */
 #endif
 			continue;
+		}
+	}
+}
+
+
+INTERNAL_LINKAGE void *
+on_handshake(struct peer *p, void *recv_buf, uint16_t recv_len)
+{
+	int n, clientlen, sockfd, h_resp_len, opts_len, s, y;
+	char *bn, buf[40 + 1];
+	char opts[1024];			/* buffer for encoded options */
+	char swarm_id[] = "swarm_id";
+	char handshake_resp[256];
+	struct peer *we;
+	struct proto_opt_str pos;
+
+	clientlen = sizeof(struct sockaddr_in);
+	we = p->seeder;					/* our data (seeder) */
+	sockfd = p->sockfd;
+
+	memset(&pos, 0, sizeof(struct proto_opt_str));
+	memset(&opts, 0, sizeof(opts));
+
+	/* prepare structure as a set of parameters to make_handshake_options() proc */
+	pos.version = 1;
+	pos.minimum_version = 1;
+	pos.swarm_id_len = strlen(swarm_id);
+	pos.swarm_id = (uint8_t *)swarm_id;
+	pos.content_prot_method = 1;			/* merkle hash tree */
+	pos.merkle_hash_func = 0;			/* 0 = sha-1 */
+	pos.live_signature_alg = 5;			/* should be taken from DNSSEC */
+	pos.chunk_addr_method = 2;			/* 2 = 32 bit chunk ranges */
+	*(unsigned int *)pos.live_disc_wind = 0x12345678;
+	pos.supported_msgs_len = 2;			/* bitmap of supported messages consists of 2 bytes */
+	*(unsigned int *)pos.supported_msgs = 0xffff;	/* bitmap of supported messages */
+	pos.chunk_size = we->chunk_size;
+	pos.file_size = we->file_size;
+
+	bn = basename(we->fname);
+	pos.file_name_len = strlen(bn);
+	memset(pos.file_name, 0, sizeof(pos.file_name));
+	memcpy(pos.file_name, bn, pos.file_name_len);
+	memcpy(pos.sha_demanded, "aaaaaaaaaaaaaaaaaaaa", 20);	/* it doesn't matter here because leecher doesn't use this field as read field */
+
+	/* mark the options we want to pass to make_handshake_options() (which ones are valid) */
+	pos.opt_map = 0;
+	pos.opt_map |= (1 << VERSION);
+	pos.opt_map |= (1 << MINIMUM_VERSION);
+	pos.opt_map |= (1 << CONTENT_PROT_METHOD);
+	pos.opt_map |= (1 << MERKLE_HASH_FUNC);
+	pos.opt_map |= (1 << CHUNK_ADDR_METHOD);
+
+	swift_dump_handshake_request(recv_buf, recv_len, p);
+	opts_len = make_handshake_options(opts, &pos);
+
+	_assert((unsigned long int) opts_len <= sizeof(opts), "%s but has value: %u\n", "opts_len should be <= 1024", opts_len);
+
+	h_resp_len = swift_make_handshake_have(handshake_resp, p->dest_chan_id, 0xfeedbabe, opts, opts_len, p);
+
+	_assert((unsigned long int) h_resp_len <= sizeof(handshake_resp), "%s but has value: %u\n", "h_resp_len should be <= 256", h_resp_len);
+	_assert(recv_len != 0, "%s but has value: %u\n", "recv_len should be != 0", recv_len);
+
+	/* send HANDSHAKE + HAVE */
+	n = sendto(sockfd, handshake_resp, h_resp_len, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
+	if (n < 0) {
+		d_printf("%s", "ERROR in sendto\n");
+		abort();
+	}
+
+	if (p->file_list_entry == NULL) {
+		s = 0;
+		for (y = 0; y < 20; y++)
+			s += sprintf(buf + s, "%02x", p->sha_demanded[y] & 0xff);
+		buf[40] = '\0';
+		d_printf("Error: there is no file with hash %s for %s:%u. Closing connection.\n", buf, inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
+		p->finishing = 1;
+		p->to_remove = 1;	/* mark this particular peer to remove by GC */
+		remove_dead_peers = 1;	/* set global flag for removing dead peers by garbage collector */
+		swift_seeder_cond_unlock(p);
+	}
+
+	clock_gettime(CLOCK_MONOTONIC, &p->ts_last_send);
+	p->d_last_send = HAVE;
+
+	memset(p->fname, 0, sizeof(p->fname));
+	strcpy(p->fname, basename(p->file_list_entry->path));	/* do we really need this here? */
+	p->chunk_size = we->chunk_size;
+	p->recv_len = 0;
+	p->sm_seeder = SM_WAIT_REQUEST;
+	swift_seeder_cond_unlock(p);
+
+	return 0;
+}
+
+
+INTERNAL_LINKAGE void *
+on_request(struct peer *p, void *recv_buf, uint16_t recv_len)
+{
+	int clientlen, data_payload_len, n;
+	char mq_buf[BUFSIZE + 1];
+	ssize_t st;
+
+	clientlen = sizeof(struct sockaddr_in);
+
+	swift_dump_request(recv_buf, recv_len, p);
+
+	p->curr_chunk = p->start_chunk;		/* set beginning number of chunk for DATA0 */
+
+	do {
+		/* shouldn't be here a loop? */
+		if (p->data_bmp[p->curr_chunk / 8] & (1 << (p->curr_chunk % 8))) {
+			d_printf("DATA %lu already sent - skipping\n", p->curr_chunk);
+			p->curr_chunk++;
+		}
+
+		n = swift_make_integrity_reverse(p->send_buf, p, p->seeder);
+
+		_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
+
+		/* check if there is enough space in MTU to send all the INTEGRITY messages and DATA in one packet */
+		if (n + 4 + 1 + 4 + 4 + 8 + 20 + 8 + p->seeder->chunk_size <= BUFSIZE) {	/* 4:chan_id, 1: DATA message id=1, 4:start, 4:end, 8:timestamp, 20: ip, 8: udp */
+
+			/* yes there is enough space so we can send INTEGRITY and DATA together in one frame */
+			data_payload_len = swift_make_data_no_chanid(p->send_buf + n, p);
+
+			_assert((uint32_t) data_payload_len <= p->seeder->chunk_size + 4 + 1 + 4 + 4 + 8, "%s but data_payload_len has value: %d and we->chunk_size: %u\n", "data_payload_len should be <= we->chunk_size", data_payload_len, p->seeder->chunk_size);
+
+			_assert(n + data_payload_len <= BUFSIZE, "we're trying to send too long UDP datagram: %u, should be <= %u\n", n + data_payload_len, BUFSIZE);
+
+			/* send DATA datagram with contents of the chunk */
+			n = sendto(p->sockfd, p->send_buf, n + data_payload_len, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
+			if (n < 0) {
+				d_printf("%s", "ERROR in sendto\n");
+				abort();
+			}
+
+			p->data_bmp[p->curr_chunk / 8] |= 1 << (p->curr_chunk % 8);
+		} else {
+			/* no - there is not enough space in MTU so we need to send INTEGRITY and DATA in separate frames */
+
+			/* first - send frame with INTEGRITY messages */
+			n = sendto(p->sockfd, p->send_buf, n, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
+			if (n < 0) {
+				d_printf("%s", "ERROR in sendto\n");
+				abort();
+			}
+
+			/* next send DATA message with chunk's data */
+			data_payload_len = swift_make_data(p->send_buf, p);
+
+			_assert((uint32_t) data_payload_len <= p->seeder->chunk_size + 4 + 1 + 4 + 4 + 8, "%s but data_payload_len has value: %d and we->chunk_size: %u\n", "data_payload_len should be <= we->chunk_size", data_payload_len, p->seeder->chunk_size);
+
+			_assert(data_payload_len <= BUFSIZE, "we're trying to send too long UDP datagram: %u, should be <= %u\n", data_payload_len, BUFSIZE);
+
+			/* send DATA datagram with contents of the chunk */
+			n = sendto(p->sockfd, p->send_buf, data_payload_len, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
+			if (n < 0) {
+				d_printf("%s", "ERROR in sendto\n");
+				abort();
+			}
+			p->data_bmp[p->curr_chunk / 8] |= 1 << (p->curr_chunk % 8);
+		}
+
+		/* libswift sends HAVE first - so get it from our high priority queue */
+		do {
+			pthread_mutex_lock(&p->hi_mutex);
+			st = wq_receive(&p->hi_wqueue, mq_buf, BUFSIZE);
+			pthread_mutex_unlock(&p->hi_mutex);
+			if (st <= 0) usleep(1000);
+		} while (st <= 0);
+
+		/* next libswift sends *sometimes* ACK - check if there is any in our high-prio queue, if yes - get it from queue */
+		do {
+			pthread_mutex_lock(&p->hi_mutex);
+			st = wq_peek(&p->hi_wqueue, mq_buf, BUFSIZE);
+			pthread_mutex_unlock(&p->hi_mutex);
+			if (st <= 0) usleep(1000);
+		} while (st <= 0);
+
+		if (mq_buf[0] == ACK) {
+			do {
+				pthread_mutex_lock(&p->hi_mutex);
+				st = wq_receive(&p->hi_wqueue, mq_buf, BUFSIZE);
+				pthread_mutex_unlock(&p->hi_mutex);
+				if (st <= 0) usleep(1000);
+			} while (st <= 0);
+		}
+
+		p->curr_chunk++;
+	} while (p->curr_chunk <= p->end_chunk);
+
+	return 0;
+}
+
+
+/* thread - seeder worker */
+INTERNAL_LINKAGE void *
+swift_seeder_worker_mq (void *data)
+{
+	char opts[1024];			/* buffer for encoded options */
+	struct peer *p;
+	struct proto_opt_str pos;
+	char mq_buf[BUFSIZE + 1];
+	ssize_t st;
+
+	p = (struct peer *) data;		/* data of remote host (leecher) connecting to us (seeder)*/
+
+	d_printf("%s", "worker started\n");
+
+	memset(&pos, 0, sizeof(struct proto_opt_str));
+	memset(&opts, 0, sizeof(opts));
+
+	while (p->finishing == 0) {
+		do {
+			pthread_mutex_lock(&p->low_mutex);
+			st = wq_receive(&p->low_wqueue, mq_buf, BUFSIZE);
+			pthread_mutex_unlock(&p->low_mutex);
+			if (st <= 0) usleep(1000);
+		} while ((st <= 0) && (p->finishing == 0));
+		if (p->finishing)
+			continue;
+
+		if (st <= 0) abort();
+
+		switch (mq_buf[0]) {
+			case HANDSHAKE: on_handshake(p, mq_buf, st);
+					break;
+			case REQUEST: on_request(p, mq_buf, st);
+					break;
+			case PEX_REQ: break;
+			case HAVE: abort();		/* there shouldn't be HAVE message in low-prio queue */
+			case ACK: abort();		/* there shouldn't be ACK message in low-prio queue */
+			default: d_printf("another msg: %u\n", mq_buf[0]);
+		}
+	}
+
+	pthread_exit(NULL);
+	abort();
+}
+
+
+/* UDP datagram server (SEEDER) */
+INTERNAL_LINKAGE int
+swift_net_seeder_mq(struct peer *seeder)
+{
+	int sockfd, optval, n, st, off, size, skip_hdr;
+	char buf[BUFSIZE];
+	socklen_t clientlen;
+	struct sockaddr_in serveraddr;
+	struct sockaddr_in clientaddr;
+	struct peer *p;
+	pthread_t thread;
+	unsigned int prio;
+
+	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sockfd < 0)
+		d_printf("%s", "ERROR opening socket\n");
+
+	optval = 1;
+	setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval , sizeof(int));
+
+	memset((char *) &serveraddr, 0, sizeof(serveraddr));
+	serveraddr.sin_family = AF_INET;
+	serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	serveraddr.sin_port = htons((unsigned short)seeder->port);
+
+	if (bind(sockfd, (struct sockaddr *) &serveraddr, sizeof(serveraddr)) < 0)
+		d_printf("%s", "ERROR on binding\n");
+
+	clientlen = sizeof(clientaddr);
+	remove_dead_peers = 0;
+
+	SLIST_INIT(&seeder->peers_list_head);
+	pthread_mutex_init(&seeder->peers_list_head_mutex, NULL);
+
+	while (1) {
+		/* invoke garbage collector */
+		if (remove_dead_peers == 1) {
+			pthread_mutex_lock(&seeder->peers_list_head_mutex);
+			cleanup_all_dead_peers(&seeder->peers_list_head);
+			pthread_mutex_unlock(&seeder->peers_list_head_mutex);
+		}
+
+		memset(buf, 0, BUFSIZE);
+		n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &clientlen);
+		if (n < 0)
+			d_printf("%s", "ERROR in recvfrom\n");
+
+
+		/* locate peer basing on IP address and UDP port */
+		pthread_mutex_lock(&seeder->peers_list_head_mutex);
+		p = ip_port_to_peer(seeder, &seeder->peers_list_head, &clientaddr);
+		pthread_mutex_unlock(&seeder->peers_list_head_mutex);
+
+		if ((message_type(buf) == HANDSHAKE) && (n > 4)) {			/* n > 4 to skip keepalive messages */
+			d_printf("%s", "OK HANDSHAKE\n");
+			if (handshake_type(buf) == HANDSHAKE_INIT) {
+				p = new_peer(&clientaddr, BUFSIZE, sockfd);
+				pthread_mutex_lock(&seeder->peers_list_head_mutex);
+				add_peer_to_list(&seeder->peers_list_head, p);
+				pthread_mutex_unlock(&seeder->peers_list_head_mutex);
+
+				_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
+
+				p->seeder = seeder;
+				wq_init(&p->hi_wqueue);
+				wq_init(&p->low_wqueue);
+				pthread_mutex_init(&p->hi_mutex, NULL);
+				pthread_mutex_init(&p->low_mutex, NULL);
+
+				/* create worker thread for this client (leecher) */
+				st = pthread_create(&thread, NULL, &swift_seeder_worker_mq, p);
+				if (st != 0) {
+					d_printf("cannot create new thread: %s\n", strerror(errno));
+					abort();
+				}
+
+				d_printf("new pthread created: %#lx\n", (uint64_t) thread);
+
+				p->thread = thread;
+			} else if (handshake_type(buf) == HANDSHAKE_FINISH) {	/* does the seeder want to close connection? */
+				d_printf("%s", "FINISH\n");
+
+				if (p == NULL) {
+					d_printf("searched IP: %s:%u  n: %u\n",  inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), n);
+					pthread_mutex_lock(&seeder->peers_list_head_mutex);
+					SLIST_FOREACH(p, &seeder->peers_list_head, snext) {
+						d_printf("    IP: %s:%u\n", inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
+					}
+					pthread_mutex_unlock(&seeder->peers_list_head_mutex);
+				}
+
+				if (p != NULL) {
+#if MQ_SYNC
+					sm = mq_send(p->mq, buf, n, 0);		/* send finishing message */
+#else
+					/* swift_semaph_post(p->sem);	*/	/* wake up seeder worker and allow him finish his work */
+#endif
+
+					p->finishing = 1;	/* set the flag for finishing the thread */
+					p->to_remove = 1;
+					pthread_mutex_lock(&seeder->peers_list_head_mutex);
+					cleanup_peer(p);
+					pthread_mutex_unlock(&seeder->peers_list_head_mutex);
+
+					free(p->integrity_bmp);
+					free(p->data_bmp);
+				}
+				continue;
+			}
+		}
+
+		skip_hdr = 1;		/* first message in udp payload always has dest_chan_id at offset [0] so skip it in interpretation  */
+		off = 0;
+		size = 0;
+		if (n > 4) {	/* keep-alive? keep-alive has only dest_chan_id - and it takes 4 bytes */
+			while (off < n) {
+				/* parse payload to separate messages */
+				switch (buf[off + skip_hdr * 4]) {
+					case HANDSHAKE:
+							size = count_handshake(buf + off, n, skip_hdr);
+							prio = 0;
+							break;
+					case REQUEST:
+							size = skip_hdr * 4 + 1 + 4 + 4;
+							prio = 0;
+							break;
+					case PEX_REQ:
+							size = skip_hdr * 4 + 1;
+							prio = 0;
+							break;
+					case HAVE:
+							size = skip_hdr * 4 + 1 + 4 + 4;
+							prio = 1;
+							break;
+					case ACK:
+							size = skip_hdr * 4 + 1 + 4 + 4 + 8;
+							prio = 1;
+							break;
+					default: d_printf("another message: %u\n",buf[off + skip_hdr * 4]);
+				}
+
+				/* send the message to proper queue */
+				if (prio == 0) {
+					pthread_mutex_lock(&p->low_mutex);
+					wq_send(&p->low_wqueue, buf + skip_hdr * 4 + off, size);
+					pthread_mutex_unlock(&p->low_mutex);
+				} else {
+					pthread_mutex_lock(&p->hi_mutex);
+					wq_send(&p->hi_wqueue, buf + skip_hdr * 4 + off, size);
+					pthread_mutex_unlock(&p->hi_mutex);
+				}
+
+				off += size;
+				skip_hdr = 0;
+			}
+		} else {
+			d_printf("%s", "KEEP-ALIVE?\n");
 		}
 	}
 }
@@ -847,7 +1279,7 @@ print_sha1(char *s1, int num)
 	for (y = 0; y < num; y++)
 		s += sprintf((char *)(bufs + s), "%02x", s1[y] & 0xff);
 	bufs[s] = '\0';
-	printf("%s\n", bufs);
+	printf("%s", bufs);
 }
 
 
@@ -876,15 +1308,39 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 {
 	char buf[40 + 1];
 	char bufs[80 + 1];
+	char zero[20];
 	uint8_t sha_buf[40 + 1];
-	uint8_t cmp;
+	uint8_t cmp, f;
 	int y, s;
+	uint32_t hci, subroot_idx;
 	unsigned char digest_sib[20], c_digest_sib[20];
-	struct node *si, *p, *left, *right, *curr;
+	struct node *si, *p, *left, *right, *curr, *subroot;
 	struct node_cache_entry *nc, *ci;
 	SHA1Context context;
 
-	d_printf("\nverification of: %u node\n", cn->number);
+	memset(zero, 0, sizeof(zero));
+
+	d_printf("\nverification of node: %u\n", cn->number);
+
+	_assert(local_peer->num_have_cache > 0, "%s\n", "local_peer->num_have_cache should be > 0");
+
+	/* find subrange and basing on it subroot - in other words find entry in HAVE cache */
+	hci = 0;
+	f = 0;
+	while (hci < local_peer->num_have_cache) {
+		if ((local_peer->have_cache[hci].start_chunk <= cn->number / 2 ) && (local_peer->have_cache[hci].end_chunk >= cn->number / 2)) {
+			f = 1;
+			break;
+		}
+		hci++;
+	}
+
+	_assert(f == 1, "current node %u hasn't been found in any range in HAVE cache\n", cn->number);
+
+	/* subroot will be needed further in this procedure */
+	subroot_idx = local_peer->have_cache[hci].start_chunk + local_peer->have_cache[hci].end_chunk;
+	subroot = &local_peer->tree[subroot_idx];
+	d_printf("subroot found: %u in have cache entry, range: %u..%u\n", subroot->number, local_peer->have_cache[hci].start_chunk, local_peer->have_cache[hci].end_chunk);
 
 	/* find sibling for just received DATA message's node - needed to calculate sum of SHA-1 hashes */
 	si = find_sibling(cn);
@@ -892,8 +1348,9 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 	_assert(si != NULL, "%s\n", "s should be != NULL - sibling must exist");
 	d_printf("sibling for: %u is: %u\n", cn->number, si->number);
 
+
 	/* check if found sibling "si" is in ACTIVE state - it means if he has SHA-1 hash */
-	_assert(si->state == ACTIVE, "si %u should be in ACTIVE state (and has SHA1 hash), but has: %u\n", si->number, si->state);
+	_assert(si->state == ACTIVE, "si %u should be in ACTIVE state (and should have SHA1 hash), but has: %u\n", si->number, si->state);
 
 	/* SHA-1 hash of the siblings always has to be linked like this: left_hash + right_hash */
 	if (cn == cn->parent->left) {
@@ -903,6 +1360,9 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 		left = si;
 		right = cn;
 	}
+
+	if ((memcmp(left->sha, zero, sizeof(zero)) == 0) && (memcmp(right->sha, zero, sizeof(zero)) == 0))
+		abort();	/* todo */
 
 	/* concatenate both SHA-1 hashes: just calculated from DATA payload and from sibling */
 	memset(buf, 0, sizeof(buf));
@@ -947,7 +1407,6 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 	 * so we need to calculate SHA-1 hash for parent node 1
 	 * as a sum of hashes of this parent (1) childrens: 0 and 2
 	 */
-
 	curr = cn;		/* working copy of cn */
 
 	if (curr == curr->parent->left) {
@@ -959,10 +1418,13 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 	}
 
 	/* check if parent has SHA-1 hash - if it is in ACTIVE state */
-	if (cn->parent->state != ACTIVE) {
-		p = curr->parent;				/* go to up - to the root of the tree */
+	if (cn->parent->state != ACTIVE) { /* enter here when paren has not SHA-1 yet */
+		p = curr->parent;		/* go to up - to the subroot of the subtree */
 		si = find_sibling(curr);
 		do {
+			if ((memcmp(left->sha, zero, sizeof(zero)) == 0) && (memcmp(right->sha, zero, sizeof(zero)) == 0))
+				abort();	/* todo */
+
 			/* concatenate both SHA-1 hashes: just calculated from DATA payload and from sibling */
 			memset(buf, 0, sizeof(buf));
 			memcpy(buf, left->sha, 20);		/* ??? just calculated SHA-1 hash of just received DATA payload */
@@ -970,11 +1432,9 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 
 			/* print sum of concatenated hashes */
 			if (debug) {
-				s = 0;
-				for (y = 0; y < 40; y++)
-					s += sprintf((char *)(bufs + s), "%02x", buf[y] & 0xff);
-				bufs[80] = '\0';
-				d_printf("siblings: %s\n", bufs);
+				printf("siblings[%u][%u]: ", left->number, right->number);
+				print_sha1(buf, 40);
+				printf("\n");
 			}
 
 			/* calculate SHA hash of sum of both siblings */
@@ -982,11 +1442,17 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 			SHA1Input(&context, (uint8_t *)buf, 40);
 			SHA1Result(&context, digest_sib);
 
+			if (debug) {
+				printf("sibling SHA-1: ");
+				print_sha1((char *)digest_sib, 20);
+				printf("\n");
+			}
+
 			nc = malloc(sizeof(struct node_cache_entry));		/* create node cache entry */
 			nc->node.number = p->number;			/* remember node number */
 			memcpy(nc->node.sha, digest_sib, 20);		/* copy SHA-1 to cache node */
 			SLIST_INSERT_HEAD(&local_peer->cache, nc, next);
-			d_printf("new cache node: %u  ", nc->node.number);
+			d_printf("new cache node: %u\n", nc->node.number);
 
 			curr = curr->parent;
 			p = curr->parent;
@@ -999,13 +1465,16 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 				left = si;
 				right = &nc->node;
 			}
-		} while ((curr->parent != NULL) && (curr->parent->parent != NULL));
+		} while ((curr->parent != subroot) && (curr->parent->parent != NULL));
 
 		si = find_sibling(curr);		/* find sibling for node "curr" */
 
 		d_printf("while loop ended with curr: %u  p: %u  nc: %u  si: %u\n", curr->number, p->number, nc->node.number, si->number);
 
 		/* _assert(p_si != NULL, "sibling %u of parent %u must be ACTIVE\n", p_si->number, p->number); */
+
+		if ((memcmp(nc->node.sha, zero, sizeof(zero)) == 0) && (memcmp(si->sha, zero, sizeof(zero)) == 0))
+			abort();		/* todo */
 
 		if (curr->parent->left == curr) {			/* left side of the tree */
 			memcpy(buf, nc->node.sha, 20);
@@ -1018,11 +1487,29 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 		SHA1Input(&context, (uint8_t *)buf, 40);
 		SHA1Result(&context, c_digest_sib);		/* calculated hash of node 3 */
 
-		/* compare just calculated above SHA-1 hash and from parent one */
-		cmp =  memcmp(p->sha, c_digest_sib, 20);
+		/* is this the case when shared file (plik6k10) INTEGRITY doesn't return SHA-1 hash of the whole tree (node 7)
+		 * and we are forced to take it from peer->sha_demanded?
+		 */
+		if (p == local_peer->tree_root) {
+			cmp =  memcmp(local_peer->sha_demanded, c_digest_sib, 20);
+		} else {
+			/* compare just calculated above SHA-1 hash and from parent one */
+			cmp =  memcmp(p->sha, c_digest_sib, 20);
+		}
 		if (cmp != 0) {
 			printf("error - hashes are different: ");
-			print_sha2(p->sha, (char *)c_digest_sib, 20);
+			printf("parent (from INTEGRITY) %u: ", p->number);
+			print_sha1(p->sha, 20);
+			printf(" vs calculated locally: ");
+			print_sha1((char *)c_digest_sib, 20);
+			printf("\n");
+
+			printf("left[%u]: ", nc->node.number);
+			print_sha1(nc->node.sha, 20);
+			printf(" right[%u]: ", si->number);
+			print_sha1(si->sha, 20);
+			printf("\n");
+			abort();
 		}
 	} else { /* enter here when parent has his own SHA-1 hash */
 		if (cn == cn->parent->left) {
@@ -1032,6 +1519,9 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 			left = si;
 			right = cn;
 		}
+
+		if ((memcmp(left->sha, zero, sizeof(zero)) == 0) && (memcmp(right->sha, zero, sizeof(zero)) == 0))
+			abort();			/* todo */
 
 		memcpy(buf, left->sha, 20);			/* SHA-1 of current node "cn" (node 4) */
 		memcpy(buf + 20, right->sha, 20);		/* SHA-1 of sibling (node 6) */
@@ -1044,7 +1534,11 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 
 		if (cmp != 0) {
 			printf("error - hashes are different: ");
-			print_sha2(cn->parent->sha, (char *)c_digest_sib, 20);
+			printf("parent (from INTEGRITY) %u: ", cn->parent->number);
+			print_sha1(cn->parent->sha, 20);
+			printf(" vs calculated locally: ");
+			print_sha1((char *)c_digest_sib, 20);
+			printf("\n");
 		}
 	}
 
@@ -1327,6 +1821,10 @@ swift_leecher_worker_sbs(void *data)
 			n = 0;
 			memset(buffer, 0, sizeof(BUFSIZE));
 			if (FD_ISSET(sockfd, &fs)) {
+				/* check the length of the packet in UDP/IP kernel stack queue */
+				n = recvfrom(sockfd, (char *)buffer, 65535, MSG_PEEK, (struct sockaddr *) &servaddr, &len);
+				_assert(n <= BUFSIZE, "error: too long udp datagram: %u - problem with seeder?\n", n);
+
 				/* receive INTEGRITY or DATA from SEEDER */
 				n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
 			}
@@ -1364,7 +1862,7 @@ swift_leecher_worker_sbs(void *data)
 			/* it means that after several INTEGRITY messages there can be also DATA message */
 			if (r != n) {
 				/* next message after INTEGRITY can be also one DATA message */
-				/* copy DATA part of this UPD payload directly to data_buffer[] for SM_DATA state */
+				/* copy DATA part of this UDP payload directly to data_buffer[] for SM_DATA state */
 				if (buffer[r] == DATA) {
 					memcpy(data_buffer + 4, &buffer[r], n - r);	/* + 4: skip destination channel*/
 					nr = n - r + 4; 			/* + 4: skip destination channel*/
@@ -1441,7 +1939,7 @@ swift_leecher_worker_sbs(void *data)
 			cmp = swift_verify_chunk(local_peer, cn);
 
 			if (cmp != 0) {
-				printf("error - hashes are different for node %lu\n", cc);
+				printf("error - hashes are different for node %lu\n", cc * 2);
 				d_printf("pthread %#lx   IP: %s\n", (uint64_t) p->thread, inet_ntoa(servaddr.sin_addr));
 				abort();
 			} else {
@@ -1562,253 +2060,6 @@ swift_leecher_worker_sbs(void *data)
 	close(sockfd);
 	pthread_exit(NULL);
 }
-
-
-#if 0
-INTERNAL_LINKAGE int
-swift_preliminary_connection_sbs_orig(struct peer *local_peer)
-{
-	char buffer[BUFSIZE], buf[40 + 1];
-	char swarm_id[] = "swarm_id";
-	char opts[1024];			/* buffer for encoded options */
-	char handshake_req[256], request[256];
-	int sockfd, n, opts_len, h_req_len, request_len, s, y;
-	uint32_t z;
-	uint32_t begin, end;
-	struct sockaddr_in servaddr;
-	socklen_t len;
-	struct proto_opt_str pos;
-	struct timeval tv;
-	fd_set fs;
-
-
-	printf("%s\n", __func__);
-
-	memset(&pos, 0, sizeof(struct proto_opt_str));
-	memset(&opts, 0, sizeof(opts));
-	memset(&handshake_req, 0, sizeof(handshake_req));
-
-	/* prepare structure as a set of parameters to make_handshake_options() proc */
-	pos.version = 1;
-	pos.minimum_version = 1;
-	pos.swarm_id_len = strlen(swarm_id);
-	pos.swarm_id = (uint8_t *)swarm_id;
-	pos.content_prot_method = 1;			/* merkle hash tree */
-	pos.merkle_hash_func = 0;			/* 0 = sha-1 */
-	pos.live_signature_alg = 0;			/* number from dnssec */
-	pos.chunk_addr_method = 2;			/* 2 = 32 bit chunk ranges */
-	*(unsigned int *)pos.live_disc_wind = 0x12345678;
-	pos.supported_msgs_len = 2;			/* 2 bytes of bitmap of serviced commands */
-	*(unsigned int *)pos.supported_msgs = 0xffff;	/* bitmap - we are servicing all of the commands from RFC*/
-	pos.chunk_size = local_peer->chunk_size;
-	pos.file_size = local_peer->file_size;
-	pos.file_name_len = local_peer->fname_len;
-	memset(pos.file_name, 0, sizeof(pos.file_name));	/* do we need this here? */
-	memcpy(pos.file_name, local_peer->fname, local_peer->fname_len);
-	memcpy(pos.sha_demanded, local_peer->sha_demanded, 20);	/* leecher demands file with hash given in "-s" command line parameter */
-
-	/* mark the options we want to pass to make_handshake_options() (which ones are valid) */
-	pos.opt_map = 0;
-	pos.opt_map |= (1 << VERSION);
-	pos.opt_map |= (1 << MINIMUM_VERSION);
-	pos.opt_map |= (1 << SWARM_ID);
-	pos.opt_map |= (1 << CONTENT_PROT_METHOD);
-	pos.opt_map |= (1 << MERKLE_HASH_FUNC);
-	pos.opt_map |= (1 << LIVE_SIGNATURE_ALG);
-	pos.opt_map |= (1 << CHUNK_ADDR_METHOD);
-	pos.opt_map |= (1 << LIVE_DISC_WIND);
-	pos.opt_map |= (1 << SUPPORTED_MSGS);
-	pos.opt_map |= (1 << CHUNK_SIZE);
-	pos.opt_map |= (1 << FILE_SIZE);
-	pos.opt_map |= (1 << FILE_NAME);
-	pos.opt_map |= (1 << FILE_HASH);
-
-	/* for leecher */
-	opts_len = make_handshake_options(opts, &pos);
-	d_printf("%s", "\n\ninitial handshake:\n");
-
-	/* make initial HANDSHAKE request - serialize dest chan id, src chan id and protocol options */
-	h_req_len = make_handshake_request(handshake_req, 0, 0xfeedbabe, opts, opts_len);
-	dump_handshake_request(handshake_req, h_req_len, local_peer);
-
-	len = sizeof(servaddr);
-
-	local_peer->sm_leecher = SM_HANDSHAKE;
-
-	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-		perror("socket creation failed\n");
-		exit(EXIT_FAILURE);
-	}
-
-	local_peer->download_schedule_len = 0;
-	local_peer->download_schedule = NULL;
-	local_peer->download_schedule_idx = 0;
-
-	/* set primary seeder IP:port as a initial default values */
-	memset(&servaddr, 0, sizeof(servaddr));
-	servaddr.sin_family = AF_INET;
-	servaddr.sin_port = local_peer->seeder_addr.sin_port;
-	servaddr.sin_addr.s_addr = local_peer->seeder_addr.sin_addr.s_addr;
-
-	local_peer->seeder_has_file = 0;
-	local_peer->finishing = 0;
-	local_peer->download_schedule_idx = 0;
-	local_peer->pex_required = 1;			/* mark flag that we want list of other seeders form primary seeder */
-	swift_mutex_init(&local_peer->download_schedule_mutex);
-
-	/* leecher's state machine */
-	while (local_peer->finishing == 0) {
-
-		if (local_peer->sm_leecher == SM_HANDSHAKE) {
-			/* send initial HANDSHAKE and wait for SEEDER's answer */
-			n = sendto(sockfd, handshake_req, h_req_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
-			if (n < 0) {
-				d_printf("error sending handshake: %d\n", n);
-				abort();
-			}
-			d_printf("%s", "initial message 1/3 sent\n");
-
-			local_peer->sm_leecher = SM_WAIT_HAVE;
-		}
-
-		if (local_peer->sm_leecher == SM_WAIT_HAVE) {
-			FD_ZERO(&fs);
-			FD_SET(sockfd, &fs);
-			tv.tv_sec = local_peer->timeout;
-			tv.tv_usec = 0;
-
-			(void) select(sockfd + 1, &fs, NULL, NULL, &tv);
-			n = 0;
-			if (FD_ISSET(sockfd, &fs)) {
-				/* receive response from SEEDER: HANDSHAKE + HAVE */
-				n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
-			}
-
-			if (n <= 0) {
-				d_printf("error: timeout of %u seconds occured\n", local_peer->timeout);
-				local_peer->sm_leecher = SM_HANDSHAKE;
-				continue;
-			} else {
-				local_peer->sm_leecher = SM_PREPARE_REQUEST;
-			}
-		}
-
-		if (local_peer->sm_leecher == SM_PREPARE_REQUEST) {
-			buffer[n] = '\0';
-			d_printf("server replied with %u bytes\n", n);
-
-			/* calculate number of SHA hashes per 1500 bytes MTU */
-			/* (MTU - sizeof(iphdr) - sizeof(udphdr) - ppspp_headers) / sha_size */
-			local_peer->hashes_per_mtu = (1500 - 20 - 8 - (4 + 1 + 4 + 4 + 8))/20;
-			d_printf("hashes_per_mtu: %lu\n", local_peer->hashes_per_mtu);
-
-			dump_handshake_have(buffer, n, local_peer);
-
-			if ((local_peer->start_chunk == 0xfffffffe) && (local_peer->end_chunk == 0xfffffffe)) {
-				s = 0;
-				for (y = 0; y < 20; y++)
-					s += sprintf(buf + s, "%02x", local_peer->sha_demanded[y] & 0xff);
-				buf[40] = '\0';
-				printf("Primary seeder %s:%u has no file for hash: %s\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port), buf);
-				local_peer->finishing = 1;
-				local_peer->seeder_has_file = 0;	/* seeder has no file for our hash stored in sha_demanded[] */
-				continue;
-			}
-
-			local_peer->seeder_has_file = 1;		/* seeder has file for our hash stored in sha_demanded[] */
-			/* build the tree */
-			local_peer->tree_root = build_tree(local_peer->nc, &local_peer->tree);
-
-			/* create and open new file only when we are downloading from primary seeder without switching to another one */
-
-			z = local_peer->start_chunk;
-			local_peer->sm_leecher = SM_WHILE_REQUEST;
-		}
-
-		/* external "while" loop, iterator "z" */
-		if (local_peer->sm_leecher == SM_WHILE_REQUEST) {
-			d_printf("z: %u  local_peer->end_chunk: %u\n", z, local_peer->end_chunk);
-
-			/* special range of chunks - empty set */
-			begin = 0xffffffff;
-			end = 0xffffffff;
-
-			d_printf("begin: %u   end: %u\n", begin, end);
-
-			/* create REQUEST  */
-			request_len = make_request(request, 0xfeedbabe, begin, end, local_peer);
-
-			_assert((long unsigned int) request_len <= sizeof(request), "%s but request_len has value: %u and sizeof(request): %lu\n", "request_len should be <= sizeof(request)", request_len, sizeof(request));
-			local_peer->sm_leecher = SM_SEND_REQUEST;
-		}
-
-		if (local_peer->sm_leecher == SM_SEND_REQUEST) {
-			/* send REQUEST */
-			n = sendto(sockfd, request, request_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
-			if (n < 0) {
-				d_printf("error sending request: %d\n", n);
-				abort();
-			}
-			d_printf("%s", "request message 3/3 sent\n");
-			local_peer->sm_leecher = SM_WAIT_PEX_RESP;
-			d_printf("request sent: %u\n", n);
-		}
-
-		/* wait for PEX_RESV4 or INTEGRITY */
-		if (local_peer->sm_leecher == SM_WAIT_PEX_RESP) {
-			FD_ZERO(&fs);
-			FD_SET(sockfd, &fs);
-			tv.tv_sec = local_peer->timeout;
-			tv.tv_usec = 0;
-
-			(void) select(sockfd + 1, &fs, NULL, NULL, &tv);
-			n = 0;
-			if (FD_ISSET(sockfd, &fs)) {
-				/* receive PEX_RESP or INTEGRITY from SEEDER */
-				n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
-			}
-
-			if (n <= 0) {
-				local_peer->sm_leecher = SM_SWITCH_SEEDER;
-				continue;
-			} else {
-				if (message_type(buffer) == INTEGRITY)
-					local_peer->sm_leecher = SM_INTEGRITY;
-				else
-					local_peer->sm_leecher = SM_PEX_RESP;
-			}
-		}
-
-		if (local_peer->sm_leecher == SM_PEX_RESP) {
-			d_printf("%s", "PEX_RESP\n");
-			dump_pex_resp(buffer, n, local_peer, sockfd);
-			local_peer->pex_required = 0;		/* unset flag  */
-
-			local_peer->sm_leecher = SM_SEND_HANDSHAKE_FINISH;
-		}
-
-		if (local_peer->sm_leecher == SM_SEND_HANDSHAKE_FINISH) {
-			/* send HANDSHAKE FINISH */
-			n = make_handshake_finish(buffer, local_peer);
-			d_printf("%s", "we're sending HANDSHAKE_FINISH\n");
-			n = sendto(sockfd, buffer, n, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
-			if (n < 0) {
-				d_printf("error sending request: %d: %s\n", n, strerror(errno));
-				abort();
-			}
-
-			local_peer->finishing = 1;
-			continue;
-		}
-	}
-	d_printf("%s", "HANDSHAKE_FINISH from main process sent\n");
-
-	d_printf("seeder has demanded file: %u  size: %lu\n", local_peer->seeder_has_file, local_peer->file_size);
-
-	close(sockfd);
-	return 0;
-}
-#endif
 
 
 INTERNAL_LINKAGE int
@@ -1944,27 +2195,22 @@ swift_preliminary_connection_sbs(struct peer *local_peer)
 			local_peer->hashes_per_mtu = (1500 - 20 - 8 - (4 + 1 + 4 + 4 + 8))/20;
 			d_printf("hashes_per_mtu: %lu\n", local_peer->hashes_per_mtu);
 
-			dump_handshake_have(buffer, n, local_peer);
+			swift_dump_handshake_have(buffer, n, local_peer);
 
-#if 0
-			if ((local_peer->start_chunk == 0xfffffffe) && (local_peer->end_chunk == 0xfffffffe)) {
-				s = 0;
-				for (y = 0; y < 20; y++)
-					s += sprintf(buf + s, "%02x", local_peer->sha_demanded[y] & 0xff);
-				buf[40] = '\0';
-				printf("Primary seeder %s:%u has no file for hash: %s\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port), buf);
-				local_peer->finishing = 1;
-				local_peer->seeder_has_file = 0;	/* seeder has no file for our hash stored in sha_demanded[] */
-				continue;
-			}
-#endif
 			local_peer->seeder_has_file = 1;		/* seeder has file for our hash stored in sha_demanded[] */
 			/* build the tree */
 			local_peer->tree_root = build_tree(local_peer->nc, &local_peer->tree);
 
+			/* here we need to refill the tree with ACTIVE states - there where won't be any chunks because file size is not power of 2 */
+			/* so they will be those nodes in tree which have now chance to be in ACTIVE state */
+			for (int x = local_peer->nc; x < local_peer->nl; x++) {
+				local_peer->tree[x * 2].state = ACTIVE;
+				d_printf("refill[%u] ACTIVE\n", x * 2);
+			}
+			/* dump_tree(local_peer->tree, local_peer->nl); */
+
 			/* for libswift compatibility we're not sending REQUEST but we're finishing connection */
 			local_peer->sm_leecher = SM_SEND_HANDSHAKE_FINISH;
-
 		}
 
 		if (local_peer->sm_leecher == SM_SEND_HANDSHAKE_FINISH) {
@@ -2024,7 +2270,6 @@ swift_net_leecher_sbs(struct peer *local_peer)
 	pthread_t thread;
 
 	/* swift_preliminary_connection_sbs(local_peer); */
-
 	local_peer->sem = swift_semaph_init(local_peer);
 	swift_mutex_init(&local_peer->fd_mutex);
 

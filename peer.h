@@ -37,6 +37,7 @@
 #include <mqueue.h>
 
 #include "mt.h"
+//#include "wqueue.h"
 
 #define INTERNAL_LINKAGE __attribute__((__visibility__("hidden")))
 
@@ -85,6 +86,35 @@ struct node_cache_entry {
 };
 
 
+#if 0
+SLIST_HEAD(wqueue_head, wqueue_entry);
+struct wqueue_entry {
+	char *msg;
+	uint16_t msg_len;
+	SLIST_ENTRY(wqueue_entry) next;
+};
+#else
+STAILQ_HEAD(wqueue_head, wqueue_entry);
+struct wqueue_entry {
+	char *msg;
+	uint16_t msg_len;
+	STAILQ_ENTRY(wqueue_entry) next;
+};
+#endif
+
+
+
+
+
+
+struct have_cache {
+	uint32_t start_chunk;
+	uint32_t end_chunk;
+};
+
+
+
+
 struct peer {
 	enum {
 		LEECHER,
@@ -101,7 +131,12 @@ struct peer {
 		SM_SEND_INTEGRITY,
 		SM_SEND_DATA,
 		SM_WAIT_ACK,
-		SM_ACK,SM_WAIT_FINISH
+		SM_ACK,SM_WAIT_FINISH,
+
+		// SWIFT compatibility mode state machine states
+		SW_SEND_INTEGRITY_DATA,
+		SW_WAIT_HAVE_ACK,
+		SW_HAVE_ACK
 	} sm_seeder;
 
 	enum {
@@ -154,6 +189,10 @@ struct peer {
 	pthread_t thread;
 	uint8_t thread_num;				/* only for debugging - thread number */
 
+//#warning FIXME docdelowo to usunac - low_queue, hi_queue i backlog bo juz chyba bedzie moja kolejka
+	mqd_t low_queue;				/* messages queue for seeder: other messages than HAVE and ACK */
+	mqd_t hi_queue;					/* messages queue for seeder: high priority messages: HAVE, ACK */
+	mqd_t back_log;					/* back log (messages queue) for seeder for hight priority queue */
 	uint32_t timeout;
 
 	/* timestamp of last received and sent message */
@@ -222,6 +261,9 @@ struct peer {
 		M_BUF
 	} transfer_method;
 
+	uint8_t *integrity_bmp;		/* bitmap used by seeder for given leecher (libswift compat mode) - to mark which tree node has already been sent, 1-integrity node sent */
+	uint8_t *data_bmp;		/* */  // zwolnic pamiec podczas finish
+
 	struct peer *current_seeder;	/* leecher side: points to one element of the list seeders in ->snext */
 
 	pthread_mutex_t peers_list_head_mutex;		/* mutex for protecting peers_list_head */
@@ -231,6 +273,15 @@ struct peer {
 	struct file_list_entry *file_list_entry;	/* seeder side: pointer to file choosen by leecher using SHA1 hash */
 
 	struct slist_node_cache cache;
+	struct wqueue_head hi_wqueue;
+	struct wqueue_head low_wqueue;
+	pthread_mutex_t hi_mutex;
+	pthread_mutex_t low_mutex;
+
+	/* HAVE cache */
+	struct have_cache *have_cache;			/* used by both - seeder and leecher */ // zwolnic te pamiec w momencie finish
+	uint16_t num_have_cache;			/* number of entries in HAVE cache */
+
 	SLIST_ENTRY(peer) snext;		/* list of peers - leechers from seeder point of view or seeders from leecher pov */
 };
 
@@ -245,6 +296,7 @@ void cleanup_peer (struct peer *);
 void cleanup_all_dead_peers (struct slist_peers *);
 void create_download_schedule (struct peer *);
 int32_t create_download_schedule_sbs (struct peer *, uint32_t, uint32_t);
+int32_t swift_create_download_schedule_sbs (struct peer *, uint32_t, uint32_t);
 int all_chunks_downloaded (struct peer *);
 void create_file_list(struct peer *, char *);
 void process_file(struct file_list_entry *, struct peer *);

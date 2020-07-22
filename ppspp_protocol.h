@@ -91,26 +91,47 @@ struct proto_opt_str {
 	uint32_t opt_map;				/* bitmap - which of the fields above have any data */
 };
 
+
+// tylko do testow - dla odwrocenia wysylania danych - tzn wysylania od konca - tak jak to robi swift
+struct integrity_temp {
+	uint32_t start_chunk;
+	uint32_t end_chunk;
+	uint8_t sha[20];
+};
+
+
 int make_handshake_options (char *, struct proto_opt_str *);
 int make_handshake_request (char *, uint32_t, uint32_t, char *, int);
 int make_handshake_have (char *, uint32_t, uint32_t, char *, int, struct peer *);
+int swift_make_handshake_have (char *, uint32_t, uint32_t, char *, int, struct peer *);
 int make_handshake_finish (char *, struct peer *);
 int make_request (char *, uint32_t, uint32_t, uint32_t, struct peer*);
 int make_pex_resp (char *, struct peer *, struct peer *);
 int make_integrity (char *, struct peer *, struct peer *);
+int swift_make_integrity (char *, struct peer *, struct peer *);
+int swift_make_integrity_reverse (char *, struct peer *, struct peer *);
 int make_data (char *, struct peer *);
+int swift_make_data (char *, struct peer *);
+int swift_make_data_no_chanid (char *, struct peer *);
 int make_ack (char *, struct peer *);
 int swift_make_have_ack (char *, struct peer *);
 int dump_options (char *ptr, struct peer *);
+int swift_dump_options (char *ptr, struct peer *);
 int dump_handshake_request (char *, int, struct peer *);
+int swift_dump_handshake_request (char *, int, struct peer *);
 int dump_handshake_have (char *, int, struct peer *);
+int swift_seeder_dump_handshake_have (char *, int, struct peer *);
 int swift_dump_handshake_have (char *, int, struct peer *);
 int dump_request (char *, int, struct peer *);
+int swift_dump_request (char *, int, struct peer *);
 int dump_pex_resp (char *, int, struct peer *, int);
 int dump_integrity (char *, int, struct peer *);
 int swift_dump_integrity (char *, int, struct peer *);
 int dump_ack (char *, int, struct peer *);
+int swift_dump_have_ack (char *, int, struct peer *);
 uint8_t message_type (char *);
 uint8_t handshake_type (char *);
+
+uint16_t count_handshake (char *, uint16_t, uint8_t);
 
 #endif /* _PPSPP_PROTOCOL_H_ */
