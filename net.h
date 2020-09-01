@@ -24,20 +24,23 @@
  */
 
 
-#ifndef _NET_H_
-#define _NET_H_
+#ifndef _NET_ppspp_H_
+#define _NET_ppspp_H_
 
 #include "mt.h"
 #include "peer.h"
 
 #define BUFSIZE 1500
 
-int net_seeder(struct peer *);
-int net_leecher_continuous(struct peer *);
-int preliminary_connection_sbs(struct peer *);
-void net_leecher_create(struct peer *);
-int net_leecher_sbs(struct peer *);
-void net_leecher_fetch_chunk(struct peer *);
-void net_leecher_close(struct peer *);
+int ppspp_net_seeder(struct peer *);
+int ppspp_net_seeder_mq(struct peer *);
+int ppspp_net_leecher_continuous(struct peer *);
+int ppspp_preliminary_connection_sbs(struct peer *);
+void ppspp_net_leecher_create(struct peer *);
+int ppspp_net_leecher_sbs(struct peer *);
+void ppspp_net_leecher_fetch_chunk(struct peer *);
+void ppspp_net_leecher_close(struct peer *);
 
-#endif /* _NET_H_ */
+void verify2(int);
+
+#endif /* _NET_ppspp_H_ */

@@ -41,13 +41,12 @@
 #include "sha1.h"
 #include "debug.h"
 #include "ppspp.h"
+#include "net.h"
 
 
 /**
  * @file ppspp.c
  */
-
-int debug;
 
 
 /**
@@ -200,7 +199,7 @@ ppspp_seeder_add_file_or_directory(ppspp_handle_t handle, char *name)
  * @param[in] f File entry to remove
  */
 INTERNAL_LINKAGE void
-remove_and_free(ppspp_handle_t handle, struct file_list_entry *f)
+ppspp_remove_and_free(ppspp_handle_t handle, struct file_list_entry *f)
 {
 	struct peer *local_seeder;
 
@@ -240,7 +239,7 @@ ppspp_seeder_remove_file_or_directory(ppspp_handle_t handle, char *name)
 		SLIST_FOREACH(f, &local_seeder->file_list_head, next) {
 			if (strcmp(f->path, name) == 0) {
 				d_printf("file to remove found: %s\n", name);
-				remove_and_free(handle, f);
+				ppspp_remove_and_free(handle, f);
 			}
 		}
 	} else if (stat.st_mode & S_IFDIR) {	/* does the user want to remove files from specific directory? */
@@ -258,7 +257,7 @@ ppspp_seeder_remove_file_or_directory(ppspp_handle_t handle, char *name)
 			c = strstr(f->path, buf);	/* compare current file entry with directory name to remove */
 			if (c == f->path) {		/* if both matches */
 				d_printf("removing file: %s\n", f->path);
-				remove_and_free(handle, f);
+				ppspp_remove_and_free(handle, f);
 			}
 		}
 		free(buf);
@@ -279,7 +278,7 @@ ppspp_seeder_run(ppspp_handle_t handle)
 	struct peer *local_seeder;
 
 	local_seeder = (struct peer *)handle;
-	net_seeder(local_seeder);
+	ppspp_net_seeder_mq(local_seeder);
 }
 
 
@@ -320,10 +319,12 @@ ppspp_leecher_create(ppspp_leecher_params_t *params)
 		local_leecher->timeout = params->timeout;
 		local_leecher->type = LEECHER;
 		local_leecher->current_seeder = NULL;
+		local_leecher->tree = NULL;
+		local_leecher->tree_root = NULL;
 		memcpy(&local_leecher->seeder_addr, &params->seeder_addr, sizeof(struct sockaddr_in));
 		memcpy(&local_leecher->sha_demanded, params->sha_demanded, 20);
 
-		net_leecher_create(local_leecher);
+		ppspp_net_leecher_create(local_leecher);
 	}
 	handle = (int64_t) local_leecher;
 
@@ -342,7 +343,7 @@ ppspp_leecher_run(ppspp_handle_t handle)
 	struct peer *local_leecher;
 
 	local_leecher = (struct peer *)handle;
-	net_leecher_sbs(local_leecher);
+	ppspp_net_leecher_sbs(local_leecher);
 }
 
 
@@ -367,7 +368,8 @@ ppspp_leecher_get_metadata(ppspp_handle_t handle, ppspp_metadata_t *meta)
 	local_leecher = (struct peer *)handle;
 
 	/* ask seeder if he has got a file for our sha stored in local_leecher->sha_demanded[] */
-	preliminary_connection_sbs(local_leecher);
+
+	ppspp_preliminary_connection_sbs(local_leecher);
 
 	if (local_leecher->seeder_has_file == 1) {
 		ret = 0;
@@ -415,7 +417,7 @@ ppspp_prepare_chunk_range(ppspp_handle_t handle, uint32_t start_chunk, uint32_t 
 
 	local_leecher->download_schedule = malloc(local_leecher->nl * sizeof(struct schedule_entry));
 	memset(local_leecher->download_schedule, 0, local_leecher->nl * sizeof(struct schedule_entry));
-	buf_size = create_download_schedule_sbs(local_leecher, start_chunk, end_chunk);
+	buf_size = ppspp_create_download_schedule_sbs(local_leecher, start_chunk, end_chunk);
 	local_leecher->download_schedule_idx = 0;
 
 	return buf_size;
@@ -439,7 +441,7 @@ ppspp_leecher_fetch_chunk_to_fd(ppspp_handle_t handle, int fd)
 	local_leecher->fd = fd;
 	local_leecher->transfer_method = M_FD;
 
-	net_leecher_fetch_chunk(local_leecher);
+	ppspp_net_leecher_fetch_chunk(local_leecher);
 }
 
 
@@ -463,7 +465,7 @@ ppspp_leecher_fetch_chunk_to_buf(ppspp_handle_t handle, uint8_t *transfer_buf)
 	local_leecher->transfer_method = M_BUF;
 	local_leecher->tx_bytes = 0;
 
-	net_leecher_fetch_chunk(local_leecher);
+	ppspp_net_leecher_fetch_chunk(local_leecher);
 
 	return local_leecher->tx_bytes;
 }
@@ -481,5 +483,5 @@ ppspp_leecher_close(ppspp_handle_t handle)
 
 	local_leecher = (struct peer *)handle;
 	local_leecher->cmd = CMD_FINISH;
-	net_leecher_close(local_leecher);
+	ppspp_net_leecher_close(local_leecher);
 }

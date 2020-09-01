@@ -211,7 +211,7 @@ cleanup_all_dead_peers(struct slist_peers *list_head)
  * basing on chunk array - create download schedule (array)
  */
 INTERNAL_LINKAGE void
-create_download_schedule(struct peer *p)
+ppspp_create_download_schedule(struct peer *p)
 {
 	uint64_t o, oldo, y;
 
@@ -242,62 +242,8 @@ create_download_schedule(struct peer *p)
 	}
 }
 
-
-/*
- * basing on chunk array - create download schedule (array)
- */
 INTERNAL_LINKAGE int32_t
-create_download_schedule_sbs(struct peer *p, uint32_t start_chunk, uint32_t end_chunk)
-{
-	int32_t ret;
-	uint32_t last_chunk;
-	uint64_t o, oldo, y;
-
-	d_printf("creating schedule for %u chunks\n", p->nc);
-	p->download_schedule_len = 0;
-	o = start_chunk;
-	last_chunk = start_chunk;
-
-	if (start_chunk > p->end_chunk) {
-		d_printf("error: range: %u-%u is outside of the allowed range (%u-%u)\n", start_chunk, end_chunk, p->start_chunk, p->end_chunk);
-		return -1;
-	}
-
-	p->hashes_per_mtu = 256;
-
-	while ((o < p->nc) && (o <= end_chunk)) {
-		/* find first/closest not yet downloaded chunk */
-		while ((p->chunk[o].downloaded == CH_YES) && (o < p->nc)) o++;
-		if (o >= p->nc) break;
-
-		oldo = o;
-		y = 0;
-		while ((y < p->hashes_per_mtu) && (o < p->nc) && (o <= end_chunk)) {
-			if (p->chunk[o].downloaded == CH_NO) o++;
-			else break;
-			y++;
-		}
-		d_printf("range of chunks: %lu-%lu   %lu\n", oldo, o - 1, o - oldo);
-
-		last_chunk = o - 1;
-		p->download_schedule[p->download_schedule_len].begin = oldo;
-		p->download_schedule[p->download_schedule_len].end = o - 1;
-		p->download_schedule_len++;
-
-#if 0
-		_assert((p->chunk[o].downloaded == CH_NO) || (p->chunk[o].downloaded == CH_YES), "p->chunk[o].downloaded should have CH_NO or CH_YES, but have: %u\n", p->chunk[o].downloaded);
-		_assert(p->download_schedule_len <= p->nc, "p->download_schedule_len should be <= p->nc, but p->download_schedule_len=%lu and p->nc=%u\n", p->download_schedule_len, p->nc);
-#endif
-	}
-
-	ret = (last_chunk - start_chunk + 1) * p->chunk_size;
-
-	return ret;
-}
-
-
-INTERNAL_LINKAGE int32_t
-swift_create_download_schedule_sbs(struct peer *p, uint32_t start_chunk, uint32_t end_chunk)
+ppspp_create_download_schedule_sbs(struct peer *p, uint32_t start_chunk, uint32_t end_chunk)
 {
 	int32_t ret, hci;
 	uint32_t last_chunk, ec;
