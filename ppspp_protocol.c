@@ -244,27 +244,11 @@ ppspp_make_handshake_options (char *ptr, struct proto_opt_str *pos)
 INTERNAL_LINKAGE int
 ppspp_make_handshake_request (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len)
 {
-	char *d;
-	int ret;
+	size_t pos = 0;
 
-	d = ptr;
-
-	*(uint32_t *)d = htobe32(dest_chan_id);
-	d += sizeof(uint32_t);
-
-	*d = HANDSHAKE;
-	d++;
-
-	*(uint32_t *)d = htobe32(src_chan_id);
-	d += sizeof(uint32_t);
-
-	memcpy(d, opts, opt_len);
-	d += opt_len;
-
-	ret = d - ptr;
-	d_printf("%s: returning %u bytes\n", __func__, ret);
-
-	return ret;
+	pos += ppspp_pack_dest_chan(ptr + pos, dest_chan_id);
+	pos += ppspp_pack_handshake(ptr + pos, src_chan_id, opts, opt_len);
+	return (pos);
 }
 
 /*
@@ -376,31 +360,15 @@ ppspp_make_handshake_finish (char *ptr, struct peer *peer)
 INTERNAL_LINKAGE int
 ppspp_make_request (char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32_t end_chunk, struct peer *peer)
 {
-	char *d;
-	int ret;
+	size_t pos = 0;
 
-	d = ptr;
+	pos += ppspp_pack_dest_chan(ptr + pos, dest_chan_id);
+	pos += ppspp_pack_request(ptr + pos, start_chunk, end_chunk);
 
-	*(uint32_t *)d = htobe32(peer->dest_chan_id);	/* set target channel id */
-	d += sizeof(uint32_t);
+	if (peer->pex_required != 0)
+		pos += ppspp_pack_pex_req(ptr + pos);
 
-	*d = REQUEST;
-	d++;
-
-	*(uint32_t *)d = htobe32(start_chunk);
-	d += sizeof(uint32_t);
-	*(uint32_t *)d = htobe32(end_chunk);
-	d += sizeof(uint32_t);
-
-	if (peer->pex_required == 1) {
-		*d = PEX_REQ;
-		d++;
-	}
-
-	ret = d - ptr;
-	d_printf("%s: returning %u bytes\n", __func__, ret);
-
-	return ret;
+	return (pos);
 }
 
 
@@ -411,7 +379,7 @@ ppspp_make_request (char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint
 INTERNAL_LINKAGE int
 ppspp_make_pex_resp (char *ptr, struct peer *peer, struct peer *we)
 {
-	char *d;
+	size_t pos = 0;
 	int ret, addr_size;
 	uint16_t space, max_pex, pex;
 	struct other_seeders_entry *e;
@@ -419,15 +387,9 @@ ppspp_make_pex_resp (char *ptr, struct peer *peer, struct peer *we)
 	/* first - check if there are any entries in altenatieve seeders list */
 	/* if list is empty then return 0 and don't send any repsonse for PEX_REQ */
 	if (SLIST_EMPTY(&we->other_seeders_list_head))
-		return 0;
+		return (0);
 
-	d = ptr;
-
-	*(uint32_t *)d = htobe32(peer->dest_chan_id);
-	d += sizeof(uint32_t);
-
-	*d = PEX_RESV4;
-	d++;
+	pos += ppspp_pack_dest_chan(ptr + pos, peer->dest_chan_id);
 
 	/* calculate amount of available space in UDP payload */
 	/* 1500 - 20(ip) - 8(udp) - 4(chanid) */
@@ -441,19 +403,13 @@ ppspp_make_pex_resp (char *ptr, struct peer *peer, struct peer *we)
 	/* IP addresses taken from "-l" commandline option: -l ip1:port1,ip2:port2,ip3:port3 ...etc */
 	pex = 0;
 	SLIST_FOREACH(e, &we->other_seeders_list_head, next) {
-			memcpy(d, &e->sa.sin_addr, sizeof(struct in_addr));	/* IP */
-			d += sizeof(struct in_addr);
-			*(uint16_t *)d = e->sa.sin_port;			/* UDP port */
-			d += sizeof(e->sa.sin_port);
+		pos += ppspp_pack_pex_resv4(ptr + pos, e->sa.sin_addr.s_addr, e->sa.sin_port);
 		pex++;
 		if (pex >= max_pex)
 			break;
 	}
 
-	ret = d - ptr;
-	d_printf("%s: returning %u bytes\n", __func__, ret);
-
-	return ret;
+	return (pos);
 }
 
 /*
@@ -610,52 +566,11 @@ ppspp_make_integrity_reverse (char *ptr, struct peer *peer, struct peer *we)
 INTERNAL_LINKAGE int
 ppspp_make_data (char *ptr, struct peer *peer)
 {
-	char *d;
-	int ret, fd, l;
-	uint64_t timestamp;
+	size_t pos = 0;
 
-	d = ptr;
-
-	*(uint32_t *)d = htobe32(peer->dest_chan_id);
-	d += sizeof(uint32_t);
-
-	*d = DATA;
-	d++;
-
-	*(uint32_t *)d = htobe32(peer->curr_chunk);	/* use curr_chunk */
-	d += sizeof(uint32_t);
-	*(uint32_t *)d = htobe32(peer->curr_chunk);	/* use curr_chunk */
-
-	d += sizeof(uint32_t);
-
-	timestamp = 0x12345678f11ff00f;		/* temporarily */
-	*(uint64_t *)d = htobe64(timestamp);
-	d += sizeof(uint64_t);
-
-	fd = open(peer->file_list_entry->path, O_RDONLY);
-	if (fd < 0) {
-		d_printf("error opening file2: %s\n", peer->file_list_entry->path);
-		abort();
-		return -1;
-	}
-
-	lseek(fd, peer->curr_chunk * peer->chunk_size, SEEK_SET);
-
-	l = read(fd, d, peer->chunk_size);
-	if (l < 0) {
-		d_printf("error reading file: %s\n", peer->fname);
-		close(fd);
-		return -1;
-	}
-
-	close(fd);
-
-	d += l;
-
-	ret = d - ptr;
-	d_printf("%s: returning %u bytes\n", __func__, ret);
-
-	return ret;
+	pos += ppspp_pack_dest_chan(ptr + pos, peer->dest_chan_id);
+	pos += ppspp_make_data_no_chanid(ptr + pos, peer);
+	return (pos);
 }
 
 
@@ -663,26 +578,15 @@ ppspp_make_data (char *ptr, struct peer *peer)
  * with another kind of message
  */
 INTERNAL_LINKAGE int
-ppspp_make_data_no_chanid (char *ptr, struct peer *peer)
-{
-	char *d;
-	int ret, fd, l;
+ppspp_make_data_no_chanid (char *ptr, struct peer *peer) {
+	size_t pos = 0;
+	int fd, l;
 	uint64_t timestamp;
 
-	d = ptr;
+	timestamp = 0x12345678f11ff00f;                /* temporarily */
 
-	*d = DATA;
-	d++;
 
-	*(uint32_t *)d = htobe32(peer->curr_chunk);
-	d += sizeof(uint32_t);
-	*(uint32_t *)d = htobe32(peer->curr_chunk);
-
-	d += sizeof(uint32_t);
-
-	timestamp = 0x12345678f11ff00f;		/* temporarily */
-	*(uint64_t *)d = htobe64(timestamp);
-	d += sizeof(uint64_t);
+	pos += ppspp_pack_data(ptr + pos, peer->curr_chunk, peer->curr_chunk, timestamp);
 
 	fd = open(peer->file_list_entry->path, O_RDONLY);
 	if (fd < 0) {
@@ -693,7 +597,7 @@ ppspp_make_data_no_chanid (char *ptr, struct peer *peer)
 
 	lseek(fd, peer->curr_chunk * peer->chunk_size, SEEK_SET);
 
-	l = read(fd, d, peer->chunk_size);
+	l = read(fd, ptr + pos, peer->chunk_size);
 	if (l < 0) {
 		d_printf("error reading file: %s\n", peer->fname);
 		close(fd);
@@ -702,25 +606,20 @@ ppspp_make_data_no_chanid (char *ptr, struct peer *peer)
 
 	close(fd);
 
-	d += l;
-
-	ret = d - ptr;
-	d_printf("%s: returning %u bytes\n", __func__, ret);
-
-	return ret;
+	pos += l;
+	return (pos);
 }
 
 INTERNAL_LINKAGE int
-ppspp_make_have_ack (char *ptr, struct peer *peer)
+ppspp_make_have_ack(char *ptr, struct peer *peer)
 {
-	char *d;
-	int ret;
+	size_t pos = 0;
 	uint64_t delay_sample = 0x12345678ABCDEF;
 
-	d = pack_dest_chan(ptr, peer->dest_chan_id);
-	d = pack_have(d, peer->curr_chunk, peer->curr_chunk);
-	d = pack_ack(d, peer->curr_chunk, peer->curr_chunk, delay_sample);
-	return (d - ptr);
+	pos += ppspp_pack_dest_chan(ptr, peer->dest_chan_id);
+	pos += ppspp_pack_have(ptr + pos, peer->curr_chunk, peer->curr_chunk);
+	pos += ppspp_pack_ack(ptr + pos, peer->curr_chunk, peer->curr_chunk, delay_sample);
+	return (pos);
 }
 
 INTERNAL_LINKAGE
@@ -1269,9 +1168,11 @@ ppspp_dump_have_ack (char *ptr, int ack_len, struct peer *peer)
  * return type of message
  */
 INTERNAL_LINKAGE uint8_t
-ppspp_message_type (char *ptr)
+ppspp_message_type (const char *ptr)
 {
-	return ptr[4];			/* skip first 4 bytes - there is destination channel id */
+	const struct ppsp_msg *msg = (const struct ppsp_msg *)&ptr[4];
+
+	return (msg->message_type);
 }
 
 

@@ -124,6 +124,12 @@ struct ppsp_msg_integrity
 	uint8_t hash[256];
 } __attribute__((packed));
 
+struct ppsp_msg_pex_resv4
+{
+	in_addr_t ip_address;
+	uint16_t port;
+} __attribute__((packed));
+
 struct ppsp_msg_signed_integrity
 {
 	uint32_t start_chunk;
@@ -153,6 +159,7 @@ struct ppsp_msg
 		struct ppsp_msg_data data;
 		struct ppsp_msg_ack ack;
 		struct ppsp_msg_integrity integrity;
+		struct ppsp_msg_pex_resv4 pex_resv4;
 		struct ppsp_msg_signed_integrity signed_integrity;
 		struct ppsp_msg_request request;
 		struct ppsp_msg_cancel cancel;
@@ -166,7 +173,16 @@ struct integrity_temp {
 	uint8_t sha[20];
 };
 
-inline size_t
+static inline size_t
+ppspp_pack_dest_chan(void *dptr, uint32_t dst_channel_id)
+{
+	uint32_t *chan_id = dptr;
+
+	*chan_id = dst_channel_id;
+	return (sizeof(*chan_id));
+}
+
+static inline size_t
 ppspp_pack_handshake(void *dptr, uint32_t src_channel_id, uint8_t *options, size_t optlen)
 {
 	struct ppsp_msg *msg = dptr;
@@ -178,7 +194,7 @@ ppspp_pack_handshake(void *dptr, uint32_t src_channel_id, uint8_t *options, size
 	return (sizeof(uint8_t) + sizeof(msg->handshake));
 }
 
-inline size_t
+static inline size_t
 ppspp_pack_have(void *dptr, uint32_t start_chunk, uint32_t end_chunk)
 {
 	struct ppsp_msg *msg = dptr;
@@ -190,9 +206,8 @@ ppspp_pack_have(void *dptr, uint32_t start_chunk, uint32_t end_chunk)
 	return (sizeof(uint8_t) + sizeof(msg->have));
 }
 
-inline size_t
-ppspp_pack_data(void *dptr, uint32_t start_chunk, uint32_t end_chunk, uint64_t timestamp,
-    void *data, size_t datalen)
+static inline size_t
+ppspp_pack_data(void *dptr, uint32_t start_chunk, uint32_t end_chunk, uint64_t timestamp)
 {
 	struct ppsp_msg *msg = dptr;
 
@@ -200,12 +215,11 @@ ppspp_pack_data(void *dptr, uint32_t start_chunk, uint32_t end_chunk, uint64_t t
 	msg->data.start_chunk = htonl(start_chunk);
 	msg->data.end_chunk = htonl(end_chunk);
 	msg->data.timestamp = timestamp;
-	memcpy(msg->data.data, data, datalen);
 
-	return (sizeof(uint8_t) + sizeof(msg->data) + datalen);
+	return (sizeof(uint8_t) + sizeof(msg->data));
 }
 
-inline int
+static inline int
 ppspp_pack_ack(void *dptr, uint32_t start_chunk, uint32_t end_chunk,
     uint64_t sample)
 {
@@ -219,7 +233,7 @@ ppspp_pack_ack(void *dptr, uint32_t start_chunk, uint32_t end_chunk,
 	return (sizeof(uint8_t) + sizeof(msg->ack));
 }
 
-inline size_t
+static inline size_t
 ppspp_pack_integrity(void *dptr, uint32_t end_chunk, uint8_t *hash)
 {
 	struct ppsp_msg *msg = dptr;
@@ -231,7 +245,29 @@ ppspp_pack_integrity(void *dptr, uint32_t end_chunk, uint8_t *hash)
 	return (sizeof(uint8_t) + sizeof(msg->integrity));
 }
 
-inline size_t
+static inline size_t
+ppspp_pack_pex_resv4(void *dptr, in_addr_t ip_address, uint16_t port)
+{
+	struct ppsp_msg *msg = dptr;
+
+	msg->message_type = PEX_RESV4;
+	msg->pex_resv4.ip_address = ip_address;
+	msg->pex_resv4.port = port;
+
+	return (sizeof(uint8_t) + sizeof(msg->pex_resv4));
+}
+
+static inline size_t
+ppspp_pack_pex_req(void *dptr)
+{
+	struct ppsp_msg *msg = dptr;
+
+	msg->message_type = PEX_REQ;
+
+	return (sizeof(uint8_t));
+}
+
+static inline size_t
 ppspp_pack_signed_integrity(void *dptr, uint32_t start_chunk, uint32_t end_chunk,
     int64_t timestamp, uint8_t *signature, size_t siglen)
 {
@@ -246,7 +282,7 @@ ppspp_pack_signed_integrity(void *dptr, uint32_t start_chunk, uint32_t end_chunk
 	return (sizeof(uint8_t) + sizeof(msg->signed_integrity) + siglen);
 }
 
-inline size_t
+static inline size_t
 ppspp_pack_request(void *dptr, uint32_t start_chunk, uint32_t end_chunk)
 {
 	struct ppsp_msg *msg = dptr;
@@ -258,7 +294,7 @@ ppspp_pack_request(void *dptr, uint32_t start_chunk, uint32_t end_chunk)
 	return (sizeof(uint8_t) + sizeof(msg->request));
 }
 
-inline size_t
+static inline size_t
 ppspp_pack_cancel(void *dptr, uint32_t start_chunk, uint32_t end_chunk)
 {
 	struct ppsp_msg *msg = dptr;
@@ -290,9 +326,8 @@ int ppspp_dump_pex_resp (char *, int, struct peer *, int);
 int ppspp_dump_integrity (char *, int, struct peer *);
 int ppspp_dump_ack (char *, int, struct peer *);
 int ppspp_dump_have_ack (char *, int, struct peer *);
-uint8_t ppspp_message_type (char *);
+uint8_t ppspp_message_type (const char *);
 uint8_t ppspp_handshake_type (char *);
-
 uint16_t ppspp_count_handshake (char *, uint16_t, uint8_t);
 
 #endif /* _PPSPP_PROTOCOL_H_ */
