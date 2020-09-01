@@ -91,6 +91,73 @@ struct proto_opt_str {
 	uint32_t opt_map;				/* bitmap - which of the fields above have any data */
 };
 
+struct ppsp_msg_handshake
+{
+	uint32_t src_channel_id;
+	uint8_t protocol_options[];
+} __attribute__((packed));
+
+struct ppsp_msg_have
+{
+	uint32_t start_chunk;
+	uint32_t end_chunk;
+} __attribute__((packed));
+
+struct ppsp_msg_data
+{
+	uint32_t start_chunk;
+	uint32_t end_chunk;
+	uint64_t timestamp;
+	uint8_t data[];
+} __attribute__((packed));
+
+struct ppsp_msg_ack
+{
+	uint32_t start_chunk;
+	uint32_t end_chunk;
+	uint64_t sample;
+};
+
+struct ppsp_msg_integrity
+{
+	uint32_t end_chunk;
+	uint8_t hash[256];
+} __attribute__((packed));
+
+struct ppsp_msg_signed_integrity
+{
+	uint32_t start_chunk;
+	uint32_t end_chunk;
+	uint64_t timestamp;
+	uint8_t signature[];
+} __attribute__((packed));
+
+struct ppsp_msg_request
+{
+	uint32_t start_chunk;
+	uint32_t end_chunk;
+} __attribute__((packed));
+
+struct ppsp_msg_cancel
+{
+	uint32_t start_chunk;
+	uint32_t end_chunk;
+} __attribute__((packed));
+
+struct ppsp_msg
+{
+	uint8_t message_type;
+	union {
+		struct ppsp_msg_handshake handshake;
+		struct ppsp_msg_have have;
+		struct ppsp_msg_data data;
+		struct ppsp_msg_ack ack;
+		struct ppsp_msg_integrity integrity;
+		struct ppsp_msg_signed_integrity signed_integrity;
+		struct ppsp_msg_request request;
+		struct ppsp_msg_cancel cancel;
+	};
+} __attribute__((packed));
 
 // tylko do testow - dla odwrocenia wysylania danych - tzn wysylania od konca - tak jak to robi swift
 struct integrity_temp {
@@ -99,6 +166,109 @@ struct integrity_temp {
 	uint8_t sha[20];
 };
 
+inline size_t
+ppspp_pack_handshake(void *dptr, uint32_t src_channel_id, uint8_t *options, size_t optlen)
+{
+	struct ppsp_msg *msg = dptr;
+
+	msg->message_type = HANDSHAKE;
+	msg->handshake.src_channel_id = src_channel_id;
+	memcpy(msg->handshake.protocol_options, options, optlen);
+
+	return (sizeof(uint8_t) + sizeof(msg->handshake));
+}
+
+inline size_t
+ppspp_pack_have(void *dptr, uint32_t start_chunk, uint32_t end_chunk)
+{
+	struct ppsp_msg *msg = dptr;
+
+	msg->message_type = HAVE;
+	msg->have.start_chunk = htonl(start_chunk);
+	msg->have.end_chunk = htonl(end_chunk);
+
+	return (sizeof(uint8_t) + sizeof(msg->have));
+}
+
+inline size_t
+ppspp_pack_data(void *dptr, uint32_t start_chunk, uint32_t end_chunk, uint64_t timestamp,
+    void *data, size_t datalen)
+{
+	struct ppsp_msg *msg = dptr;
+
+	msg->message_type = DATA;
+	msg->data.start_chunk = htonl(start_chunk);
+	msg->data.end_chunk = htonl(end_chunk);
+	msg->data.timestamp = timestamp;
+	memcpy(msg->data.data, data, datalen);
+
+	return (sizeof(uint8_t) + sizeof(msg->data) + datalen);
+}
+
+inline int
+ppspp_pack_ack(void *dptr, uint32_t start_chunk, uint32_t end_chunk,
+    uint64_t sample)
+{
+	struct ppsp_msg *msg = dptr;
+
+	msg->message_type = ACK;
+	msg->ack.start_chunk = htonl(start_chunk);
+	msg->ack.end_chunk = htonl(end_chunk);
+	msg->ack.sample = sample;
+
+	return (sizeof(uint8_t) + sizeof(msg->ack));
+}
+
+inline size_t
+ppspp_pack_integrity(void *dptr, uint32_t end_chunk, uint8_t *hash)
+{
+	struct ppsp_msg *msg = dptr;
+
+	msg->message_type = INTEGRITY;
+	msg->integrity.end_chunk = htonl(end_chunk);
+	memcpy(msg->integrity.hash, hash, sizeof(msg->integrity.hash));
+
+	return (sizeof(uint8_t) + sizeof(msg->integrity));
+}
+
+inline size_t
+ppspp_pack_signed_integrity(void *dptr, uint32_t start_chunk, uint32_t end_chunk,
+    int64_t timestamp, uint8_t *signature, size_t siglen)
+{
+	struct ppsp_msg *msg = dptr;
+
+	msg->message_type = SIGNED_INTEGRITY;
+	msg->signed_integrity.start_chunk = htonl(start_chunk);
+	msg->signed_integrity.end_chunk = htonl(end_chunk);
+	msg->signed_integrity.timestamp = timestamp;
+	memcpy(msg->signed_integrity.signature, signature, siglen);
+
+	return (sizeof(uint8_t) + sizeof(msg->signed_integrity) + siglen);
+}
+
+inline size_t
+ppspp_pack_request(void *dptr, uint32_t start_chunk, uint32_t end_chunk)
+{
+	struct ppsp_msg *msg = dptr;
+
+	msg->message_type = REQUEST;
+	msg->request.start_chunk = htonl(start_chunk);
+	msg->request.end_chunk = htonl(end_chunk);
+
+	return (sizeof(uint8_t) + sizeof(msg->request));
+}
+
+inline size_t
+ppspp_pack_cancel(void *dptr, uint32_t start_chunk, uint32_t end_chunk)
+{
+	struct ppsp_msg *msg = dptr;
+
+	msg->message_type = CANCEL;
+	msg->cancel.start_chunk = htonl(start_chunk);
+	msg->cancel.end_chunk = htonl(end_chunk);
+
+	return (sizeof(uint8_t) + sizeof(msg->cancel));
+}
 
 int ppspp_make_handshake_options (char *, struct proto_opt_str *);
 int ppspp_make_handshake_request (char *, uint32_t, uint32_t, char *, int);

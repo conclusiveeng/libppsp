@@ -49,13 +49,8 @@
 #include "debug.h"
 #include "wqueue.h"
 
-#define MQ_SYNC 0
-
 #define SEM_NAME "/ppspp"
 
-/* #if MQ_SYNC */
-#define MQ_NAME "/mq"
-/* #endif */
 
 extern int h_errno;
 int debug = 0;
@@ -349,69 +344,6 @@ ppspp_leecher_cond_set2 (struct peer *p, int val)
 
 	return 0;
 }
-
-#if MQ_SYNC
-INTERNAL_LINKAGE mqd_t
-mq_init_main_process_sender(void)
-{
-	mqd_t q;
-	char mq_name[64];
-	struct mq_attr attr;
-
-	attr.mq_flags = 0;
-	attr.mq_maxmsg = 10;
-	attr.mq_msgsize = BUFSIZE;		/* must be shorter than mq_receive length arg */
-	attr.mq_curmsgs = 0;
-
-	memset(mq_name, 0, sizeof(mq_name));
-	snprintf(mq_name, sizeof(mq_name) - 1, "%s_%x_%lx", MQ_NAME, (uint32_t) getpid(), random());
-
-	mq_unlink(mq_name);
-
-	q = mq_open(mq_name, O_RDWR | O_CREAT, 0666, &attr);
-
-	if (q == -1) {
-		printf("error creating sender (process) mq: %s\n", strerror(errno));
-		exit(1);
-	}
-
-	return q;
-}
-#endif
-
-
-INTERNAL_LINKAGE mqd_t
-mq_init(int non_block)
-{
-	mqd_t q;
-	char mq_name[64];
-	struct mq_attr attr;
-	int flag;
-
-	attr.mq_flags = 0;
-	attr.mq_maxmsg = 10;			/* max is in /proc/sys/fs/mqueue/msg_max and equals 10 in Linux*/
-	attr.mq_msgsize = BUFSIZE;		/* must be shorter than mq_receive length arg */
-	attr.mq_curmsgs = 0;
-
-	memset(mq_name, 0, sizeof(mq_name));
-	snprintf(mq_name, sizeof(mq_name) - 1, "%s_%x_%lx", MQ_NAME, (uint32_t) getpid(), random());
-
-	mq_unlink(mq_name);
-
-	flag = O_RDWR | O_CREAT;
-	if (non_block)
-		flag |= O_NONBLOCK;
-
-	q = mq_open(mq_name, flag, 0666, &attr);
-
-	if (q == -1) {
-		printf("error creating sender (process) mq: %s\n", strerror(errno));
-		exit(1);
-	}
-
-	return q;
-}
-
 
 /* thread - seeder worker */
 INTERNAL_LINKAGE void *

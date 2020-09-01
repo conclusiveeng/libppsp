@@ -715,36 +715,12 @@ ppspp_make_have_ack (char *ptr, struct peer *peer)
 {
 	char *d;
 	int ret;
-	uint64_t delay_sample;
+	uint64_t delay_sample = 0x12345678ABCDEF;
 
-	d = ptr;
-
-	*(uint32_t *)d = htobe32(peer->dest_chan_id);
-	d += sizeof(uint32_t);
-
-	*d = HAVE;
-	d++;
-
-	*(uint32_t *)d = htobe32(peer->curr_chunk);
-	d += sizeof(uint32_t);
-	*(uint32_t *)d = htobe32(peer->curr_chunk);
-	d += sizeof(uint32_t);
-
-	*d = ACK;
-	d++;
-
-	*(uint32_t *)d = htobe32(peer->curr_chunk);
-	d += sizeof(uint32_t);
-	*(uint32_t *)d = htobe32(peer->curr_chunk);
-	d += sizeof(uint32_t);
-
-	delay_sample = 0x12345678ABCDEF;		/* temporarily */
-	*(uint64_t *)d = htobe64(delay_sample);
-	d += sizeof(uint64_t);
-
-	ret = d - ptr;
-
-	return ret;
+	d = pack_dest_chan(ptr, peer->dest_chan_id);
+	d = pack_have(d, peer->curr_chunk, peer->curr_chunk);
+	d = pack_ack(d, peer->curr_chunk, peer->curr_chunk, delay_sample);
+	return (d - ptr);
 }
 
 INTERNAL_LINKAGE
