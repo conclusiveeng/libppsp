@@ -354,7 +354,32 @@ list_dir(struct peer *peer, char *dname)
 	}
 	closedir(dir);
 }
+INTERNAL_LINKAGE int
+ppspp_add_file(struct peer *peer, const char *path)
+{
+	struct file_list_entry *entry;
+	struct stat stat;
 
+	entry = calloc(1, sizeof(*entry));
+	strncpy(entry->path, path, sizeof(entry->path));
+
+	entry->fds[0] = open(path, O_RDONLY);
+	if (entry->fds[0] < 0) {
+		free(entry);
+		return (-1);
+	}
+
+	if (fstat(entry->fds[0], &stat) != 0) {
+		close(entry->fds[0]);
+		free(entry);
+		return (-1);
+	}
+
+	entry->file_size = stat.st_size;
+	SLIST_INSERT_HEAD(&peer->file_list_head, entry, next);
+
+	return (0);
+}
 
 INTERNAL_LINKAGE void
 create_file_list(struct peer *peer, char *dname)

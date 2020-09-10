@@ -798,13 +798,14 @@ ppspp_net_seeder(struct peer *seeder)
 
 
 INTERNAL_LINKAGE void *
-on_handshake(struct peer *p, void *recv_buf, uint16_t recv_len)
+on_handshake(struct worker_peer *worker, void *recv_buf, uint16_t recv_len)
 {
 	int n, clientlen, sockfd, h_resp_len, opts_len, s, y;
 	char *bn, buf[40 + 1];
 	char opts[1024];			/* buffer for encoded options */
 	char swarm_id[] = "swarm_id";
 	char handshake_resp[256];
+	struct peer *p = worker->peer;
 	struct peer *we;
 	struct proto_opt_str pos;
 
@@ -888,8 +889,9 @@ on_handshake(struct peer *p, void *recv_buf, uint16_t recv_len)
 
 
 INTERNAL_LINKAGE void *
-on_request(struct peer *p, void *recv_buf, uint16_t recv_len)
+on_request(struct worker_peer *worker, void *recv_buf, uint16_t recv_len)
 {
+	struct peer *p = worker->peer;
 	int clientlen, data_payload_len, n;
 	char mq_buf[BUFSIZE + 1];
 	ssize_t st;
@@ -992,34 +994,35 @@ INTERNAL_LINKAGE void *
 ppspp_seeder_worker_mq (void *data)
 {
 	char opts[1024];			/* buffer for encoded options */
-	struct peer *p;
+	struct worker_peer *worker = data;
+	struct peer *peer = worker->peer;
 	struct proto_opt_str pos;
 	char mq_buf[BUFSIZE + 1];
 	ssize_t st;
-
-	p = (struct peer *) data;		/* data of remote host (leecher) connecting to us (seeder)*/
 
 	d_printf("%s", "worker started\n");
 
 	memset(&pos, 0, sizeof(struct proto_opt_str));
 	memset(&opts, 0, sizeof(opts));
 
-	while (p->finishing == 0) {
+	while (peer->finishing == 0) {
 		do {
-			pthread_mutex_lock(&p->low_mutex);
-			st = wq_receive(&p->low_wqueue, mq_buf, BUFSIZE);
-			pthread_mutex_unlock(&p->low_mutex);
+			pthread_mutex_lock(&peer->low_mutex);
+			st = wq_receive(&peer->low_wqueue, mq_buf, BUFSIZE);
+			pthread_mutex_unlock(&peer->low_mutex);
 			if (st <= 0) usleep(1000);
-		} while ((st <= 0) && (p->finishing == 0));
-		if (p->finishing)
+		} while ((st <= 0) && (peer->finishing == 0));
+
+		if (peer->finishing)
 			continue;
 
-		if (st <= 0) abort();
+		if (st <= 0)
+			abort();
 
 		switch (mq_buf[0]) {
-			case HANDSHAKE: on_handshake(p, mq_buf, st);
+			case HANDSHAKE: on_handshake(worker, mq_buf, st);
 					break;
-			case REQUEST: on_request(p, mq_buf, st);
+			case REQUEST: on_request(worker, mq_buf, st);
 					break;
 			case PEX_REQ: break;
 			case HAVE: abort();		/* there shouldn't be HAVE message in low-prio queue */

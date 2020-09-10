@@ -564,12 +564,12 @@ ppspp_make_integrity_reverse (char *ptr, struct peer *peer, struct peer *we)
 }
 
 INTERNAL_LINKAGE int
-ppspp_make_data (char *ptr, struct peer *peer)
+ppspp_make_data(char *ptr, struct worker_peer *worker)
 {
 	size_t pos = 0;
 
-	pos += ppspp_pack_dest_chan(ptr + pos, peer->dest_chan_id);
-	pos += ppspp_make_data_no_chanid(ptr + pos, peer);
+	pos += ppspp_pack_dest_chan(ptr + pos, worker->peer->dest_chan_id);
+	pos += ppspp_make_data_no_chanid(ptr + pos, worker);
 	return (pos);
 }
 
@@ -578,7 +578,9 @@ ppspp_make_data (char *ptr, struct peer *peer)
  * with another kind of message
  */
 INTERNAL_LINKAGE int
-ppspp_make_data_no_chanid (char *ptr, struct peer *peer) {
+ppspp_make_data_no_chanid (char *ptr, struct worker_peer *worker)
+{
+	struct peer *peer = worker->peer;
 	size_t pos = 0;
 	int fd, l;
 	uint64_t timestamp;
@@ -587,12 +589,17 @@ ppspp_make_data_no_chanid (char *ptr, struct peer *peer) {
 
 
 	pos += ppspp_pack_data(ptr + pos, peer->curr_chunk, peer->curr_chunk, timestamp);
+	fd = peer->file_list_entry->fds[worker->thread_id];
 
-	fd = open(peer->file_list_entry->path, O_RDONLY);
-	if (fd < 0) {
-		d_printf("error opening file2: %s\n", peer->file_list_entry->path);
-		abort();
-		return -1;
+	if (fd < -1) {
+		fd = open(peer->file_list_entry->path, O_RDONLY);
+		if (fd < 0) {
+			d_printf("error opening file2: %s\n", peer->file_list_entry->path);
+			abort();
+			return -1;
+		}
+
+		peer->file_list_entry->fds[worker->thread_id] = fd;
 	}
 
 	lseek(fd, peer->curr_chunk * peer->chunk_size, SEEK_SET);
@@ -603,8 +610,6 @@ ppspp_make_data_no_chanid (char *ptr, struct peer *peer) {
 		close(fd);
 		return -1;
 	}
-
-	close(fd);
 
 	pos += l;
 	return (pos);
@@ -772,12 +777,14 @@ int ppspp_dump_options (char *ptr, struct peer *peer)
 }
 
 INTERNAL_LINKAGE int
-ppspp_dump_handshake_request (char *ptr, int req_len, struct peer *peer) {
-	char *d;
+ppspp_dump_handshake_request(void *ptr, int req_len, struct peer *peer) {
+	struct ppsp_msg *msg = ptr;
 	uint32_t src_chan_id;
 	int ret, opt_len;
 
-	d = ptr;
+	_assert(msg->message_type == HANDSHAKE, "not a handshake request");
+
+
 
 	if (*d == HANDSHAKE) {
 		d_printf("%s", "ok, HANDSHAKE req\n");
@@ -820,9 +827,9 @@ ppspp_dump_handshake_request (char *ptr, int req_len, struct peer *peer) {
 /* for leecher
  */
 INTERNAL_LINKAGE int
-ppspp_dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
+ppspp_dump_handshake_have (void *ptr, int resp_len, struct peer *peer)
 {
-	char *d;
+	struct ppsp_msg *msg = ptr;
 	int req_len, ret;
 	uint32_t start_chunk, end_chunk, num_chunks, nr_chunk;
 
@@ -1045,8 +1052,9 @@ dump_pex_resp (char *ptr, int req_len, struct peer *peer, int sockfd)
 }
 
 INTERNAL_LINKAGE int
-ppspp_dump_integrity (char *ptr, int req_len, struct peer *peer)
+ppspp_dump_integrity (FILE *f, void *ptr, int req_len, struct peer *peer)
 {
+	struct ppsp_msg *msg = ptr;
 	char *d;
 	char sha_buf[40 + 1];
 	int ret, s, y;

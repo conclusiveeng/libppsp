@@ -39,15 +39,19 @@
 #include "mt.h"
 //#include "wqueue.h"
 
+#define MAX_THREADS 64
 #define INTERNAL_LINKAGE __attribute__((__visibility__("hidden")))
 
-struct schedule_entry {
-	uint64_t begin, end;
+struct schedule_entry
+{
+	uint64_t begin;
+	uint64_t end;
 };
 
 
 /* list of files shared by seeder */
 SLIST_HEAD(slisthead, file_list_entry);
+
 struct file_list_entry {
 	char path[1024];		/* full path to file: directory name + file name */
 	char sha[20];			/* do we need this? */
@@ -59,6 +63,7 @@ struct file_list_entry {
 	struct node *tree_root;		/* pointer to root node of the tree */
 	uint32_t start_chunk;
 	uint32_t end_chunk;
+	int fds[MAX_THREADS];
 
 	SLIST_ENTRY(file_list_entry) next;
 };
@@ -285,6 +290,11 @@ struct peer {
 	SLIST_ENTRY(peer) snext;		/* list of peers - leechers from seeder point of view or seeders from leecher pov */
 };
 
+struct worker_peer
+{
+	int thread_id;
+	struct peer *peer;
+};
 
 void add_peer_to_list (struct slist_peers *, struct peer *);
 void print_peer_list(struct slist_peers *);

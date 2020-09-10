@@ -202,12 +202,18 @@ INTERNAL_LINKAGE void
 ppspp_remove_and_free(ppspp_handle_t handle, struct file_list_entry *f)
 {
 	struct peer *local_seeder;
+	int i;
 
 	local_seeder = (struct peer *)handle;
 	free(f->tab_chunk);
 	free(f->tree);
 	f->tab_chunk = NULL;
 	f->tree = f->tree_root = NULL;
+
+	for (i = 0; i < MAX_THREADS; i++) {
+		if (f->fds[i] != -1)
+			close(f->fds[i]);
+	}
 
 	SLIST_REMOVE(&local_seeder->file_list_head, f, file_list_entry, next);
 	free(f);
