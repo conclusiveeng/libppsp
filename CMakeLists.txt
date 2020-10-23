@@ -5,7 +5,7 @@ set(VERSION 0.3)
 set(CMAKE_C_FLAGS "-Wall -ggdb3 -std=c11 -D_DEFAULT_SOURCE")
 set(CMAKE_C_CLANG_TIDY clang-tidy -checks=-*,readability-*)
 
-add_library(ppspp SHARED mt.c ppspp_protocol.c net.c net_swift.c peer.c sha1.c ppspp.c ppspp_swift.c wqueue.c)
+add_library(ppspp SHARED mt.c ppspp_protocol.c net.c net_swift.c peer.c sha1.c ppspp_swift.c wqueue.c)
 add_executable(ppspp_exe main.c)
 
 set_target_properties(ppspp_exe PROPERTIES OUTPUT_NAME ppspp)

@@ -37,10 +37,10 @@
 #include "mt.h"
 #include "net.h"
 #include "ppspp_protocol.h"
+#include "ppspp_swift.h"
 #include "peer.h"
 #include "sha1.h"
 #include "debug.h"
-#include "ppspp.h"
 #include "net_swift.h"
 
 
@@ -398,7 +398,7 @@ swift_leecher_get_metadata(ppspp_handle_t handle, ppspp_metadata_t *meta)
  *
  * @return Return size of buffer needed for fetching given chunk range
  * User should allocate that number of bytes for buffer and pass it to
- * ppspp_leecher_fetch_chunk_to_buf() procedure if he/she choosen
+ * swift_leecher_fetch_chunk_to_buf() procedure if he/she choosen
  * transferring buffer method instead of transferring vie file descriptor
  */
 uint32_t

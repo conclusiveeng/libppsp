@@ -30,8 +30,6 @@
  * @file ppspp.h
  */
 
-#if 0
-
 typedef struct {
 	uint32_t chunk_size;		/**< Size of the chunk for seeded files */
 	uint32_t timeout;		/**< Timeout for network communication */
@@ -54,8 +52,6 @@ typedef struct {
 } ppspp_metadata_t;
 
 typedef int64_t ppspp_handle_t;	/**< seeder or leecher handle */
-
-#endif
 
 ppspp_handle_t swift_seeder_create(ppspp_seeder_params_t *);
 int swift_seeder_add_seeder(ppspp_handle_t, struct sockaddr_in *);

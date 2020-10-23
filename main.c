@@ -36,11 +36,10 @@
 #include <arpa/inet.h>
 #include <errno.h>
 
-#include "ppspp.h"
 #include "ppspp_swift.h"
 
 
-extern int debug;
+int debug;
 
 enum {
 	SEEDER_TYPE = 1,
@@ -71,10 +70,8 @@ main (int argc, char *argv[])
 	char *sha_demanded;
 	char buf_ip_addr[24], buf_ip_port[64];
 	uint8_t swift;
-	uint8_t *transfer_buf;
 	int opt, chunk_size, type, sia, port, file_exist, fd;
-	int32_t size;
-	uint32_t timeout, buf_size, x;
+	uint32_t timeout;
 	struct sockaddr_in sa_in;
 	ppspp_seeder_params_t seeder_params;
 	ppspp_leecher_params_t leecher_params;
@@ -198,115 +195,6 @@ main (int argc, char *argv[])
 			exit(1);
 		}
 	}
-
-	if (!swift) {
-		if (type == SEEDER_TYPE) {
-			/* SEEDER mode */
-			printf("Processing data, please wait... \n");
-
-			seeder_params.chunk_size = chunk_size;
-			seeder_params.timeout = timeout;
-			seeder_params.port = port;
-
-			seeder_handle = ppspp_seeder_create(&seeder_params);
-
-			if (peer_list != NULL) {
-				ch = peer_list;
-
-				while (ch < peer_list + strlen(peer_list)) {
-					comma = strchr(ch, ',');
-					if (comma != NULL) { /* if comma found */
-						last_char = comma - 1;
-					} else if (ch < peer_list + strlen(peer_list)) { /* last IP without ending comma */
-						last_char = peer_list + strlen(peer_list);
-					}
-
-					/* copy IP:PORT pair to temporary buffer */
-					memset(buf_ip_port, 0, sizeof(buf_ip_port));
-					memcpy(buf_ip_port, ch, last_char - ch + 1);
-
-					/* extract IP address */
-					colon = strchr(buf_ip_port, ':');
-					if (colon != NULL) { /* colon found */
-						memset(buf_ip_addr, 0, sizeof(buf_ip_addr));
-						memcpy(buf_ip_addr, buf_ip_port, colon - buf_ip_port);
-					} else {
-						printf("Error: no colon found at: %s\n", buf_ip_port);
-						exit(1);
-					}
-
-					sia = inet_aton(buf_ip_addr, &sa_in.sin_addr);
-					sa_in.sin_port = htons(atoi(colon + 1));
-
-					if (sia == 1) { /* if conversion succeeded */
-						ppspp_seeder_add_seeder(seeder_handle, &sa_in);
-					}
-					ch = last_char + 2;
-				}
-			}
-
-			if (fdname != NULL) {
-				ppspp_seeder_add_file_or_directory(seeder_handle, fdname);
-			}
-
-			printf("Ok, ready for sharing\n");
-
-			ppspp_seeder_run(seeder_handle);
-
-			ppspp_seeder_close(seeder_handle);
-
-			free(fname2);
-
-		} else { /* LEECHER mode */
-			/* prepare data for step-by-step leecher version */
-			leecher_params.timeout = timeout;
-			ascii_sha_to_bin(sha_demanded, leecher_params.sha_demanded);
-			leecher_handle = ppspp_leecher_create(&leecher_params);
-
-			/* get metadata for demanded sha file */
-			file_exist = ppspp_leecher_get_metadata(leecher_handle, &meta);
-			if (file_exist == 0) {
-				unlink(meta.file_name);
-				fd = open(meta.file_name, O_WRONLY | O_CREAT, 0744);
-				if (fd < 0) {
-					printf("error opening file '%s' for writing: %u %s\n", meta.file_name, errno, strerror(errno));
-					abort();
-				}
-	#if 0
-				/* run 1 (non-blocking) leecher thread with state machine */
-				ppspp_leecher_run(leecher_handle);
-
-				/* let the library prepare itself for transfer */
-				ppspp_prepare_chunk_range(leecher_handle, meta.start_chunk, meta.end_chunk);
-
-				ppspp_leecher_fetch_chunk_to_fd(leecher_handle, fd);
-
-				ppspp_leecher_close(leecher_handle);
-	#else
-				/* transfering buffer transfer method */
-
-				/* run 1 (non-blocking) leecher thread with state machine */
-				ppspp_leecher_run(leecher_handle);
-
-				x = meta.start_chunk;
-				/* let the library prepare itself for transfer */
-				buf_size = ppspp_prepare_chunk_range(leecher_handle, x, x + 1000 - 1);
-				transfer_buf = malloc(buf_size);
-
-				while ((x <= meta.end_chunk) && (buf_size > 0)) {
-					size = ppspp_leecher_fetch_chunk_to_buf(leecher_handle, transfer_buf);
-					write(fd, transfer_buf, size);
-					x += 1000;
-					buf_size = ppspp_prepare_chunk_range(leecher_handle, x, x + 1000 - 1);
-				}
-
-				close(fd);
-				ppspp_leecher_close(leecher_handle);
-				free(transfer_buf);
-	#endif
-			}
-		}
-	} else { /* swift compatibility mode on */
 		if (type == SEEDER_TYPE) {
 			/* SEEDER mode */
 			printf("Processing data, please wait... \n");
@@ -413,7 +301,6 @@ main (int argc, char *argv[])
 #endif
 			}
 		}
-	}
 
 	return 0;
 }
