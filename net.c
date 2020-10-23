@@ -87,7 +87,7 @@ semaph_post (sem_t *sem)
 
 	s = sem_post(sem);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -102,7 +102,7 @@ semaph_wait (sem_t *sem)
 
 	s = sem_wait(sem);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -117,7 +117,7 @@ mutex_init (pthread_mutex_t *mutex)
 
 	s = pthread_mutex_init(mutex, NULL);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -132,7 +132,7 @@ mutex_lock (pthread_mutex_t *mutex)
 
 	s = pthread_mutex_lock(mutex);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -147,7 +147,7 @@ mutex_unlock (pthread_mutex_t *mutex)
 
 	s = pthread_mutex_unlock(mutex);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -162,13 +162,13 @@ seeder_cond_lock_init (struct peer *p)
 
 	s = pthread_mutex_init(&p->seeder_mutex, NULL);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
 	s = pthread_cond_init(&p->seeder_mtx_cond, NULL);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -213,13 +213,13 @@ leecher_cond_lock_init (struct peer *p)
 
 	s = pthread_mutex_init(&p->leecher_mutex, NULL);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
 	s = pthread_cond_init(&p->leecher_mtx_cond, NULL);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -294,13 +294,13 @@ leecher_cond_lock_init2 (struct peer *p)
 
 	s = pthread_mutex_init(&p->leecher_mutex2, NULL);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
 	s = pthread_cond_init(&p->leecher_mtx_cond2, NULL);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -494,17 +494,17 @@ seeder_worker (void *data)
 
 			opts_len = make_handshake_options(opts, &pos);
 
-			_assert((unsigned long int) opts_len <= sizeof(opts), "%s but has value: %u\n", "opts_len should be <= 1024", opts_len);
+			_assert((unsigned long int) opts_len <= sizeof(opts), "%s but has value: %d\n", "opts_len should be <= 1024", opts_len);
 
 			h_resp_len = make_handshake_have(handshake_resp, 0, 0xfeedbabe, opts, opts_len, p);
 
-			_assert((unsigned long int) h_resp_len <= sizeof(handshake_resp), "%s but has value: %u\n", "h_resp_len should be <= 256", h_resp_len);
+			_assert((unsigned long int) h_resp_len <= sizeof(handshake_resp), "%s but has value: %d\n", "h_resp_len should be <= 256", h_resp_len);
 
 			p->sm_seeder = SM_SEND_HANDSHAKE_HAVE;
 		}
 
 		if (p->sm_seeder == SM_SEND_HANDSHAKE_HAVE) {
-			_assert(recv_len != 0, "%s but has value: %u\n", "recv_len should be != 0", recv_len);
+			_assert(recv_len != 0, "%s but has value: %d\n", "recv_len should be != 0", recv_len);
 
 			/* send HANDSHAKE + HAVE */
 			n = sendto(sockfd, handshake_resp, h_resp_len, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
@@ -523,7 +523,7 @@ seeder_worker (void *data)
 				for (y = 0; y < 20; y++)
 					s += sprintf(buf + s, "%02x", p->sha_demanded[y] & 0xff);
 				buf[40] = '\0';
-				d_printf("Error: there is no file with hash %s for %s:%u. Closing connection.\n", buf, inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
+				d_printf("Error: there is no file with hash %s for %s:%d. Closing connection.\n", buf, inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
 				p->finishing = 1;
 				p->to_remove = 1;	/* mark this particular peer to remove by GC */
 				remove_dead_peers = 1;	/* set global flag for removing dead peers by garbage collector */
@@ -550,7 +550,7 @@ seeder_worker (void *data)
 		}
 
 		if (p->sm_seeder == SM_REQUEST) {
-			_assert(recv_len != 0, "%s but has value: %u\n", "recv_len should be != 0", recv_len);
+			_assert(recv_len != 0, "%s but has value: %d\n", "recv_len should be != 0", recv_len);
 
 			clock_gettime(CLOCK_MONOTONIC, &p->ts_last_recv);
 			p->d_last_recv = REQUEST;
@@ -568,7 +568,7 @@ seeder_worker (void *data)
 		if (p->sm_seeder == SM_SEND_PEX_RESP) {
 			n = make_pex_resp(p->send_buf, p, we);
 
-			_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
+			_assert(n <= BUFSIZE, "%s but n has value: %d and BUFSIZE: %d\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 			n = sendto(sockfd, p->send_buf, n, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
 			if (n < 0) {
@@ -595,7 +595,7 @@ seeder_worker (void *data)
 		if (p->sm_seeder == SM_SEND_INTEGRITY) {
 			n = make_integrity(p->send_buf, p, we);
 
-			_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
+			_assert(n <= BUFSIZE, "%s but n has value: %d and BUFSIZE: %d\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 			/* send INTEGRITY with data */
 			n = sendto(sockfd, p->send_buf, n, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
@@ -671,12 +671,11 @@ seeder_worker (void *data)
 INTERNAL_LINKAGE int
 net_seeder(struct peer *seeder)
 {
-	int sockfd, optval, n, st;
+	int sockfd, optval, st;
 	char buf[BUFSIZE];
 	socklen_t clientlen;
 	struct sockaddr_in serveraddr;
 	struct sockaddr_in clientaddr;
-	struct peer *p;
 	pthread_t thread;
 
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -709,13 +708,13 @@ net_seeder(struct peer *seeder)
 		}
 
 		memset(buf, 0, BUFSIZE);
-		n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &clientlen);
+		int n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &clientlen);
 		if (n < 0)
 			d_printf("%s", "ERROR in recvfrom\n");
 
 		/* locate peer basing on IP address and UDP port */
 		pthread_mutex_lock(&seeder->peers_list_head_mutex);
-		p = ip_port_to_peer(seeder, &seeder->peers_list_head, &clientaddr);
+		struct peer *p = ip_port_to_peer(seeder, &seeder->peers_list_head, &clientaddr);
 		pthread_mutex_unlock(&seeder->peers_list_head_mutex);
 
 		if ((p == NULL) && (message_type(buf) != HANDSHAKE))
@@ -729,7 +728,7 @@ net_seeder(struct peer *seeder)
 				add_peer_to_list(&seeder->peers_list_head, p);
 				pthread_mutex_unlock(&seeder->peers_list_head_mutex);
 
-				_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
+				_assert(n <= BUFSIZE, "%s but n has value: %d and BUFSIZE: %d\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 				memcpy(p->recv_buf, buf, n);
 				p->recv_len = n;
@@ -763,10 +762,10 @@ net_seeder(struct peer *seeder)
 				d_printf("%s", "FINISH\n");
 
 				if (p == NULL) {
-					d_printf("searched IP: %s:%u  n: %u\n",  inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), n);
+					d_printf("searched IP: %s:%d  n: %d\n",  inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), n);
 					pthread_mutex_lock(&seeder->peers_list_head_mutex);
 					SLIST_FOREACH(p, &seeder->peers_list_head, snext) {
-						d_printf("    IP: %s:%u\n", inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
+						d_printf("    IP: %s:%d\n", inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
 					}
 					pthread_mutex_unlock(&seeder->peers_list_head_mutex);
 				}
@@ -796,7 +795,7 @@ net_seeder(struct peer *seeder)
 
 			d_printf("%s", "OK REQUEST\n");
 
-			_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
+			_assert(n <= BUFSIZE, "%s but n has value: %d and BUFSIZE: %d\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 			memcpy(p->recv_buf, buf, n);
 			p->recv_len = n;
@@ -816,7 +815,7 @@ net_seeder(struct peer *seeder)
 			seeder_cond_lock(p);
 
 			d_printf("%s", "OK ACK\n");
-			_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
+			_assert(n <= BUFSIZE, "%s but n has value: %d and BUFSIZE: %d\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 			memcpy(p->recv_buf, buf, n);
 			p->recv_len = n;
@@ -979,7 +978,7 @@ leecher_worker_continuous(void *data)
 
 		if (p->sm_leecher == SM_PREPARE_REQUEST) {
 			buffer[n] = '\0';
-			d_printf("server replied with %u bytes\n", n);
+			d_printf("server replied with %d bytes\n", n);
 
 			dump_handshake_have(buffer, n, p);
 
@@ -988,7 +987,7 @@ leecher_worker_continuous(void *data)
 				for (y = 0; y < 20; y++)
 					s += sprintf(buf + s, "%02x", local_peer->sha_demanded[y] & 0xff);
 				buf[40] = '\0';
-				d_printf("Seeder %s:%u has no file for hash: %s\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port), buf);
+				d_printf("Seeder %s:%d has no file for hash: %s\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port), buf);
 				p->to_remove = 1; /* mark peer to remove by garbage collector */
 
 				goto exit;
@@ -996,7 +995,7 @@ leecher_worker_continuous(void *data)
 			}
 
 			if ((p->after_seeder_switch == 1) && (prev_chunk_size != local_peer->chunk_size)) {
-				d_printf("previous and current seeder have different chunk size: %u vs %u\n", prev_chunk_size, local_peer->chunk_size);
+				d_printf("previous and current seeder have different chunk size: %d vs %d\n", prev_chunk_size, local_peer->chunk_size);
 				abort();
 			}
 
@@ -1006,7 +1005,7 @@ leecher_worker_continuous(void *data)
 
 		/* external "while" loop, iterator "z" */
 		if (p->sm_leecher == SM_WHILE_REQUEST) {
-			d_printf("local_peer->end_chunk: %u\n", local_peer->end_chunk);
+			d_printf("local_peer->end_chunk: %d\n", local_peer->end_chunk);
 
 			if (p->fetch_schedule == 1) {
 				/* lock "download_schedule" array and "download_schedule_idx" index */
@@ -1024,7 +1023,7 @@ leecher_worker_continuous(void *data)
 			/* create REQUEST  */
 			request_len = make_request(request, 0xfeedbabe, begin, end, p);
 
-			_assert((long unsigned int) request_len <= sizeof(request), "%s but request_len has value: %u and sizeof(request): %lu\n", "request_len should be <= sizeof(request)", request_len, sizeof(request));
+			_assert((long unsigned int) request_len <= sizeof(request), "%s but request_len has value: %d and sizeof(request): %lu\n", "request_len should be <= sizeof(request)", request_len, sizeof(request));
 			p->sm_leecher = SM_SEND_REQUEST;
 		}
 
@@ -1037,7 +1036,7 @@ leecher_worker_continuous(void *data)
 			}
 			d_printf("%s", "request message 3/3 sent\n");
 			p->sm_leecher = SM_WAIT_PEX_RESP;
-			d_printf("request sent: %u\n", n);
+			d_printf("request sent: %d\n", n);
 		}
 
 		/* wait for PEX_RESV4 or INTEGRITY */
@@ -1178,7 +1177,7 @@ leecher_worker_continuous(void *data)
 			/* create ACK message to confirm that chunk in last DATA datagram has been transferred correctly */
 			ack_len = make_ack(buffer, p);
 
-			_assert(ack_len <= BUFSIZE, "%s but ack_len has value: %lu and BUFSIZE: %u\n", "ack_len should be <= BUFSIZE", ack_len, BUFSIZE);
+			_assert(ack_len <= BUFSIZE, "%s but ack_len has value: %lu and BUFSIZE: %d\n", "ack_len should be <= BUFSIZE", ack_len, BUFSIZE);
 
 			/* send ACK */
 			n = sendto(sockfd, buffer, ack_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
@@ -1247,7 +1246,7 @@ leecher_worker_continuous(void *data)
 			else
 				p->current_seeder = SLIST_FIRST(&peers_list_head); /* select begin of the qeueue */
 
-			d_printf("selected new seeder: %s:%u\n", inet_ntoa(p->current_seeder->leecher_addr.sin_addr), ntohs(p->current_seeder->leecher_addr.sin_port));
+			d_printf("selected new seeder: %s:%d\n", inet_ntoa(p->current_seeder->leecher_addr.sin_addr), ntohs(p->current_seeder->leecher_addr.sin_port));
 
 			/* change IP address and port for all the new connections */
 			memset(&servaddr, 0, sizeof(servaddr));
@@ -1397,7 +1396,7 @@ net_leecher_continuous(struct peer *local_peer)
 			}
 
 			if (n <= 0) {
-				d_printf("error: timeout of %u seconds occured\n", local_peer->timeout);
+				d_printf("error: timeout of %d seconds occured\n", local_peer->timeout);
 				local_peer->sm_leecher = SM_HANDSHAKE;
 				continue;
 			} else {
@@ -1407,7 +1406,7 @@ net_leecher_continuous(struct peer *local_peer)
 
 		if (local_peer->sm_leecher == SM_PREPARE_REQUEST) {
 			buffer[n] = '\0';
-			d_printf("server replied with %u bytes\n", n);
+			d_printf("server replied with %d bytes\n", n);
 
 			/* calculate number of SHA hashes per 1500 bytes MTU */
 			/* (MTU - sizeof(iphdr) - sizeof(udphdr) - ppspp_headers) / sha_size */
@@ -1421,7 +1420,7 @@ net_leecher_continuous(struct peer *local_peer)
 				for (y = 0; y < 20; y++)
 					s += sprintf(buf + s, "%02x", local_peer->sha_demanded[y] & 0xff);
 				buf[40] = '\0';
-				printf("Primary seeder %s:%u has no file for hash: %s\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port), buf);
+				printf("Primary seeder %s:%d has no file for hash: %s\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port), buf);
 				goto exit;
 			}
 
@@ -1433,7 +1432,7 @@ net_leecher_continuous(struct peer *local_peer)
 			unlink(fname);
 			fd = open(fname, O_WRONLY | O_CREAT, 0744);
 			if (fd < 0) {
-				d_printf("error opening file '%s' for writing: %u %s\n", fname, errno, strerror(errno));
+				d_printf("error opening file '%s' for writing: %d %s\n", fname, errno, strerror(errno));
 				abort();
 			}
 			local_peer->fd = fd;
@@ -1444,18 +1443,18 @@ net_leecher_continuous(struct peer *local_peer)
 
 		/* external "while" loop, iterator "z" */
 		if (local_peer->sm_leecher == SM_WHILE_REQUEST) {
-			d_printf("z: %u  local_peer->end_chunk: %u\n", z, local_peer->end_chunk);
+			d_printf("z: %d  local_peer->end_chunk: %d\n", z, local_peer->end_chunk);
 
 			/* special range of chunks - empty set */
 			begin = 0xffffffff;
 			end = 0xffffffff;
 
-			d_printf("begin: %u   end: %u\n", begin, end);
+			d_printf("begin: %d   end: %d\n", begin, end);
 
 			/* create REQUEST  */
 			request_len = make_request(request, 0xfeedbabe, begin, end, local_peer);
 
-			_assert((long unsigned int) request_len <= sizeof(request), "%s but request_len has value: %u and sizeof(request): %lu\n", "request_len should be <= sizeof(request)", request_len, sizeof(request));
+			_assert((long unsigned int) request_len <= sizeof(request), "%s but request_len has value: %d and sizeof(request): %lu\n", "request_len should be <= sizeof(request)", request_len, sizeof(request));
 			local_peer->sm_leecher = SM_SEND_REQUEST;
 		}
 
@@ -1468,7 +1467,7 @@ net_leecher_continuous(struct peer *local_peer)
 			}
 			d_printf("%s", "request message 3/3 sent\n");
 			local_peer->sm_leecher = SM_WAIT_PEX_RESP;
-			d_printf("request sent: %u\n", n);
+			d_printf("request sent: %d\n", n);
 		}
 
 		/* wait for PEX_RESV4 or INTEGRITY */
@@ -1545,7 +1544,7 @@ net_leecher_continuous(struct peer *local_peer)
 	}
 	pthread_mutex_unlock(&peer_list_head_mutex);
 
-	d_printf("created %u leecher threads\n", xx);
+	d_printf("created %d leecher threads\n", xx);
 
 	/* wait for end of all of the threads and free the allocated memory for them */
 	pthread_mutex_lock(&peer_list_head_mutex);
@@ -1556,7 +1555,7 @@ net_leecher_continuous(struct peer *local_peer)
 	yy = 0;
 	while (yy < local_peer->nc) {
 		if (local_peer->chunk[yy].downloaded != CH_YES)
-			d_printf("chunk[%u]\n", yy);
+			d_printf("chunk[%d]\n", yy);
 		yy++;
 	}
 
@@ -1718,7 +1717,7 @@ leecher_worker_sbs(void *data)
 
 		if (p->sm_leecher == SM_PREPARE_REQUEST) {
 			buffer[n] = '\0';
-			d_printf("server replied with %u bytes\n", n);
+			d_printf("server replied with %d bytes\n", n);
 
 			dump_handshake_have(buffer, n, p);
 
@@ -1727,11 +1726,10 @@ leecher_worker_sbs(void *data)
 				for (y = 0; y < 20; y++)
 					s += sprintf(buf + s, "%02x", local_peer->sha_demanded[y] & 0xff);
 				buf[40] = '\0';
-				printf("Seeder %s:%u has no file for hash: %s\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port), buf);
+				printf("Seeder %s:%d has no file for hash: %s\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port), buf);
 				p->to_remove = 1; /* mark peer to remove by garbage collector */
 
 				goto exit;
-				continue;
 			}
 
 			if ((p->after_seeder_switch == 1) && (prev_chunk_size != local_peer->chunk_size)) {
@@ -1746,7 +1744,7 @@ leecher_worker_sbs(void *data)
 			/* we are connected to some seeder - so go to sleep and wait for awakening by some other task */
 			leecher_cond_sleep(p);
 
-			_assert((p->cmd == CMD_FETCH) || (p->cmd == CMD_FINISH), "Command for leecher state machine should be FETCH or FINISH but is: %u\n", p->cmd);
+			_assert((p->cmd == CMD_FETCH) || (p->cmd == CMD_FINISH), "Command for leecher state machine should be FETCH or FINISH but is: %d\n", p->cmd);
 
 			/* here someone has awakened us - so check the command we need to do */
 			/* other task has set proper command in p->local_leecher->cmd */
@@ -1777,7 +1775,7 @@ leecher_worker_sbs(void *data)
 			/* create REQUEST  */
 			request_len = make_request(request, 0xfeedbabe, begin, end, p);
 
-			_assert((long unsigned int) request_len <= sizeof(request), "%s but request_len has value: %u and sizeof(request): %lu\n", "request_len should be <= sizeof(request)", request_len, sizeof(request));
+			_assert((long unsigned int) request_len <= sizeof(request), "%s but request_len has value: %d and sizeof(request): %zu\n", "request_len should be <= sizeof(request)", request_len, sizeof(request));
 			p->sm_leecher = SM_SEND_REQUEST;
 		}
 
@@ -1790,7 +1788,7 @@ leecher_worker_sbs(void *data)
 			}
 			d_printf("%s", "request message 3/3 sent\n");
 			p->sm_leecher = SM_WAIT_PEX_RESP;
-			d_printf("request sent: %u\n", n);
+			d_printf("request sent: %d\n", n);
 		}
 
 		/* wait for PEX_RESV4 or INTEGRITY */
@@ -1941,7 +1939,7 @@ leecher_worker_sbs(void *data)
 			/* create ACK message to confirm that chunk in last DATA datagram has been transferred correctly */
 			ack_len = make_ack(buffer, p);
 
-			_assert(ack_len <= BUFSIZE, "%s but ack_len has value: %lu and BUFSIZE: %u\n", "ack_len should be <= BUFSIZE", ack_len, BUFSIZE);
+			_assert(ack_len <= BUFSIZE, "%s but ack_len has value: %lu and BUFSIZE: %d\n", "ack_len should be <= BUFSIZE", ack_len, BUFSIZE);
 
 			/* send ACK */
 			n = sendto(sockfd, buffer, ack_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
@@ -2010,6 +2008,7 @@ leecher_worker_sbs(void *data)
 			/* finish transmission with current seeder */
 
 			n = make_handshake_finish(buffer, p);
+			d_printf("make_handshake_finish %d \n", n);
 			n = sendto(sockfd, buffer, ack_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
 			if (n < 0) {
 				d_printf("error sending request: %d\n", n);
@@ -2028,7 +2027,7 @@ leecher_worker_sbs(void *data)
 			else
 				p->current_seeder = SLIST_FIRST(&local_peer->peers_list_head); /* select begin of the qeueue */
 
-			d_printf("selected new seeder: %s:%u\n", inet_ntoa(p->current_seeder->leecher_addr.sin_addr), ntohs(p->current_seeder->leecher_addr.sin_port));
+			d_printf("selected new seeder: %s:%d\n", inet_ntoa(p->current_seeder->leecher_addr.sin_addr), ntohs(p->current_seeder->leecher_addr.sin_port));
 
 			/* change IP address and port for all the new connections */
 			memset(&servaddr, 0, sizeof(servaddr));
@@ -2176,7 +2175,7 @@ preliminary_connection_sbs(struct peer *local_peer)
 
 		if (local_peer->sm_leecher == SM_PREPARE_REQUEST) {
 			buffer[n] = '\0';
-			d_printf("server replied with %u bytes\n", n);
+			d_printf("server replied with %d bytes\n", n);
 
 			/* calculate number of SHA hashes per 1500 bytes MTU */
 			/* (MTU - sizeof(iphdr) - sizeof(udphdr) - ppspp_headers) / sha_size */
@@ -2190,7 +2189,7 @@ preliminary_connection_sbs(struct peer *local_peer)
 				for (y = 0; y < 20; y++)
 					s += sprintf(buf + s, "%02x", local_peer->sha_demanded[y] & 0xff);
 				buf[40] = '\0';
-				printf("Primary seeder %s:%u has no file for hash: %s\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port), buf);
+				printf("Primary seeder %s:%d has no file for hash: %s\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port), buf);
 				local_peer->finishing = 1;
 				local_peer->seeder_has_file = 0;	/* seeder has no file for our hash stored in sha_demanded[] */
 				continue;
@@ -2219,7 +2218,7 @@ preliminary_connection_sbs(struct peer *local_peer)
 			/* create REQUEST  */
 			request_len = make_request(request, 0xfeedbabe, begin, end, local_peer);
 
-			_assert((long unsigned int) request_len <= sizeof(request), "%s but request_len has value: %u and sizeof(request): %lu\n", "request_len should be <= sizeof(request)", request_len, sizeof(request));
+			_assert((long unsigned int) request_len <= sizeof(request), "%s but request_len has value: %d and sizeof(request): %zu\n", "request_len should be <= sizeof(request)", request_len, sizeof(request));
 			local_peer->sm_leecher = SM_SEND_REQUEST;
 		}
 
@@ -2232,7 +2231,7 @@ preliminary_connection_sbs(struct peer *local_peer)
 			}
 			d_printf("%s", "request message 3/3 sent\n");
 			local_peer->sm_leecher = SM_WAIT_PEX_RESP;
-			d_printf("request sent: %u\n", n);
+			d_printf("request sent: %d\n", n);
 		}
 
 		/* wait for PEX_RESV4 or INTEGRITY */
@@ -2284,7 +2283,7 @@ preliminary_connection_sbs(struct peer *local_peer)
 	}
 	d_printf("%s", "HANDSHAKE_FINISH from main process sent\n");
 
-	d_printf("seeder has demanded file: %u  size: %lu\n", local_peer->seeder_has_file, local_peer->file_size);
+	d_printf("seeder has demanded file: %d  size: %lu\n", local_peer->seeder_has_file, local_peer->file_size);
 
 	close(sockfd);
 	return 0;
@@ -2335,7 +2334,7 @@ net_leecher_sbs(struct peer *local_peer)
 	xx++;
 	pthread_mutex_unlock(&local_peer->peers_list_head_mutex);
 
-	d_printf("created %u leecher threads\n", xx);
+	d_printf("created %d leecher threads\n", xx);
 
 	return 0;
 }

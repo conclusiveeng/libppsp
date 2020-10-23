@@ -26,6 +26,8 @@
 #ifndef _PPSPP_SWIFT_H_
 #define _PPSPP_SWIFT_H_
 
+#include<stdint.h>
+
 /**
  * @file ppspp.h
  */

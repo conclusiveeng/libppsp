@@ -87,7 +87,7 @@ swift_semaph_post (sem_t *sem)
 
 	s = sem_post(sem);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -102,7 +102,7 @@ swift_semaph_wait (sem_t *sem)
 
 	s = sem_wait(sem);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -117,7 +117,7 @@ swift_mutex_init (pthread_mutex_t *mutex)
 
 	s = pthread_mutex_init(mutex, NULL);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -132,7 +132,7 @@ swift_mutex_lock (pthread_mutex_t *mutex)
 
 	s = pthread_mutex_lock(mutex);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -147,7 +147,7 @@ swift_mutex_unlock (pthread_mutex_t *mutex)
 
 	s = pthread_mutex_unlock(mutex);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -162,13 +162,13 @@ swift_seeder_cond_lock_init (struct peer *p)
 
 	s = pthread_mutex_init(&p->seeder_mutex, NULL);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
 	s = pthread_cond_init(&p->seeder_mtx_cond, NULL);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -213,13 +213,13 @@ swift_leecher_cond_lock_init (struct peer *p)
 
 	s = pthread_mutex_init(&p->leecher_mutex, NULL);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
 	s = pthread_cond_init(&p->leecher_mtx_cond, NULL);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -276,7 +276,7 @@ swift_leecher_cond_wake (struct peer *p)
 
 
 INTERNAL_LINKAGE int
-swift_leecher_cond_set (struct peer *p, int val)
+swift_leecher_cond_set (struct peer *p, enum leech_condition val)
 {
 	pthread_mutex_lock(&p->leecher_mutex);
 	p->leecher_cond = val;
@@ -294,13 +294,13 @@ swift_leecher_cond_lock_init2 (struct peer *p)
 
 	s = pthread_mutex_init(&p->leecher_mutex2, NULL);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
 	s = pthread_cond_init(&p->leecher_mtx_cond2, NULL);
 	if (s != 0) {
-		d_printf("%s: error: %u  %s\n", __func__, errno, strerror(errno));
+		d_printf("%s: error: %d  %s\n", __func__, errno, strerror(errno));
 		abort();
 	}
 
@@ -339,7 +339,7 @@ swift_leecher_cond_unlock2 (struct peer *p)
 
 
 INTERNAL_LINKAGE int
-swift_leecher_cond_set2 (struct peer *p, int val)
+swift_leecher_cond_set2 (struct peer *p, enum leech_condition2 val)
 {
 	pthread_mutex_lock(&p->leecher_mutex2);
 	p->leecher_cond2 = val;
@@ -417,7 +417,7 @@ INTERNAL_LINKAGE void *
 swift_seeder_worker (void *data)
 {
 	int n, clientlen, sockfd, data_payload_len, h_resp_len, opts_len, s, y;
-	char *data_payload, *bn, buf[40 + 1];
+	char *bn, buf[40 + 1];
 	char opts[1024];			/* buffer for encoded options */
 	char swarm_id[] = "swarm_id";
 	char handshake_resp[256];
@@ -475,8 +475,6 @@ swift_seeder_worker (void *data)
 */
 	p->sm_seeder = SM_NONE;
 
-	data_payload = malloc(we->chunk_size + 4 + 1 + 4 + 4 + 8);	/* chunksize + headers */
-
 	wait_for_cmd = 1;   /* 1 = wait for next message from main seeder process (from router) */
 
 	while (p->finishing == 0) {
@@ -523,17 +521,17 @@ swift_seeder_worker (void *data)
 
 			opts_len = make_handshake_options(opts, &pos);
 
-			_assert((unsigned long int) opts_len <= sizeof(opts), "%s but has value: %u\n", "opts_len should be <= 1024", opts_len);
+			_assert((unsigned long int) opts_len <= sizeof(opts), "%s but has value: %d\n", "opts_len should be <= 1024", opts_len);
 
 			h_resp_len = swift_make_handshake_have(handshake_resp, p->dest_chan_id, 0xfeedbabe, opts, opts_len, p);
 
-			_assert((unsigned long int) h_resp_len <= sizeof(handshake_resp), "%s but has value: %u\n", "h_resp_len should be <= 256", h_resp_len);
+			_assert((unsigned long int) h_resp_len <= sizeof(handshake_resp), "%s but has value: %d\n", "h_resp_len should be <= 256", h_resp_len);
 
 			p->sm_seeder = SM_SEND_HANDSHAKE_HAVE;
 		}
 
 		if (p->sm_seeder == SM_SEND_HANDSHAKE_HAVE) {
-			_assert(recv_len != 0, "%s but has value: %u\n", "recv_len should be != 0", recv_len);
+			_assert(recv_len != 0, "%s but has value: %d\n", "recv_len should be != 0", recv_len);
 
 			/* send HANDSHAKE + HAVE */
 			n = sendto(sockfd, handshake_resp, h_resp_len, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
@@ -552,7 +550,7 @@ swift_seeder_worker (void *data)
 				for (y = 0; y < 20; y++)
 					s += sprintf(buf + s, "%02x", p->sha_demanded[y] & 0xff);
 				buf[40] = '\0';
-				d_printf("Error: there is no file with hash %s for %s:%u. Closing connection.\n", buf, inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
+				d_printf("Error: there is no file with hash %s for %s:%d. Closing connection.\n", buf, inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
 				p->finishing = 1;
 				p->to_remove = 1;	/* mark this particular peer to remove by GC */
 				remove_dead_peers = 1;	/* set global flag for removing dead peers by garbage collector */
@@ -579,7 +577,7 @@ swift_seeder_worker (void *data)
 		}
 
 		if (p->sm_seeder == SM_REQUEST) {
-			_assert(recv_len != 0, "%s but has value: %u\n", "recv_len should be != 0", recv_len);
+			_assert(recv_len != 0, "%s but has value: %d\n", "recv_len should be != 0", recv_len);
 
 			clock_gettime(CLOCK_MONOTONIC, &p->ts_last_recv);
 			p->d_last_recv = REQUEST;
@@ -597,7 +595,7 @@ swift_seeder_worker (void *data)
 		if (p->sm_seeder == SM_SEND_PEX_RESP) {
 			n = make_pex_resp(p->send_buf, p, we);
 
-			_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
+			_assert(n <= BUFSIZE, "%s but n has value: %d and BUFSIZE: %d\n", "n should be <= BUFSIZE", n, BUFSIZE);
 			if (n > 0) {	/* wyslij cokolwiek tylko jesli mamy cos do wyslania */
 				n = sendto(sockfd, p->send_buf, n, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
 				if (n < 0) {
@@ -624,7 +622,7 @@ swift_seeder_worker (void *data)
 
 		if (p->sm_seeder == SW_SEND_INTEGRITY_DATA) {
 			n = swift_make_integrity_reverse(p->send_buf, p, we);
-			_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
+			_assert(n <= BUFSIZE, "%s but n has value: %d and BUFSIZE: %d\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 			/* send INTEGRITY with data */
 			p->curr_chunk = p->start_chunk;		/* set beginning number of chunk for DATA0 */
@@ -694,8 +692,6 @@ swift_seeder_worker (void *data)
 
 	/* finishing thread */
 
-	free(data_payload);
-
 	pthread_exit(NULL);
 }
 
@@ -704,12 +700,11 @@ swift_seeder_worker (void *data)
 INTERNAL_LINKAGE int
 swift_net_seeder(struct peer *seeder)
 {
-	int sockfd, optval, n, st;
+	int sockfd, optval, st;
 	char buf[BUFSIZE];
 	socklen_t clientlen;
 	struct sockaddr_in serveraddr;
 	struct sockaddr_in clientaddr;
-	struct peer *p;
 	pthread_t thread;
 
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -742,13 +737,13 @@ swift_net_seeder(struct peer *seeder)
 		}
 
 		memset(buf, 0, BUFSIZE);
-		n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &clientlen);
+		int n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &clientlen);
 		if (n < 0)
 			d_printf("%s", "ERROR in recvfrom\n");
 
 		/* locate peer basing on IP address and UDP port */
 		pthread_mutex_lock(&seeder->peers_list_head_mutex);
-		p = ip_port_to_peer(seeder, &seeder->peers_list_head, &clientaddr);
+		struct peer *p = ip_port_to_peer(seeder, &seeder->peers_list_head, &clientaddr);
 		pthread_mutex_unlock(&seeder->peers_list_head_mutex);
 
 		if ((p == NULL) && (message_type(buf) != HANDSHAKE))
@@ -762,7 +757,7 @@ swift_net_seeder(struct peer *seeder)
 				add_peer_to_list(&seeder->peers_list_head, p);
 				pthread_mutex_unlock(&seeder->peers_list_head_mutex);
 
-				_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
+				_assert(n <= BUFSIZE, "%s but n has value: %d and BUFSIZE: %d\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 				memcpy(p->recv_buf, buf, n);
 				p->recv_len = n;
@@ -796,10 +791,10 @@ swift_net_seeder(struct peer *seeder)
 				d_printf("%s", "FINISH\n");
 
 				if (p == NULL) {
-					d_printf("searched IP: %s:%u  n: %u\n",  inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), n);
+					d_printf("searched IP: %s:%d  n: %d\n",  inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), n);
 					pthread_mutex_lock(&seeder->peers_list_head_mutex);
 					SLIST_FOREACH(p, &seeder->peers_list_head, snext) {
-						d_printf("    IP: %s:%u\n", inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
+						d_printf("    IP: %s:%d\n", inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
 					}
 					pthread_mutex_unlock(&seeder->peers_list_head_mutex);
 				}
@@ -829,7 +824,7 @@ swift_net_seeder(struct peer *seeder)
 
 			d_printf("%s", "OK REQUEST\n");
 
-			_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
+			_assert(n <= BUFSIZE, "%s but n has value: %d and BUFSIZE: %d\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 			memcpy(p->recv_buf, buf, n);
 			p->recv_len = n;
@@ -848,7 +843,7 @@ swift_net_seeder(struct peer *seeder)
 			swift_seeder_cond_lock(p);
 
 			d_printf("%s", "OK HAVE+ACK\n");
-			_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
+			_assert(n <= BUFSIZE, "%s but n has value: %d and BUFSIZE: %d\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 			memcpy(p->recv_buf, buf, n);
 			p->recv_len = n;
@@ -867,7 +862,7 @@ swift_net_seeder(struct peer *seeder)
 INTERNAL_LINKAGE void *
 on_handshake(struct peer *p, void *recv_buf, uint16_t recv_len)
 {
-	int n, clientlen, sockfd, h_resp_len, opts_len, s, y;
+	int n, clientlen, sockfd, h_resp_len, opts_len, y;
 	char *bn, buf[40 + 1];
 	char opts[1024];			/* buffer for encoded options */
 	char swarm_id[] = "swarm_id";
@@ -914,12 +909,12 @@ on_handshake(struct peer *p, void *recv_buf, uint16_t recv_len)
 	swift_dump_handshake_request(recv_buf, recv_len, p);
 	opts_len = make_handshake_options(opts, &pos);
 
-	_assert((unsigned long int) opts_len <= sizeof(opts), "%s but has value: %u\n", "opts_len should be <= 1024", opts_len);
+	_assert((unsigned long int) opts_len <= sizeof(opts), "%s but has value: %d\n", "opts_len should be <= 1024", opts_len);
 
 	h_resp_len = swift_make_handshake_have(handshake_resp, p->dest_chan_id, 0xfeedbabe, opts, opts_len, p);
 
-	_assert((unsigned long int) h_resp_len <= sizeof(handshake_resp), "%s but has value: %u\n", "h_resp_len should be <= 256", h_resp_len);
-	_assert(recv_len != 0, "%s but has value: %u\n", "recv_len should be != 0", recv_len);
+	_assert((unsigned long int) h_resp_len <= sizeof(handshake_resp), "%s but has value: %d\n", "h_resp_len should be <= 256", h_resp_len);
+	_assert(recv_len != 0, "%s but has value: %d\n", "recv_len should be != 0", recv_len);
 
 	/* send HANDSHAKE + HAVE */
 	n = sendto(sockfd, handshake_resp, h_resp_len, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
@@ -929,11 +924,11 @@ on_handshake(struct peer *p, void *recv_buf, uint16_t recv_len)
 	}
 
 	if (p->file_list_entry == NULL) {
-		s = 0;
+		int s = 0;
 		for (y = 0; y < 20; y++)
 			s += sprintf(buf + s, "%02x", p->sha_demanded[y] & 0xff);
 		buf[40] = '\0';
-		d_printf("Error: there is no file with hash %s for %s:%u. Closing connection.\n", buf, inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
+		d_printf("Error: there is no file with hash %s for %s:%d. Closing connection.\n", buf, inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
 		p->finishing = 1;
 		p->to_remove = 1;	/* mark this particular peer to remove by GC */
 		remove_dead_peers = 1;	/* set global flag for removing dead peers by garbage collector */
@@ -976,7 +971,7 @@ on_request(struct peer *p, void *recv_buf, uint16_t recv_len)
 
 		n = swift_make_integrity_reverse(p->send_buf, p, p->seeder);
 
-		_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
+		_assert(n <= BUFSIZE, "%s but n has value: %d and BUFSIZE: %d\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 		/* check if there is enough space in MTU to send all the INTEGRITY messages and DATA in one packet */
 		if (n + 4 + 1 + 4 + 4 + 8 + 20 + 8 + p->seeder->chunk_size <= BUFSIZE) {	/* 4:chan_id, 1: DATA message id=1, 4:start, 4:end, 8:timestamp, 20: ip, 8: udp */
@@ -986,7 +981,7 @@ on_request(struct peer *p, void *recv_buf, uint16_t recv_len)
 
 			_assert((uint32_t) data_payload_len <= p->seeder->chunk_size + 4 + 1 + 4 + 4 + 8, "%s but data_payload_len has value: %d and we->chunk_size: %u\n", "data_payload_len should be <= we->chunk_size", data_payload_len, p->seeder->chunk_size);
 
-			_assert(n + data_payload_len <= BUFSIZE, "we're trying to send too long UDP datagram: %u, should be <= %u\n", n + data_payload_len, BUFSIZE);
+			_assert(n + data_payload_len <= BUFSIZE, "we're trying to send too long UDP datagram: %d, should be <= %d\n", n + data_payload_len, BUFSIZE);
 
 			/* send DATA datagram with contents of the chunk */
 			n = sendto(p->sockfd, p->send_buf, n + data_payload_len, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
@@ -1011,7 +1006,7 @@ on_request(struct peer *p, void *recv_buf, uint16_t recv_len)
 
 			_assert((uint32_t) data_payload_len <= p->seeder->chunk_size + 4 + 1 + 4 + 4 + 8, "%s but data_payload_len has value: %d and we->chunk_size: %u\n", "data_payload_len should be <= we->chunk_size", data_payload_len, p->seeder->chunk_size);
 
-			_assert(data_payload_len <= BUFSIZE, "we're trying to send too long UDP datagram: %u, should be <= %u\n", data_payload_len, BUFSIZE);
+			_assert(data_payload_len <= BUFSIZE, "we're trying to send too long UDP datagram: %d, should be <= %d\n", data_payload_len, BUFSIZE);
 
 			/* send DATA datagram with contents of the chunk */
 			n = sendto(p->sockfd, p->send_buf, data_payload_len, 0, (struct sockaddr *) &p->leecher_addr, clientlen);
@@ -1091,7 +1086,7 @@ swift_seeder_worker_mq (void *data)
 			case PEX_REQ: break;
 			case HAVE: abort();		/* there shouldn't be HAVE message in low-prio queue */
 			case ACK: abort();		/* there shouldn't be ACK message in low-prio queue */
-			default: d_printf("another msg: %u\n", mq_buf[0]);
+			default: d_printf("another msg: %d\n", mq_buf[0]);
 		}
 	}
 
@@ -1161,7 +1156,7 @@ swift_net_seeder_mq(struct peer *seeder)
 				add_peer_to_list(&seeder->peers_list_head, p);
 				pthread_mutex_unlock(&seeder->peers_list_head_mutex);
 
-				_assert(n <= BUFSIZE, "%s but n has value: %u and BUFSIZE: %u\n", "n should be <= BUFSIZE", n, BUFSIZE);
+				_assert(n <= BUFSIZE, "%s but n has value: %d and BUFSIZE: %d\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
 				p->seeder = seeder;
 				wq_init(&p->hi_wqueue);
@@ -1183,10 +1178,10 @@ swift_net_seeder_mq(struct peer *seeder)
 				d_printf("%s", "FINISH\n");
 
 				if (p == NULL) {
-					d_printf("searched IP: %s:%u  n: %u\n",  inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), n);
+					d_printf("searched IP: %s:%d  n: %d\n",  inet_ntoa(clientaddr.sin_addr), ntohs(clientaddr.sin_port), n);
 					pthread_mutex_lock(&seeder->peers_list_head_mutex);
 					SLIST_FOREACH(p, &seeder->peers_list_head, snext) {
-						d_printf("    IP: %s:%u\n", inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
+						d_printf("    IP: %s:%d\n", inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
 					}
 					pthread_mutex_unlock(&seeder->peers_list_head_mutex);
 				}
@@ -1238,7 +1233,7 @@ swift_net_seeder_mq(struct peer *seeder)
 							size = skip_hdr * 4 + 1 + 4 + 4 + 8;
 							prio = 1;
 							break;
-					default: d_printf("another message: %u\n",buf[off + skip_hdr * 4]);
+					default: d_printf("another message: %d\n",buf[off + skip_hdr * 4]);
 				}
 
 				/* send the message to proper queue */
@@ -1320,7 +1315,7 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 
 	memset(zero, 0, sizeof(zero));
 
-	d_printf("\nverification of node: %u\n", cn->number);
+	d_printf("\nverification of node: %d\n", cn->number);
 
 	_assert(local_peer->num_have_cache > 0, "%s\n", "local_peer->num_have_cache should be > 0");
 
@@ -1335,22 +1330,22 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 		hci++;
 	}
 
-	_assert(f == 1, "current node %u hasn't been found in any range in HAVE cache\n", cn->number);
+	_assert(f == 1, "current node %d hasn't been found in any range in HAVE cache\n", cn->number);
 
 	/* subroot will be needed further in this procedure */
 	subroot_idx = local_peer->have_cache[hci].start_chunk + local_peer->have_cache[hci].end_chunk;
 	subroot = &local_peer->tree[subroot_idx];
-	d_printf("subroot found: %u in have cache entry, range: %u..%u\n", subroot->number, local_peer->have_cache[hci].start_chunk, local_peer->have_cache[hci].end_chunk);
+	d_printf("subroot found: %d in have cache entry, range: %u..%u\n", subroot->number, local_peer->have_cache[hci].start_chunk, local_peer->have_cache[hci].end_chunk);
 
 	/* find sibling for just received DATA message's node - needed to calculate sum of SHA-1 hashes */
 	si = find_sibling(cn);
 
 	_assert(si != NULL, "%s\n", "s should be != NULL - sibling must exist");
-	d_printf("sibling for: %u is: %u\n", cn->number, si->number);
+	d_printf("sibling for: %d is: %d\n", cn->number, si->number);
 
 
 	/* check if found sibling "si" is in ACTIVE state - it means if he has SHA-1 hash */
-	_assert(si->state == ACTIVE, "si %u should be in ACTIVE state (and should have SHA1 hash), but has: %u\n", si->number, si->state);
+	_assert(si->state == ACTIVE, "si %d should be in ACTIVE state (and should have SHA1 hash), but has: %d\n", si->number, si->state);
 
 	/* SHA-1 hash of the siblings always has to be linked like this: left_hash + right_hash */
 	if (cn == cn->parent->left) {
@@ -1397,8 +1392,8 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 		d_printf("siblings digest: %s\n", sha_buf);
 	}
 
-	_assert(cn->parent != NULL, "parent for node %u doesn't exist\n", cn->number);
-	/* _assert(cn->parent->state == ACTIVE, "parent %u of node %u should be in ACTIVE state, but is: %u\n", cn->parent->number, cn->number, cn->parent->state); */
+	_assert(cn->parent != NULL, "parent for node %d doesn't exist\n", cn->number);
+	/* _assert(cn->parent->state == ACTIVE, "parent %d of node %d should be in ACTIVE state, but is: %d\n", cn->parent->number, cn->number, cn->parent->state); */
 
 	node_cache_init(local_peer);
 
@@ -1432,7 +1427,7 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 
 			/* print sum of concatenated hashes */
 			if (debug) {
-				printf("siblings[%u][%u]: ", left->number, right->number);
+				printf("siblings[%d][%d]: ", left->number, right->number);
 				print_sha1(buf, 40);
 				printf("\n");
 			}
@@ -1452,7 +1447,7 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 			nc->node.number = p->number;			/* remember node number */
 			memcpy(nc->node.sha, digest_sib, 20);		/* copy SHA-1 to cache node */
 			SLIST_INSERT_HEAD(&local_peer->cache, nc, next);
-			d_printf("new cache node: %u\n", nc->node.number);
+			d_printf("new cache node: %d\n", nc->node.number);
 
 			curr = curr->parent;
 			p = curr->parent;
@@ -1469,9 +1464,9 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 
 		si = find_sibling(curr);		/* find sibling for node "curr" */
 
-		d_printf("while loop ended with curr: %u  p: %u  nc: %u  si: %u\n", curr->number, p->number, nc->node.number, si->number);
+		d_printf("while loop ended with curr: %d  p: %d  nc: %d  si: %d\n", curr->number, p->number, nc->node.number, si->number);
 
-		/* _assert(p_si != NULL, "sibling %u of parent %u must be ACTIVE\n", p_si->number, p->number); */
+		/* _assert(p_si != NULL, "sibling %d of parent %d must be ACTIVE\n", p_si->number, p->number); */
 
 		if ((memcmp(nc->node.sha, zero, sizeof(zero)) == 0) && (memcmp(si->sha, zero, sizeof(zero)) == 0))
 			abort();		/* todo */
@@ -1498,15 +1493,15 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 		}
 		if (cmp != 0) {
 			printf("error - hashes are different: ");
-			printf("parent (from INTEGRITY) %u: ", p->number);
+			printf("parent (from INTEGRITY) %d: ", p->number);
 			print_sha1(p->sha, 20);
 			printf(" vs calculated locally: ");
 			print_sha1((char *)c_digest_sib, 20);
 			printf("\n");
 
-			printf("left[%u]: ", nc->node.number);
+			printf("left[%d]: ", nc->node.number);
 			print_sha1(nc->node.sha, 20);
-			printf(" right[%u]: ", si->number);
+			printf(" right[%d]: ", si->number);
 			print_sha1(si->sha, 20);
 			printf("\n");
 			abort();
@@ -1534,7 +1529,7 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 
 		if (cmp != 0) {
 			printf("error - hashes are different: ");
-			printf("parent (from INTEGRITY) %u: ", cn->parent->number);
+			printf("parent (from INTEGRITY) %d: ", cn->parent->number);
 			print_sha1(cn->parent->sha, 20);
 			printf(" vs calculated locally: ");
 			print_sha1((char *)c_digest_sib, 20);
@@ -1547,7 +1542,7 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 	/* after copying of given hash - remove given cache entry from the list */
 	if (cmp == 0) {
 		SLIST_FOREACH(ci, &local_peer->cache, next) {
-			d_printf("copying SHA-1 of node %u from cache to tree\n", ci->node.number);
+			d_printf("copying SHA-1 of node %d from cache to tree\n", ci->node.number);
 			memcpy(local_peer->tree[ci->node.number].sha, ci->node.sha, 20);
 			local_peer->tree[ci->node.number].state = ACTIVE;
 			SLIST_REMOVE(&local_peer->cache, ci, node_cache_entry, next);
@@ -1713,7 +1708,7 @@ swift_leecher_worker_sbs(void *data)
 		if (p->sm_leecher == SM_PREPARE_REQUEST) {
 			buffer[n] = '\0';
 
-			d_printf("server replied with %u bytes\n", n);
+			d_printf("server replied with %d bytes\n", n);
 			swift_dump_handshake_have(buffer, n, p);
 
 			if ((p->after_seeder_switch == 1) && (prev_chunk_size != local_peer->chunk_size)) {
@@ -1727,7 +1722,7 @@ swift_leecher_worker_sbs(void *data)
 			/* we are connected to some seeder - so go to sleep and wait for awakening by some other task */
 			swift_leecher_cond_sleep(p);
 
-			_assert((p->cmd == CMD_FETCH) || (p->cmd == CMD_FINISH), "Command for leecher state machine should be FETCH or FINISH but is: %u\n", p->cmd);
+			_assert((p->cmd == CMD_FETCH) || (p->cmd == CMD_FINISH), "Command for leecher state machine should be FETCH or FINISH but is: %d\n", p->cmd);
 
 			/* here someone has awakened us - so check the command we need to do */
 			/* other task has set proper command in p->local_leecher->cmd */
@@ -1757,7 +1752,7 @@ swift_leecher_worker_sbs(void *data)
 			/* create REQUEST  */
 			request_len = make_request(request, 0xfeedbabe, begin, end, p);
 
-			_assert((long unsigned int) request_len <= sizeof(request), "%s but request_len has value: %u and sizeof(request): %lu\n", "request_len should be <= sizeof(request)", request_len, sizeof(request));
+			_assert((long unsigned int) request_len <= sizeof(request), "%s but request_len has value: %d and sizeof(request): %zu\n", "request_len should be <= sizeof(request)", request_len, sizeof(request));
 			p->sm_leecher = SM_SEND_REQUEST;
 		}
 
@@ -1770,7 +1765,7 @@ swift_leecher_worker_sbs(void *data)
 			}
 			d_printf("%s", "request message 3/3 sent\n");
 			p->sm_leecher = SM_WAIT_INTEGRITY;   /* jump over PEX_REQ because swift doesn't send any PEX_RESP answers */
-			d_printf("request sent: %u\n", n);
+			d_printf("request sent: %d\n", n);
 			cc = begin;	/* internal "for" loop, iterator - cc */
 		}
 
@@ -1788,7 +1783,7 @@ swift_leecher_worker_sbs(void *data)
 				n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
 			}
 
-			printf("PEX_RESP n: %u\n", n);
+			printf("PEX_RESP n: %d\n", n);
 
 			if (n <= 0) {
 				p->sm_leecher = SM_SWITCH_SEEDER;
@@ -1823,7 +1818,7 @@ swift_leecher_worker_sbs(void *data)
 			if (FD_ISSET(sockfd, &fs)) {
 				/* check the length of the packet in UDP/IP kernel stack queue */
 				n = recvfrom(sockfd, (char *)buffer, 65535, MSG_PEEK, (struct sockaddr *) &servaddr, &len);
-				_assert(n <= BUFSIZE, "error: too long udp datagram: %u - problem with seeder?\n", n);
+				_assert(n <= BUFSIZE, "error: too long udp datagram: %d - problem with seeder?\n", n);
 
 				/* receive INTEGRITY or DATA from SEEDER */
 				n = recvfrom(sockfd, (char *)buffer, BUFSIZE, 0, (struct sockaddr *) &servaddr, &len);
@@ -1851,7 +1846,7 @@ swift_leecher_worker_sbs(void *data)
 		if (p->sm_leecher == SM_INTEGRITY) {
 			d_printf("server sent INTEGRITY: %d\n", n);
 			r = swift_dump_integrity(buffer, n, local_peer);		/* copy SHA hashes to local_peer->chunk[] */
-			if (r != n) d_printf("there are some bytes %u remaining for further parse\n", n - r);
+			if (r != n) d_printf("there are some bytes %d remaining for further parse\n", n - r);
 
 			/* correct number of transferred bytes in case of seeder switching */
 			/* local_peer->tx_bytes -= (cc - begin) * local_peer->chunk_size; */	/* in swift version it brokes counting tx_bytes */
@@ -1868,7 +1863,7 @@ swift_leecher_worker_sbs(void *data)
 					nr = n - r + 4; 			/* + 4: skip destination channel*/
 					p->sm_leecher = SM_DATA;		/* skip SM_WAIT_DATA state and jump directly to SM_DATA */
 				} else {
-					_assert(buffer[r] == DATA, "should be DATA message but is: %u\n", buffer[r]);
+					_assert(buffer[r] == DATA, "should be DATA message but is: %d\n", buffer[r]);
 				}
 			} else
 				p->sm_leecher = SM_WAIT_DATA;
@@ -1905,7 +1900,7 @@ swift_leecher_worker_sbs(void *data)
 
 			/* is this transferring data via file descriptor? */
 			if (local_peer->transfer_method == M_FD) {
-				d_printf("writing chunk to file: nr: %u  offset: %lu\n", nr, cc * local_peer->chunk_size);
+				d_printf("writing chunk to file: nr: %d  offset: %lu\n", nr, cc * local_peer->chunk_size);
 				swift_mutex_lock(&local_peer->fd_mutex);
 				lseek(local_peer->fd, cc * local_peer->chunk_size, SEEK_SET);
 				write(local_peer->fd, data_buffer + 1 + 4 + 4 + 8 + 4, nr - (1 + 4 + 4 + 8 + 4));
@@ -1918,8 +1913,8 @@ swift_leecher_worker_sbs(void *data)
 				local_peer->tx_bytes += nr - (1 + 4 + 4 + 8 + 4);
 			}
 
-			_assert(nr <= BUFSIZE, "nr should be <= %u but has: %u\n", BUFSIZE, nr);
-			_assert(nr >= 1 + 4 + 4 + 8 + 4, "nr should be >= %u but is: %u\n", 1 + 4 + 4 + 8 + 4, nr);
+			_assert(nr <= BUFSIZE, "nr should be <= %d but has: %d\n", BUFSIZE, nr);
+			_assert(nr >= 1 + 4 + 4 + 8 + 4, "nr should be >= %d but is: %d\n", 1 + 4 + 4 + 8 + 4, nr);
 			/* calculate SHA hash of just received DATA */
 			SHA1Reset(&context);
 			SHA1Input(&context, data_buffer + 1 + 4 + 4 + 8 + 4 , nr - (1 + 4 + 4 + 8 + 4)); /* skip the headers */
@@ -1955,7 +1950,7 @@ swift_leecher_worker_sbs(void *data)
 			/* create ACK message to confirm that chunk in last DATA datagram has been transferred correctly */
 			ack_len = swift_make_have_ack(buffer, p);
 
-			_assert(ack_len <= BUFSIZE, "%s but ack_len has value: %lu and BUFSIZE: %u\n", "ack_len should be <= BUFSIZE", ack_len, BUFSIZE);
+			_assert(ack_len <= BUFSIZE, "%s but ack_len has value: %lu and BUFSIZE: %d\n", "ack_len should be <= BUFSIZE", ack_len, BUFSIZE);
 
 			/* send ACK */
 			n = sendto(sockfd, buffer, ack_len, 0, (const struct sockaddr *) &servaddr, sizeof(servaddr));
@@ -2042,7 +2037,7 @@ swift_leecher_worker_sbs(void *data)
 			else
 				p->current_seeder = SLIST_FIRST(&local_peer->peers_list_head); /* select begin of the qeueue */
 
-			d_printf("selected new seeder: %s:%u\n", inet_ntoa(p->current_seeder->leecher_addr.sin_addr), ntohs(p->current_seeder->leecher_addr.sin_port));
+			d_printf("selected new seeder: %s:%d\n", inet_ntoa(p->current_seeder->leecher_addr.sin_addr), ntohs(p->current_seeder->leecher_addr.sin_port));
 
 			/* change IP address and port for all the new connections */
 			memset(&servaddr, 0, sizeof(servaddr));
@@ -2188,7 +2183,7 @@ swift_preliminary_connection_sbs(struct peer *local_peer)
 
 		if (local_peer->sm_leecher == SM_PREPARE_REQUEST) {
 			buffer[n] = '\0';
-			d_printf("server replied with %u bytes\n", n);
+			d_printf("server replied with %d bytes\n", n);
 
 			/* calculate number of SHA hashes per 1500 bytes MTU */
 			/* (MTU - sizeof(iphdr) - sizeof(udphdr) - ppspp_headers) / sha_size */
@@ -2205,7 +2200,7 @@ swift_preliminary_connection_sbs(struct peer *local_peer)
 			/* so they will be those nodes in tree which have now chance to be in ACTIVE state */
 			for (int x = local_peer->nc; x < local_peer->nl; x++) {
 				local_peer->tree[x * 2].state = ACTIVE;
-				d_printf("refill[%u] ACTIVE\n", x * 2);
+				d_printf("refill[%d] ACTIVE\n", x * 2);
 			}
 			/* dump_tree(local_peer->tree, local_peer->nl); */
 
@@ -2229,7 +2224,7 @@ swift_preliminary_connection_sbs(struct peer *local_peer)
 	}
 	d_printf("%s", "HANDSHAKE_FINISH from main process sent\n");
 
-	d_printf("seeder has demanded file: %u  size: %lu\n", local_peer->seeder_has_file, local_peer->file_size);
+	d_printf("seeder has demanded file: %d  size: %lu\n", local_peer->seeder_has_file, local_peer->file_size);
 
 	close(sockfd);
 	return 0;
@@ -2258,7 +2253,7 @@ swift_net_leecher_create(struct peer *local_peer)
 	/* initially set current_seeder on primary seeder */
 	local_peer->current_seeder = c;
 
-	d_printf("[__] %s:%u\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
+	d_printf("[__] %s:%d\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
 }
 
 
@@ -2297,7 +2292,7 @@ swift_net_leecher_sbs(struct peer *local_peer)
 	xx++;
 	pthread_mutex_unlock(&local_peer->peers_list_head_mutex);
 
-	d_printf("created %u leecher threads\n", xx);
+	d_printf("created %d leecher threads\n", xx);
 
 	return 0;
 }

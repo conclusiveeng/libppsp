@@ -86,19 +86,19 @@ build_tree (int num_chunks, struct node **ret)
 	int left, right, parent, root_idx;
 	struct node *rot, *tt;
 
-	d_printf("num_chunks: %u\n", num_chunks);
+	d_printf("num_chunks: %d\n", num_chunks);
 
 	h = order2(num_chunks);							/* "h" - height of the tree */
 	nc = 1 << h;								/* if there are for example only 7 chunks - create tree with 8 leaves */
-	d_printf("order2(%u): %u\n", num_chunks, h);
-	d_printf("num_chunks(orig): %u  after_correction: %u\n", num_chunks, nc);
+	d_printf("order2(%d): %d\n", num_chunks, h);
+	d_printf("num_chunks(orig): %d  after_correction: %d\n", num_chunks, nc);
 
 	/* list the tree */
 #if 1
 	for (l = 1; l <= h + 1; l++) {		/* goes level by level from bottom up to highest level */
 		first_idx = (1 << (l - 1)) -1;  /* first index on the given level starting from left: 0, 1, 3, 7, 15, etc */
 		for (si = first_idx; si < 2 * nc; si += (1 << l)) {   /* si - sibling index */
-			d_printf("%u ", si);
+			d_printf("%d ", si);
 		}
 		d_printf("%s", "\n");
 	}
@@ -123,7 +123,7 @@ build_tree (int num_chunks, struct node **ret)
 			left = si;
 			right = (si | (1 << l));
 			parent = (left + right) / 2;
-			/* d_printf("pair %u-%u will have parent: %u\n", left, right, parent); */
+			/* d_printf("pair %d-%d will have parent: %d\n", left, right, parent); */
 			tt[left].parent = &tt[parent];			/* parent for left node */
 			tt[right].parent = &tt[parent];			/* parent for right node */
 
@@ -136,7 +136,7 @@ build_tree (int num_chunks, struct node **ret)
 	*ret = tt;							/* return just created tree */
 
 	root_idx = (1 << h) - 1;
-	d_printf("root node: %u\n", root_idx);
+	d_printf("root node: %d\n", root_idx);
 
 	rot = &tt[root_idx];
 	return rot;
@@ -154,26 +154,26 @@ build_tree (int num_chunks, struct node **ret)
 INTERNAL_LINKAGE struct node *
 extend_tree (struct node *orig_tree, int orig_num_chunks, struct node **ret)
 {
-	int x, l, si, h, first_idx, nc;
+	int x, l, si, h, nc;
 	int left, right, parent, root_idx;
 	int root_idx_012, root_idx_456;
 	struct node *rot, *tt;
 	struct node min, max;
 
-	d_printf("extending tree - num_chunks: %u => %u\n", orig_num_chunks, orig_num_chunks * 2);
+	d_printf("extending tree - num_chunks: %d => %d\n", orig_num_chunks, orig_num_chunks * 2);
 
 	h = order2(orig_num_chunks);
 	nc = 1 << h;
-	d_printf("order2(%u): %u\n", orig_num_chunks, h);
-	d_printf("num_chunks(orig): %u  after_correction: %u\n", orig_num_chunks, nc);
+	d_printf("order2(%d): %d\n", orig_num_chunks, h);
+	d_printf("num_chunks(orig): %d  after_correction: %d\n", orig_num_chunks, nc);
 
 
 	/* list the tree */
 #if 0
 	for (l = 1; l <= h + 1; l++) {		/* go through levels of the tree starting from bottom */
-		first_idx = (1 << (l - 1)) -1;  /* first index to show on given level: 0, 1, 3, 7, 15 */
+		int first_idx = (1 << (l - 1)) -1;  /* first index to show on given level: 0, 1, 3, 7, 15 */
 		for (si = first_idx; si < 2 * nc; si += (1 << l)) {	/* si - sibling index */
-			d_printf("%u ", si);
+			d_printf("%d ", si);
 		}
 		d_printf("%s", "\n");
 	}
@@ -206,7 +206,7 @@ extend_tree (struct node *orig_tree, int orig_num_chunks, struct node **ret)
 
 	/* linking nodes */
 	for (l = 1; l <= h; l++) {
-		first_idx = (1 << (l - 1)) -1;
+		int first_idx = (1 << (l - 1)) -1;
 		for (si = first_idx; si < 2 * nc; si += (2 << l)) {
 			left = si;
 			right = (si | (1 << l));
@@ -234,7 +234,7 @@ extend_tree (struct node *orig_tree, int orig_num_chunks, struct node **ret)
 
 	free(orig_tree);
 
-	d_printf("extend root node: %u  %u\n", root_idx, tt[root_idx].number);
+	d_printf("extend root node: %d  %d\n", root_idx, tt[root_idx].number);
 
 	rot = &tt[root_idx];
 	return rot;
@@ -255,34 +255,30 @@ INTERNAL_LINKAGE void
 show_tree_root_based (struct node *t)
 {
 	int l, si, nl, h, ti, first_idx;
-	int center, iw, m, sp, is;
+	int center, sp;
 	struct node min, max;
 
-	d_printf("print the tree starting from root node: %u\n", t->number);
+	d_printf("print the tree starting from root node: %d\n", t->number);
 
 	ti = t->number;
 	interval_min_max(t, &min, &max);
-	d_printf("min: %u   max: %u\n", min.number, max.number);
+	d_printf("min: %d   max: %d\n", min.number, max.number);
 	nl = (max.number - min.number) / 2 + 1;		/* number of leaves in given subtree */
 	h = order2(nl) + 1;
 
 	first_idx = ti;
 
-	d_printf("%s", "\n\n");
-
 	/* justification */
 #if 1
-	first_idx = ti;
-
 	center = (nl * (2 + 2)) / 2;
 	for (l = h; l >= 1; l--) {
-		is = 1 << l;			/* how many spaces has to be inserted between values on given level */
-		iw = 1 << (h - l);		/* number of nodes to print on given level */
-		m = iw * (2 + is) - is;		/*  */
-		/* d_printf("center: %u  iw: %u  m: %u  is: %u\n", center, iw, m, is); */
+		int is = 1 << l;			/* how many spaces has to be inserted between values on given level */
+		int iw = 1 << (h - l);		/* number of nodes to print on given level */
+		int m = iw * (2 + is) - is;		/*  */
+		/* d_printf("center: %d  iw: %d  m: %d  is: %d\n", center, iw, m, is); */
 		for (sp = 0; sp < (center - m/2); sp++) d_printf("%s", " ");			/* insert (center - m/2) spaces first */
 		for (si = first_idx; si <= max.number; si += (1 << l)) {
-			d_printf("%2u", si);
+			d_printf("%2d", si);
 			for (sp = 0; sp < is; sp++) d_printf("%s", " ");			/* add a few spaces */
 		}
 		first_idx -= (1 << (l - 2));
@@ -312,7 +308,7 @@ find_uncle (struct node *t, struct node *n)
 	if (p == gp->left)		/* if parent is left child of grandparent - then uncle is right child of the grandparent */
 		u = gp->right;
 
-	d_printf("node: %u   parent: %u  grandparent: %u  uncle: %u\n", n->number, p->number, gp->number, u->number);
+	d_printf("node: %d   parent: %d  grandparent: %d  uncle: %d\n", n->number, p->number, gp->number, u->number);
 
 	return u;
 }
@@ -332,7 +328,7 @@ find_sibling (struct node *n)
 	if (n == p->right)		/* if node 'n' is right child of parent - then sibling is left child of parent */
 		s = p->left;
 
-	d_printf("node: %u   parent: %u  sibling: %u\n", n->number, p->number, s->number);
+	d_printf("node: %d   parent: %d  sibling: %d\n", n->number, p->number, s->number);
 
 	return s;
 }
@@ -358,7 +354,7 @@ list_interval (struct node *i)
 	}
 	max = c;
 
-	d_printf("root: %u  interval  min: %u  max: %u\n", i->number, min->number, max->number);
+	d_printf("root: %d  interval  min: %d  max: %d\n", i->number, min->number, max->number);
 }
 
 
@@ -383,7 +379,7 @@ interval_min_max (struct node *i, struct node *min, struct node *max)
 
 	memcpy(max, c, sizeof(struct node));
 
-	d_printf("root: %u  interval  min: %u  max: %u\n", i->number, min->number, max->number);
+	d_printf("root: %d  interval  min: %d  max: %d\n", i->number, min->number, max->number);
 }
 
 
@@ -405,7 +401,7 @@ dump_tree (struct node *t, int l)
 		s = 0;
 		for (y = 0; y < 20; y++)
 			s += sprintf(shas + s, "%02x", t[x].sha[y] & 0xff);
-		d_printf("[%3u]  %u  %s\n", t[x].number, t[x].state, shas);
+		d_printf("[%3d]  %d  %s\n", t[x].number, t[x].state, shas);
 	}
 	d_printf("%s", "\n");
 }
@@ -422,16 +418,16 @@ INTERNAL_LINKAGE void
 dump_chunk_tab (struct chunk *c, int l)
 {
 	char buf[40 + 1];
-	int x, y, s;
+	int x, y;
 
-	d_printf("%s l: %u\n", __func__, l);
+	d_printf("%s l: %d\n", __func__, l);
 	for (x = 0; x < l; x++) {
-		s = 0;
+		int s = 0;
 		for (y = 0; y < 20; y++) {
 			s += sprintf(buf + s, "%02x", c[x].sha[y] & 0xff);
 		}
 		buf[40] = '\0';
-		d_printf("chunk[%3u]  off: %8lu  len: %8u  sha: %s  state: %s\n", x, c[x].offset, c[x].len, buf, c[x].state == CH_EMPTY ? "EMPTY" : "ACTIVE" );
+		d_printf("chunk[%3d]  off: %8lu  len: %8u  sha: %s  state: %s\n", x, c[x].offset, c[x].len, buf, c[x].state == CH_EMPTY ? "EMPTY" : "ACTIVE" );
 	}
 }
 
@@ -504,7 +500,7 @@ update_sha (struct node *t, int num_chunks)
 	char zero[20];
 	uint8_t concat[80 + 1];
 	unsigned char digest[20 + 1];
-	int h, nc, l, si, first_idx, y, s, left, right, parent;
+	int h, nc, l, si, y, s, left, right, parent;
 	SHA1Context context;
 
 	memset(zero, 0, sizeof(zero));
@@ -513,7 +509,7 @@ update_sha (struct node *t, int num_chunks)
 	nc = 1 << h;
 
 	for (l = 1; l <= h; l++) {		/* go through levels of the tree starting from bottom of the tree */
-		first_idx = (1 << (l - 1)) -1;  /* first index on given level starting from left: 0, 1, 3, 7, 15, etc */
+		int first_idx = (1 << (l - 1)) -1;  /* first index on given level starting from left: 0, 1, 3, 7, 15, etc */
 		for (si = first_idx; si < 2 * nc; si += (2 << l)) {   /* si - sibling index */
 			left = si;
 			right = (si | (1 << l));
@@ -540,7 +536,7 @@ update_sha (struct node *t, int num_chunks)
 				for (y = 0; y < 20; y++)
 					s += sprintf(sha_parent + s, "%02x", digest[y] & 0xff);
 				sha_parent[40] = '\0';
-				d_printf(" p[%u]: %s\n", t[parent].number, sha_parent);
+				d_printf(" p[%d]: %s\n", t[parent].number, sha_parent);
 			}
 			t[parent].state = ACTIVE;
 		}

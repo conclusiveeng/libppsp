@@ -49,7 +49,7 @@
 INTERNAL_LINKAGE void
 add_peer_to_list(struct slist_peers *list_head, struct peer *p)
 {
-	struct peer *pd, *last;
+	struct peer *pd;
 
 	d_printf("add new peer to list: %#lx  %s:%u\n", (uint64_t) p, inet_ntoa(p->leecher_addr.sin_addr), ntohs(p->leecher_addr.sin_port));
 
@@ -65,7 +65,7 @@ add_peer_to_list(struct slist_peers *list_head, struct peer *p)
 	if (SLIST_EMPTY(list_head)) {
 		SLIST_INSERT_HEAD(list_head, p, snext);
 	} else {
-		last = NULL;
+		struct peer *last = NULL;
 		/* look for last element in the list */
 		SLIST_FOREACH(pd, list_head, snext) {
 			if (SLIST_NEXT(pd, snext) == NULL)
@@ -213,7 +213,7 @@ cleanup_all_dead_peers(struct slist_peers *list_head)
 INTERNAL_LINKAGE void
 create_download_schedule(struct peer *p)
 {
-	uint64_t o, oldo, y;
+	uint64_t o, old_o;
 
 	d_printf("creating schedule for %u chunks\n", p->nc);
 
@@ -224,20 +224,20 @@ create_download_schedule(struct peer *p)
 		while ((p->chunk[o].downloaded == CH_YES) && (o < p->nc)) o++;
 		if (o >= p->nc) break;
 
-		oldo = o;
-		y = 0;
+		old_o = o;
+		uint64_t y = 0;
 		while ((y < p->hashes_per_mtu) && (o < p->nc)) {
 			if (p->chunk[o].downloaded == CH_NO) o++;
 			else break;
 			y++;
 		}
-		d_printf("%lu-%lu   %lu\n", oldo, o - 1, o - oldo);
+		d_printf("%lu-%lu   %lu\n", old_o, o - 1, o - old_o);
 
-		p->download_schedule[p->download_schedule_len].begin = oldo;
+		p->download_schedule[p->download_schedule_len].begin = old_o;
 		p->download_schedule[p->download_schedule_len].end = o - 1;
 		p->download_schedule_len++;
 
-		_assert((p->chunk[o].downloaded == CH_NO) || (p->chunk[o].downloaded == CH_YES), "p->chunk[o].downloaded should have CH_NO or CH_YES, but have: %u\n", p->chunk[o].downloaded);
+		_assert((p->chunk[o].downloaded == CH_NO) || (p->chunk[o].downloaded == CH_YES), "p->chunk[o].downloaded should have CH_NO or CH_YES, but have: %d\n", p->chunk[o].downloaded);
 		_assert(p->download_schedule_len <= p->nc, "p->download_schedule_len should be <= p->nc, but p->download_schedule_len=%lu and p->nc=%u\n", p->download_schedule_len, p->nc);
 	}
 }
@@ -251,7 +251,7 @@ create_download_schedule_sbs(struct peer *p, uint32_t start_chunk, uint32_t end_
 {
 	int32_t ret;
 	uint32_t last_chunk;
-	uint64_t o, oldo, y;
+	uint64_t o, old_o;
 
 	d_printf("creating schedule for %u chunks\n", p->nc);
 	p->download_schedule_len = 0;
@@ -270,17 +270,17 @@ create_download_schedule_sbs(struct peer *p, uint32_t start_chunk, uint32_t end_
 		while ((p->chunk[o].downloaded == CH_YES) && (o < p->nc)) o++;
 		if (o >= p->nc) break;
 
-		oldo = o;
-		y = 0;
+		old_o = o;
+		uint64_t y = 0;
 		while ((y < p->hashes_per_mtu) && (o < p->nc) && (o <= end_chunk)) {
 			if (p->chunk[o].downloaded == CH_NO) o++;
 			else break;
 			y++;
 		}
-		d_printf("range of chunks: %lu-%lu   %lu\n", oldo, o - 1, o - oldo);
+		d_printf("range of chunks: %lu-%lu   %lu\n", old_o, o - 1, o - old_o);
 
 		last_chunk = o - 1;
-		p->download_schedule[p->download_schedule_len].begin = oldo;
+		p->download_schedule[p->download_schedule_len].begin = old_o;
 		p->download_schedule[p->download_schedule_len].end = o - 1;
 		p->download_schedule_len++;
 
@@ -301,7 +301,7 @@ swift_create_download_schedule_sbs(struct peer *p, uint32_t start_chunk, uint32_
 {
 	int32_t ret, hci;
 	uint32_t last_chunk, ec;
-	uint64_t o, oldo, y;
+	uint64_t o, old_o, y;
 
 	d_printf("creating schedule for %u chunks\n", p->nc);
 	p->download_schedule_len = 0;
@@ -325,17 +325,17 @@ swift_create_download_schedule_sbs(struct peer *p, uint32_t start_chunk, uint32_
 			while ((p->chunk[o].downloaded == CH_YES) && (o < p->nc)) o++;
 			if (o >= p->nc) break;
 
-			oldo = o;
+			old_o = o;
 			y = 0;
 			while ((y < p->hashes_per_mtu) && (o < p->nc) && (o <= ec)) {
 				if (p->chunk[o].downloaded == CH_NO) o++;
 				else break;
 				y++;
 			}
-			d_printf("range of chunks: %lu-%lu   %lu\n", oldo, o - 1, o - oldo);
+			d_printf("range of chunks: %lu-%lu   %lu\n", old_o, o - 1, o - old_o);
 
 			last_chunk = o - 1;
-			p->download_schedule[p->download_schedule_len].begin = oldo;
+			p->download_schedule[p->download_schedule_len].begin = old_o;
 			p->download_schedule[p->download_schedule_len].end = o - 1;
 			p->download_schedule_len++;
 
@@ -378,7 +378,6 @@ INTERNAL_LINKAGE void
 list_dir(struct peer *peer, char *dname)
 {
 	DIR *dir;
-	struct dirent *dirent;
 	char newdir[1024];
 	struct file_list_entry *f;
 	struct stat stat;
@@ -388,7 +387,7 @@ list_dir(struct peer *peer, char *dname)
 		return;
 
 	while (1) {
-		dirent = readdir(dir);
+		struct dirent *dirent = readdir(dir);
 		if (dirent == NULL)
 			break;
 

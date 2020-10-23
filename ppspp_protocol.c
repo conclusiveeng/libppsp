@@ -223,7 +223,7 @@ make_handshake_options (char *ptr, struct proto_opt_str *pos)
 	d++;
 
 	ret = d - (unsigned char *)ptr;
-	d_printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -262,7 +262,7 @@ make_handshake_request (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, 
 	d += opt_len;
 
 	ret = d - ptr;
-	d_printf("%s: returning %u bytes\n", __func__, ret);
+	d_printf("%s: returning %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -316,7 +316,7 @@ make_handshake_have (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, cha
 		d += sizeof(uint32_t);
 	}
 	ret = d - ptr;
-	d_printf("%s: returning %u bytes\n", __func__, ret);
+	d_printf("%s: returning %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -370,10 +370,10 @@ swift_make_handshake_have (char *ptr, uint32_t dest_chan_id, uint32_t src_chan_i
 		b--;
 	}
 
-	d_printf("num_have_cache: %u\n", peer->num_have_cache);
+	d_printf("num_have_cache: %d\n", peer->num_have_cache);
 
 	ret = d - ptr;
-	d_printf("%s: returning %u bytes\n", __func__, ret);
+	d_printf("%s: returning %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -410,7 +410,7 @@ make_handshake_finish (char *ptr, struct peer *peer)
 	d++;
 
 	ret = d - (unsigned char *)ptr;
-	d_printf("%s: returning %u bytes\n", __func__, ret);
+	d_printf("%s: returning %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -453,7 +453,7 @@ make_request (char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32_t e
 	}
 
 	ret = d - ptr;
-	d_printf("%s: returning %u bytes\n", __func__, ret);
+	d_printf("%s: returning %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -506,7 +506,7 @@ make_pex_resp (char *ptr, struct peer *peer, struct peer *we)
 	}
 
 	ret = d - ptr;
-	d_printf("%s: returning %u bytes\n", __func__, ret);
+	d_printf("%s: returning %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -552,7 +552,7 @@ make_integrity (char *ptr, struct peer *peer, struct peer *we)
 	}
 
 	ret = d - ptr;
-	d_printf("%s: returning %u bytes\n", __func__, ret);
+	d_printf("%s: returning %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -616,7 +616,7 @@ swift_make_integrity_reverse (char *ptr, struct peer *peer, struct peer *we)
 
 			if (!(peer->integrity_bmp[v_root / 8] & (1 << (v_root % 8)))) {
 				memcpy(it[itn].sha, e->sha, 20);
-				d_printf("it[%u] %u..%u\n", itn, it[itn].start_chunk, it[itn].end_chunk);
+				d_printf("it[%d] %u..%u\n", itn, it[itn].start_chunk, it[itn].end_chunk);
 				itn++;
 				peer->integrity_bmp[v_root / 8] |= (1 << (v_root % 8));		/* update INTEGRITY bitmap */
 			}
@@ -637,7 +637,7 @@ swift_make_integrity_reverse (char *ptr, struct peer *peer, struct peer *we)
 	ic = 0;
 	f = 0;
 	while (ic < peer->num_have_cache) {
-		d_printf("have_cache[%u]: start: %u  end: %u\n", ic, peer->have_cache[ic].start_chunk, peer->have_cache[ic].end_chunk);
+		d_printf("have_cache[%d]: start: %u  end: %u\n", ic, peer->have_cache[ic].start_chunk, peer->have_cache[ic].end_chunk);
 		if ((peer->curr_chunk >= peer->have_cache[ic].start_chunk) && (peer->curr_chunk <= peer->have_cache[ic].end_chunk)) {
 			f = 1;
 			break;
@@ -645,13 +645,13 @@ swift_make_integrity_reverse (char *ptr, struct peer *peer, struct peer *we)
 		ic++;
 	}
 
-	_assert(f == 1, "f must be equal 1 but it has: %u value\n", f);
+	_assert(f == 1, "f must be equal 1 but it has: %d value\n", f);
 
 	/* determine subroot for curr_chunk and given HAVE subtree
 	 * "ic" is pointing to index of subrange in peer->have_cache
 	 */
 	n_subroot = &peer->file_list_entry->tree[peer->have_cache[ic].start_chunk + peer->have_cache[ic].end_chunk];
-	d_printf("subroot for subrange: %u..%u is: %u\n", peer->have_cache[ic].start_chunk, peer->have_cache[ic].end_chunk, n_subroot->number);
+	d_printf("subroot for subrange: %u..%u is: %d\n", peer->have_cache[ic].start_chunk, peer->have_cache[ic].end_chunk, n_subroot->number);
 
 	while ((n != n_subroot) && (n->parent != NULL)) {
 		/* which children the node "n" is? left or right from paren point of view? */
@@ -668,7 +668,7 @@ swift_make_integrity_reverse (char *ptr, struct peer *peer, struct peer *we)
 			memcpy(it2[itn2].sha, s->sha, 20);
 			itn2++;
 			peer->integrity_bmp[s->number / 8] |= (1 << (s->number % 8));
-		} else d_printf("INTEGRITY already sent: %u skip it\n", s->number);
+		} else d_printf("INTEGRITY already sent: %d skip it\n", s->number);
 
 		/* go up - to parent of current "n" */
 		n = n->parent;
@@ -678,7 +678,7 @@ swift_make_integrity_reverse (char *ptr, struct peer *peer, struct peer *we)
 	if (itn2 > 0) {
 		iti2 = itn2 - 1;
 		while (iti2 >= 0) {
-			d_printf("it2[%u] %u..%u\n", iti2, it2[iti2].start_chunk, it2[iti2].end_chunk);
+			d_printf("it2[%d] %u..%u\n", iti2, it2[iti2].start_chunk, it2[iti2].end_chunk);
 			it[itn].start_chunk = it2[iti2].start_chunk;
 			it[itn].end_chunk = it2[iti2].end_chunk;
 			memcpy(it[itn].sha, it2[iti2].sha, 20);
@@ -689,7 +689,7 @@ swift_make_integrity_reverse (char *ptr, struct peer *peer, struct peer *we)
 
 	/* finally for each of generated subranges - generate INTEGRITY entries */
 	for (iti = 0; iti < itn; iti++) {
-		d_printf("INTEGRITY[%u] (%u..%u)\n", iti, it[iti].start_chunk, it[iti].end_chunk);
+		d_printf("INTEGRITY[%d] (%u..%u)\n", iti, it[iti].start_chunk, it[iti].end_chunk);
 		*d = INTEGRITY;
 		d++;
 		*(uint32_t *)d = htobe32(it[iti].start_chunk);
@@ -704,7 +704,7 @@ swift_make_integrity_reverse (char *ptr, struct peer *peer, struct peer *we)
 	free(it2);
 
 	ret = d - ptr;
-	d_printf("%s: returning %u bytes\n", __func__, ret);
+	d_printf("%s: returning %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -765,7 +765,7 @@ make_data (char *ptr, struct peer *peer)
 	d += l;
 
 	ret = d - ptr;
-	d_printf("%s: returning %u bytes\n", __func__, ret);
+	d_printf("%s: returning %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -817,7 +817,7 @@ swift_make_data (char *ptr, struct peer *peer)
 	d += l;
 
 	ret = d - ptr;
-	d_printf("%s: returning %u bytes\n", __func__, ret);
+	d_printf("%s: returning %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -869,7 +869,7 @@ swift_make_data_no_chanid (char *ptr, struct peer *peer)
 	d += l;
 
 	ret = d - ptr;
-	d_printf("%s: returning %u bytes\n", __func__, ret);
+	d_printf("%s: returning %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -974,9 +974,9 @@ dump_options (char *ptr, struct peer *peer)
 
 	if (*d == VERSION) {
 		d++;
-		d_printf("version: %u\n", *d);
+		d_printf("version: %d\n", *d);
 		if (*d != 1) {
-			d_printf("version should be 1 but is: %u\n", *d);
+			d_printf("version should be 1 but is: %d\n", *d);
 			abort();
 		}
 		d++;
@@ -984,7 +984,7 @@ dump_options (char *ptr, struct peer *peer)
 
 	if (*d == MINIMUM_VERSION) {
 		d++;
-		d_printf("minimum_version: %u\n", *d);
+		d_printf("minimum_version: %d\n", *d);
 		d++;
 	}
 
@@ -993,7 +993,7 @@ dump_options (char *ptr, struct peer *peer)
 		d++;
 		swarm_len = be16toh(*((uint16_t *)d) & 0xffff);
 		d += 2;
-		/* d_printf("swarm_id[%u]: %s\n", swarm_len, d); 	swarm_id are binary data so don't print them in raw format */
+		/* d_printf("swarm_id[%d]: %s\n", swarm_len, d); 	swarm_id are binary data so don't print them in raw format */
 		d += swarm_len;
 	}
 
@@ -1026,7 +1026,7 @@ dump_options (char *ptr, struct peer *peer)
 
 	if (*d == LIVE_SIGNATURE_ALG) {
 		d++;
-		d_printf("Live Signature Algorithm: %u\n", *d);
+		d_printf("Live Signature Algorithm: %d\n", *d);
 		d++;
 	}
 
@@ -1072,7 +1072,7 @@ dump_options (char *ptr, struct peer *peer)
 
 	if (*d == CHUNK_SIZE) {
 		d++;
-		d_printf("Chunk size: %u\n", be32toh(*(uint32_t *)d));
+		d_printf("Chunk size: %d\n", be32toh(*(uint32_t *)d));
 		if (peer->type == LEECHER) {
 			peer->chunk_size = be32toh(*(uint32_t *)d);
 		}
@@ -1090,7 +1090,7 @@ dump_options (char *ptr, struct peer *peer)
 
 	if (*d == FILE_NAME) {
 		d++;
-		d_printf("File name size: %u\n", *d & 0xff);
+		d_printf("File name size: %d\n", *d & 0xff);
 		peer->fname_len = *d & 0xff ;
 		d++;
 		memcpy(peer->fname, d, peer->fname_len);
@@ -1128,7 +1128,7 @@ dump_options (char *ptr, struct peer *peer)
 		d_printf("%s", "end option\n");
 		d++;
 	} else {
-		d_printf("error: should be END_OPTION(0xff) but is: d[%lu]: %u\n", d - ptr, *d & 0xff);
+		d_printf("error: should be END_OPTION(0xff) but is: d[%ld]: %d\n", d - ptr, *d & 0xff);
 		abort();
 	}
 
@@ -1137,7 +1137,7 @@ dump_options (char *ptr, struct peer *peer)
 		peer->chunk_size = 1024;
 	}
 
-	d_printf("parsed: %lu bytes\n", d - ptr);
+	d_printf("parsed: %ld bytes\n", d - ptr);
 
 	ret = d - ptr;
 	return ret;
@@ -1158,9 +1158,9 @@ swift_dump_options (char *ptr, struct peer *peer)
 
 	if (*d == VERSION) {
 		d++;
-		d_printf("version: %u\n", *d);
+		d_printf("version: %d\n", *d);
 		if (*d != 1) {
-			d_printf("version should be 1 but is: %u\n", *d);
+			d_printf("version should be 1 but is: %d\n", *d);
 			abort();
 		}
 		d++;
@@ -1168,7 +1168,7 @@ swift_dump_options (char *ptr, struct peer *peer)
 
 	if (*d == MINIMUM_VERSION) {
 		d++;
-		d_printf("minimum_version: %u\n", *d);
+		d_printf("minimum_version: %d\n", *d);
 		d++;
 	}
 
@@ -1176,7 +1176,7 @@ swift_dump_options (char *ptr, struct peer *peer)
 		d++;
 		swarm_len = be16toh(*((uint16_t *)d) & 0xffff);
 		d += 2;
-		/* d_printf("swarm_id[%u]: %s\n", swarm_len, d); 	swarm_id are binary data so don't print them */
+		/* d_printf("swarm_id[%d]: %s\n", swarm_len, d); 	swarm_id are binary data so don't print them */
 
 		if (1) {
 			SLIST_FOREACH(fi, &peer->seeder->file_list_head, next) {
@@ -1220,7 +1220,7 @@ swift_dump_options (char *ptr, struct peer *peer)
 
 	if (*d == LIVE_SIGNATURE_ALG) {
 		d++;
-		d_printf("Live Signature Algorithm: %u\n", *d);
+		d_printf("Live Signature Algorithm: %d\n", *d);
 		d++;
 	}
 
@@ -1266,7 +1266,7 @@ swift_dump_options (char *ptr, struct peer *peer)
 
 	if (*d == CHUNK_SIZE) {
 		d++;
-		d_printf("Chunk size: %u\n", be32toh(*(uint32_t *)d));
+		d_printf("Chunk size: %d\n", be32toh(*(uint32_t *)d));
 		if (peer->type == LEECHER) {
 			peer->chunk_size = be32toh(*(uint32_t *)d);
 		}
@@ -1278,7 +1278,7 @@ swift_dump_options (char *ptr, struct peer *peer)
 		d_printf("%s", "end option\n");
 		d++;
 	} else {
-		d_printf("error: should be END_OPTION(0xff) but is: d[%lu]: %u\n", d - ptr, *d & 0xff);
+		d_printf("error: should be END_OPTION(0xff) but is: d[%lu]: %d\n", d - ptr, *d & 0xff);
 		abort();
 	}
 
@@ -1320,7 +1320,7 @@ dump_handshake_request (char *ptr, int req_len, struct peer *peer)
 	if (*d == HANDSHAKE) {
 		d_printf("%s", "ok, HANDSHAKE req\n");
 	} else {
-		d_printf("error - should be HANDSHAKE req (0) but is: %u\n", *d);
+		d_printf("error - should be HANDSHAKE req (0) but is: %d\n", *d);
 		abort();
 	}
 	d++;
@@ -1335,7 +1335,7 @@ dump_handshake_request (char *ptr, int req_len, struct peer *peer)
 	opt_len = dump_options(d, peer);
 
 	ret = d + opt_len - ptr;
-	d_printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -1353,7 +1353,7 @@ swift_dump_handshake_request (char *ptr, int req_len, struct peer *peer)
 	if (*d == HANDSHAKE) {
 		d_printf("%s", "ok, HANDSHAKE req\n");
 	} else {
-		d_printf("error - should be HANDSHAKE req (0) but is: %u\n", *d);
+		d_printf("error - should be HANDSHAKE req (0) but is: %d\n", *d);
 		abort();
 	}
 	d++;
@@ -1382,7 +1382,7 @@ swift_dump_handshake_request (char *ptr, int req_len, struct peer *peer)
 	memset(peer->data_bmp, 0, 2 * peer->file_list_entry->nl / 8);
 
 	ret = d + opt_len - ptr;
-	d_printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -1414,7 +1414,7 @@ dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 	if (*d == HAVE) {
 		d_printf("%s", "ok, HAVE header\n");
 	} else {
-		d_printf("error, should be HAVE header but is: %u\n", *d);
+		d_printf("error, should be HAVE header but is: %d\n", *d);
 		abort();
 	}
 
@@ -1458,7 +1458,7 @@ dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 	}
 
 	ret = d - ptr;
-	d_printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -1491,7 +1491,7 @@ swift_dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 		if (*d == HAVE) {
 			d_printf("%s", "ok, HAVE header\n");
 		} else {
-			d_printf("error, should be HAVE header but is: %u\n", *d);
+			d_printf("error, should be HAVE header but is: %d\n", *d);
 			abort();
 		}
 
@@ -1513,7 +1513,7 @@ swift_dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 		peer->num_have_cache++;				/* increment number of HAVE cache entries */
 	}
 
-	d_printf("created HAVE cache with %u entries\n", peer->num_have_cache);
+	d_printf("created HAVE cache with %d entries\n", peer->num_have_cache);
 
 	peer->start_chunk = start_chunk;
 	d_printf("final: start chunk: %u\n", start_chunk);
@@ -1522,7 +1522,7 @@ swift_dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 
 	/* calculate how many chunks seeder has */
 	num_chunks = end_chunk - start_chunk + 1;
-	d_printf("seeder has %u chunks\n", num_chunks);
+	d_printf("seeder has %d chunks\n", num_chunks);
 	peer->nc = num_chunks;
 	if (peer->local_leecher)
 		peer->local_leecher->nc = num_chunks;
@@ -1531,7 +1531,7 @@ swift_dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 	peer->nl = 1 << order2(peer->nc);
 	if (peer->local_leecher)
 		peer->local_leecher->nl = peer->nl;
-	d_printf("nc: %u nl: %u\n", peer->nc, peer->nl);
+	d_printf("nc: %d nl: %d\n", peer->nc, peer->nl);
 
 	if (peer->local_leecher) {
 		if (peer->local_leecher->chunk_size == 0)
@@ -1563,7 +1563,7 @@ swift_dump_handshake_have (char *ptr, int resp_len, struct peer *peer)
 	}
 
 	ret = d - ptr;
-	d_printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -1594,18 +1594,18 @@ dump_request (char *ptr, int req_len, struct peer *peer)
 	if (*d == REQUEST) {
 		d_printf("%s", "ok, REQUEST header\n");
 	} else {
-		d_printf("error, should be REQUEST header but is: %u\n", *d);
+		d_printf("error, should be REQUEST header but is: %d\n", *d);
 		abort();
 	}
 	d++;
 
 	start_chunk = be32toh(*(uint32_t *)d);
 	d += sizeof(uint32_t);
-	d_printf("  start chunk: %u\n", start_chunk);
+	d_printf("  start chunk: %d\n", start_chunk);
 
 	end_chunk = be32toh(*(uint32_t *)d);
 	d += sizeof(uint32_t);
-	d_printf("  end chunk: %u\n", end_chunk);
+	d_printf("  end chunk: %d\n", end_chunk);
 
 	_assert(peer->type == LEECHER, "%s\n", "Only leecher is allowed to run this procedure");
 
@@ -1624,7 +1624,7 @@ dump_request (char *ptr, int req_len, struct peer *peer)
 	}
 
 	ret = d - ptr;
-	d_printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -1642,7 +1642,7 @@ swift_dump_request (char *ptr, int req_len, struct peer *peer)
 	if (*d == REQUEST) {
 		d_printf("%s", "ok, REQUEST header\n");
 	} else {
-		d_printf("error, should be REQUEST header but is: %u\n", *d);
+		d_printf("error, should be REQUEST header but is: %d\n", *d);
 		abort();
 	}
 	d++;
@@ -1672,7 +1672,7 @@ swift_dump_request (char *ptr, int req_len, struct peer *peer)
 	}
 
 	ret = d - ptr;
-	d_printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -1702,7 +1702,7 @@ dump_pex_resp (char *ptr, int req_len, struct peer *peer, int sockfd)
 	if (*d == PEX_RESV4) {
 		d_printf("%s", "ok, PEX_RESV4 header\n");
 	} else {
-		d_printf("error, should be PEX_RESV4 header but is: %u\n", *d);
+		d_printf("error, should be PEX_RESV4 header but is: %d\n", *d);
 		abort();
 	}
 	d++;
@@ -1725,9 +1725,9 @@ dump_pex_resp (char *ptr, int req_len, struct peer *peer, int sockfd)
 		/* initially set current_seeder on primary seeder */
 		peer->current_seeder = c;
 
-		d_printf("[__] %s:%u\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
+		d_printf("[__] %s:%d\n", inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
 
-		d_printf("max_pex: %u\n", max_pex);
+		d_printf("max_pex: %d\n", max_pex);
 		pex = 0;
 		while (pex < max_pex) {
 			memcpy(&sa.sin_addr.s_addr, d, sizeof(sa.sin_addr.s_addr));
@@ -1735,7 +1735,7 @@ dump_pex_resp (char *ptr, int req_len, struct peer *peer, int sockfd)
 			memcpy(&sa.sin_port, d, sizeof(sa.sin_port));
 			d += sizeof(sa.sin_port);
 
-			d_printf("[%u] %s:%u\n", pex, inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
+			d_printf("[%d] %s:%d\n", pex, inet_ntoa(sa.sin_addr), ntohs(sa.sin_port));
 
 			c = new_seeder(&sa, BUFSIZE);
 			c->sockfd = sockfd;
@@ -1748,7 +1748,7 @@ dump_pex_resp (char *ptr, int req_len, struct peer *peer, int sockfd)
 	}
 
 	ret = d - ptr;
-	d_printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -1779,18 +1779,18 @@ dump_integrity (char *ptr, int req_len, struct peer *peer)
 	if (*d == INTEGRITY) {
 		d_printf("%s", "ok, INTEGRITY header\n");
 	} else {
-		d_printf("error, should be INTEGRITY header but is: %u\n", *d);
+		d_printf("error, should be INTEGRITY header but is: %d\n", *d);
 		abort();
 	}
 	d++;
 
 	start_chunk = be32toh(*(uint32_t *)d);
 	d += sizeof(uint32_t);
-	d_printf("  start chunk: %u\n", start_chunk);
+	d_printf("  start chunk: %d\n", start_chunk);
 
 	end_chunk = be32toh(*(uint32_t *)d);
 	d += sizeof(uint32_t);
-	d_printf("  end chunk: %u\n", end_chunk);
+	d_printf("  end chunk: %d\n", end_chunk);
 
 	for (x = start_chunk; x <= end_chunk; x++) {
 		memcpy(peer->chunk[x].sha, d, 20);
@@ -1805,7 +1805,7 @@ dump_integrity (char *ptr, int req_len, struct peer *peer)
 		for (y = 0; y < 20; y++)
 			s += sprintf(sha_buf + s, "%02x", peer->chunk[x].sha[y] & 0xff);
 		sha_buf[40] = '\0';
-		d_printf("dumping chunk %u:  %s\n", x, sha_buf);
+		d_printf("dumping chunk %d:  %s\n", x, sha_buf);
 
 		d += 20;
 	}
@@ -1814,7 +1814,7 @@ dump_integrity (char *ptr, int req_len, struct peer *peer)
 		d_printf("  %lu bytes left, parse them\n", req_len - (d - ptr));
 
 	ret = d - ptr;
-	d_printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -1839,17 +1839,17 @@ swift_dump_integrity (char *ptr, int req_len, struct peer *peer)
 		if (*d == INTEGRITY) {
 			d_printf("%s", "ok, INTEGRITY header\n");
 		} else {
-			d_printf("error, should be INTEGRITY header but is: %u\n", *d);
+			d_printf("error, should be INTEGRITY header but is: %d\n", *d);
 			abort();
 		}
 		d++;
 
 		start_chunk = be32toh(*(uint32_t *)d);
-		d_printf("  start chunk: %u\n", start_chunk);
+		d_printf("  start chunk: %d\n", start_chunk);
 		d += sizeof(uint32_t);
 
 		end_chunk = be32toh(*(uint32_t *)d);
-		d_printf("  end chunk: %u\n", end_chunk);
+		d_printf("  end chunk: %d\n", end_chunk);
 		d += sizeof(uint32_t);
 
 		/* for example tree: 0,2,4,6 (indexes: 0,1,2,3) and range (start_chunk==0 and end_chunk==3) root node is 3
@@ -1857,7 +1857,7 @@ swift_dump_integrity (char *ptr, int req_len, struct peer *peer)
 		 */
 		node = start_chunk + end_chunk;		/* calculate root node */
 
-		d_printf("setting up node: %u\n", node);
+		d_printf("setting up node: %d\n", node);
 
 		memcpy(peer->tree[node].sha, d, 20);
 		peer->tree[node].state = ACTIVE;
@@ -1867,7 +1867,7 @@ swift_dump_integrity (char *ptr, int req_len, struct peer *peer)
 			for (y = 0; y < 20; y++)
 				s += sprintf(sha_buf + s, "%02x", peer->tree[node].sha[y] & 0xff);
 			sha_buf[40] = '\0';
-			d_printf("dumping node %u:  %s\n", node, sha_buf);
+			d_printf("dumping node %d:  %s\n", node, sha_buf);
 		}
 		d += 20;		/* jump over SHA-1 hash */
 	}
@@ -1876,7 +1876,7 @@ swift_dump_integrity (char *ptr, int req_len, struct peer *peer)
 		d_printf("  %lu bytes left, parse them\n", req_len - (d - ptr));
 
 	ret = d - ptr;
-	d_printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -1908,24 +1908,24 @@ dump_ack (char *ptr, int ack_len, struct peer *peer)
 	if (*d == ACK) {
 		d_printf("%s", "ok, ACK header\n");
 	} else {
-		d_printf("error, should be ACK header but is: %u\n", *d);
+		d_printf("error, should be ACK header but is: %d\n", *d);
 	}
 	d++;
 
 	start_chunk = be32toh(*(uint32_t *)d);
 	d += sizeof(uint32_t);
-	d_printf("start chunk: %u\n", start_chunk);
+	d_printf("start chunk: %d\n", start_chunk);
 
 	end_chunk = be32toh(*(uint32_t *)d);
 	d += sizeof(uint32_t);
-	d_printf("end chunk: %u\n", end_chunk);
+	d_printf("end chunk: %d\n", end_chunk);
 
 	delay_sample = be64toh(*(uint64_t *)d);
 	d += sizeof(uint64_t);
 	d_printf("delay_sample: %#lx\n", delay_sample);
 
 	ret = d - ptr;
-	d_printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -1948,7 +1948,7 @@ swift_dump_have_ack (char *ptr, int ack_len, struct peer *peer)
 	if (*d == HAVE) {
 		d_printf("%s", "ok, HAVE header\n");
 	} else {
-		d_printf("error, should be HAVE header but is: %u\n", *d);
+		d_printf("error, should be HAVE header but is: %d\n", *d);
 	}
 	d++;
 
@@ -1978,13 +1978,13 @@ swift_dump_have_ack (char *ptr, int ack_len, struct peer *peer)
 		d += sizeof(uint64_t);
 		d_printf("delay_sample: %#lx\n", delay_sample);
 	} else {
-		d_printf("error, should be ACK header but is: %u\n", *d);
+		d_printf("error, should be ACK header but is: %d\n", *d);
 	}
 
 	if (d - ptr > ack_len) abort();
 
 	ret = d - ptr;
-	d_printf("%s returning: %u bytes\n", __func__, ret);
+	d_printf("%s returning: %d bytes\n", __func__, ret);
 
 	return ret;
 }
@@ -2019,7 +2019,7 @@ handshake_type (char *ptr)
 	if (*d == HANDSHAKE) {
 		d_printf("%s", "ok, HANDSHAKE header\n");
 	} else {
-		d_printf("error, should be HANDSHAKE header but is: %u\n", *d);
+		d_printf("error, should be HANDSHAKE header but is: %d\n", *d);
 		abort();
 	}
 	d++;
@@ -2067,7 +2067,7 @@ count_handshake (char *ptr, uint16_t n, uint8_t skip_hdr)
 	if (*d == HANDSHAKE) {
 		d_printf("%s", "ok, HANDSHAKE req\n");
 	} else {
-		d_printf("error - should be HANDSHAKE req (0) but is: %u\n", *d);
+		d_printf("error - should be HANDSHAKE req (0) but is: %d\n", *d);
 		abort();
 	}
 	d++;
@@ -2133,7 +2133,7 @@ count_handshake (char *ptr, uint16_t n, uint8_t skip_hdr)
 		d_printf("%s", "end option\n");
 		d++;
 	} else {
-		d_printf("error: should be END_OPTION(0xff) but is: d[%lu]: %u\n", d - ptr, *d & 0xff);
+		d_printf("error: should be END_OPTION(0xff) but is: d[%lu]: %d\n", d - ptr, *d & 0xff);
 		abort();
 	}
 

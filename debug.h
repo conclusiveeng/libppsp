@@ -37,7 +37,7 @@ extern int debug;
 #if DEBUG
 #define _assert(cond, format, ...) do {					\
 	if (!(cond)) {							\
-		printf("*** %s:%u %s() [%#lx] Assertion failed: " format,	\
+		printf("*** %s:%d %s() [%#lx] Assertion failed: " format,	\
 		__FILE__, __LINE__, __func__, pthread_self(), __VA_ARGS__);	\
 		abort(); }						\
 } while(0)
