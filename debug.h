@@ -23,7 +23,6 @@
  * SUCH DAMAGE.
  */
 
-
 #ifndef _DEBUG_H_
 #define _DEBUG_H_
 
@@ -35,22 +34,29 @@ extern int debug;
 #define DEBUG 1
 
 #if DEBUG
-#define _assert(cond, format, ...) do {					\
-	if (!(cond)) {							\
-		printf("*** %s:%d %s() [%#lx] Assertion failed: " format,	\
-		__FILE__, __LINE__, __func__, pthread_self(), __VA_ARGS__);	\
-		abort(); }						\
-} while(0)
+#define _assert(cond, format, ...)                                             \
+  do {                                                                         \
+    if (!(cond)) {                                                             \
+      printf("*** %s:%d %s() [%#lx] Assertion failed: " format, __FILE__,      \
+             __LINE__, __func__, pthread_self(), __VA_ARGS__);                 \
+      abort();                                                                 \
+    }                                                                          \
+  } while (0)
 
-#define d_printf(format, ...) do {					\
-	if (debug > 0)							\
-		printf(format, __VA_ARGS__);				\
-} while(0)
+#define d_printf(format, ...)                                                  \
+  do {                                                                         \
+    if (debug > 0)                                                             \
+      printf(format, __VA_ARGS__);                                             \
+  } while (0)
 
 #else
 
-#define _assert(cond, format, ...) do {} while(0)
-#define d_printf(format, ...) do {} while(0)
+#define _assert(cond, format, ...)                                             \
+  do {                                                                         \
+  } while (0)
+#define d_printf(format, ...)                                                  \
+  do {                                                                         \
+  } while (0)
 
 #endif
 #endif /* _DEBUG_H_ */

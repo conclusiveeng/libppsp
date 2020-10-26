@@ -23,7 +23,6 @@
  * SUCH DAMAGE.
  */
 
-
 #ifndef _NET_SWIFT_H_
 #define _NET_SWIFT_H_
 

@@ -26,34 +26,35 @@
 #ifndef _PPSPP_SWIFT_H_
 #define _PPSPP_SWIFT_H_
 
-#include<stdint.h>
+#include <stdint.h>
 
 /**
  * @file ppspp.h
  */
 
 typedef struct {
-	uint32_t chunk_size;		/**< Size of the chunk for seeded files */
-	uint32_t timeout;		/**< Timeout for network communication */
-	uint16_t port;			/**< UDP port number to bind to */
+  uint32_t chunk_size; /**< Size of the chunk for seeded files */
+  uint32_t timeout;    /**< Timeout for network communication */
+  uint16_t port;       /**< UDP port number to bind to */
 } ppspp_seeder_params_t;
 
 typedef struct {
-	uint32_t timeout;		/**< Timeout for network communication */
-	uint8_t sha_demanded[20];	/**< SHA1 of demanded file */
-	struct sockaddr_in seeder_addr;	/**< Primary seeder IP/PORT address from leecher point of view */
+  uint32_t timeout;               /**< Timeout for network communication */
+  uint8_t sha_demanded[20];       /**< SHA1 of demanded file */
+  struct sockaddr_in seeder_addr; /**< Primary seeder IP/PORT address from
+                                     leecher point of view */
 } ppspp_leecher_params_t;
 
 /* metadata of the file published for user of library */
 typedef struct {
-	char file_name[256];		/**< File name for demanded SHA1 hash */
-	uint64_t file_size;		/**< Size of the file */
-	uint32_t chunk_size;		/**< Size of the chunk */
-	uint32_t start_chunk;		/**< Number of first chunk in file */
-	uint32_t end_chunk;		/**< Number of last chunk in file */
+  char file_name[256];  /**< File name for demanded SHA1 hash */
+  uint64_t file_size;   /**< Size of the file */
+  uint32_t chunk_size;  /**< Size of the chunk */
+  uint32_t start_chunk; /**< Number of first chunk in file */
+  uint32_t end_chunk;   /**< Number of last chunk in file */
 } ppspp_metadata_t;
 
-typedef int64_t ppspp_handle_t;	/**< seeder or leecher handle */
+typedef int64_t ppspp_handle_t; /**< seeder or leecher handle */
 
 ppspp_handle_t swift_seeder_create(ppspp_seeder_params_t *);
 int swift_seeder_add_seeder(ppspp_handle_t, struct sockaddr_in *);
