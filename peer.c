@@ -68,11 +68,13 @@ INTERNAL_LINKAGE void add_peer_to_list(struct slist_peers *list_head,
     struct peer *last = NULL;
     /* look for last element in the list */
     SLIST_FOREACH(pd, list_head, snext) {
-      if (SLIST_NEXT(pd, snext) == NULL)
-        last = pd;
+      if (SLIST_NEXT(pd, snext) == NULL) {
+	last = pd;
+      }
     }
-    if (last == NULL)
+    if (last == NULL) {
       abort();
+    }
     /* add element to the end of the list */
     SLIST_INSERT_AFTER(last, p, snext);
   }
@@ -105,8 +107,9 @@ INTERNAL_LINKAGE struct peer *new_peer(struct sockaddr_in *sa, int n,
   struct peer *p;
 
   p = malloc(sizeof(struct peer));
-  if (p == NULL)
+  if (p == NULL) {
     return NULL;
+  }
 
   memset(p, 0, sizeof(struct peer));
   memcpy(&p->leecher_addr, sa, sizeof(struct sockaddr_in));
@@ -133,8 +136,9 @@ INTERNAL_LINKAGE struct peer *new_seeder(struct sockaddr_in *sa, int n) {
   struct peer *p;
 
   p = malloc(sizeof(struct peer));
-  if (p == NULL)
+  if (p == NULL) {
     return NULL;
+  }
 
   memset(p, 0, sizeof(struct peer));
 
@@ -175,10 +179,12 @@ INTERNAL_LINKAGE void cleanup_peer(struct peer *p) {
   }
 
   /* free allocated memory */
-  if (p->recv_buf)
+  if (p->recv_buf) {
     free(p->recv_buf);
-  if (p->send_buf)
+  }
+  if (p->send_buf) {
     free(p->send_buf);
+  }
   p->recv_buf = p->send_buf = NULL;
   d_printf("freeing peer: %#lx\n", (uint64_t)p);
   free(p);
@@ -200,7 +206,8 @@ INTERNAL_LINKAGE void cleanup_all_dead_peers(struct slist_peers *list_head) {
  * basing on chunk array - create download schedule (array)
  */
 INTERNAL_LINKAGE void create_download_schedule(struct peer *p) {
-  uint64_t o, old_o;
+  uint64_t o;
+  uint64_t old_o;
 
   d_printf("creating schedule for %u chunks\n", p->nc);
 
@@ -208,18 +215,21 @@ INTERNAL_LINKAGE void create_download_schedule(struct peer *p) {
   o = 0;
   while (o < p->nc) {
     /* find first/closest not yet downloaded chunk */
-    while ((p->chunk[o].downloaded == CH_YES) && (o < p->nc))
+    while ((p->chunk[o].downloaded == CH_YES) && (o < p->nc)) {
       o++;
-    if (o >= p->nc)
+    }
+    if (o >= p->nc) {
       break;
+    }
 
     old_o = o;
     uint64_t y = 0;
     while ((y < p->hashes_per_mtu) && (o < p->nc)) {
-      if (p->chunk[o].downloaded == CH_NO)
-        o++;
-      else
-        break;
+      if (p->chunk[o].downloaded == CH_NO) {
+	o++;
+      } else {
+	break;
+      }
       y++;
     }
     d_printf("%lu-%lu   %lu\n", old_o, o - 1, o - old_o);
@@ -247,7 +257,8 @@ INTERNAL_LINKAGE int32_t create_download_schedule_sbs(struct peer *p,
                                                       uint32_t end_chunk) {
   int32_t ret;
   uint32_t last_chunk;
-  uint64_t o, old_o;
+  uint64_t o;
+  uint64_t old_o;
 
   d_printf("creating schedule for %u chunks\n", p->nc);
   p->download_schedule_len = 0;
@@ -264,18 +275,21 @@ INTERNAL_LINKAGE int32_t create_download_schedule_sbs(struct peer *p,
 
   while ((o < p->nc) && (o <= end_chunk)) {
     /* find first/closest not yet downloaded chunk */
-    while ((p->chunk[o].downloaded == CH_YES) && (o < p->nc))
+    while ((p->chunk[o].downloaded == CH_YES) && (o < p->nc)) {
       o++;
-    if (o >= p->nc)
+    }
+    if (o >= p->nc) {
       break;
+    }
 
     old_o = o;
     uint64_t y = 0;
     while ((y < p->hashes_per_mtu) && (o < p->nc) && (o <= end_chunk)) {
-      if (p->chunk[o].downloaded == CH_NO)
-        o++;
-      else
-        break;
+      if (p->chunk[o].downloaded == CH_NO) {
+	o++;
+      } else {
+	break;
+      }
       y++;
     }
     d_printf("range of chunks: %lu-%lu   %lu\n", old_o, o - 1, o - old_o);
@@ -284,11 +298,6 @@ INTERNAL_LINKAGE int32_t create_download_schedule_sbs(struct peer *p,
     p->download_schedule[p->download_schedule_len].begin = old_o;
     p->download_schedule[p->download_schedule_len].end = o - 1;
     p->download_schedule_len++;
-
-#if 0
-		_assert((p->chunk[o].downloaded == CH_NO) || (p->chunk[o].downloaded == CH_YES), "p->chunk[o].downloaded should have CH_NO or CH_YES, but have: %u\n", p->chunk[o].downloaded);
-		_assert(p->download_schedule_len <= p->nc, "p->download_schedule_len should be <= p->nc, but p->download_schedule_len=%lu and p->nc=%u\n", p->download_schedule_len, p->nc);
-#endif
   }
 
   ret = (last_chunk - start_chunk + 1) * p->chunk_size;
@@ -298,9 +307,13 @@ INTERNAL_LINKAGE int32_t create_download_schedule_sbs(struct peer *p,
 
 INTERNAL_LINKAGE int32_t swift_create_download_schedule_sbs(
     struct peer *p, uint32_t start_chunk, uint32_t end_chunk) {
-  int32_t ret, hci;
-  uint32_t last_chunk, ec;
-  uint64_t o, old_o, y;
+  int32_t ret;
+  int32_t hci;
+  uint32_t last_chunk;
+  uint32_t ec;
+  uint64_t o;
+  uint64_t old_o;
+  uint64_t y;
 
   d_printf("creating schedule for %u chunks\n", p->nc);
   p->download_schedule_len = 0;
@@ -323,19 +336,22 @@ INTERNAL_LINKAGE int32_t swift_create_download_schedule_sbs(
     ec = p->have_cache[hci].end_chunk;
     while ((o < p->nc) && (o <= ec)) {
       /* find first/closest not yet downloaded chunk */
-      while ((p->chunk[o].downloaded == CH_YES) && (o < p->nc))
-        o++;
-      if (o >= p->nc)
-        break;
+      while ((p->chunk[o].downloaded == CH_YES) && (o < p->nc)) {
+	o++;
+      }
+      if (o >= p->nc) {
+	break;
+      }
 
       old_o = o;
       y = 0;
       while ((y < p->hashes_per_mtu) && (o < p->nc) && (o <= ec)) {
-        if (p->chunk[o].downloaded == CH_NO)
-          o++;
-        else
-          break;
-        y++;
+	if (p->chunk[o].downloaded == CH_NO) {
+	  o++;
+	} else {
+	  break;
+	}
+	y++;
       }
       d_printf("range of chunks: %lu-%lu   %lu\n", old_o, o - 1, o - old_o);
 
@@ -343,11 +359,6 @@ INTERNAL_LINKAGE int32_t swift_create_download_schedule_sbs(
       p->download_schedule[p->download_schedule_len].begin = old_o;
       p->download_schedule[p->download_schedule_len].end = o - 1;
       p->download_schedule_len++;
-
-#if 0
-			_assert((p->chunk[o].downloaded == CH_NO) || (p->chunk[o].downloaded == CH_YES), "p->chunk[o].downloaded should have CH_NO or CH_YES, but have: %u\n", p->chunk[o].downloaded);
-			_assert(p->download_schedule_len <= p->nc, "p->download_schedule_len should be <= p->nc, but p->download_schedule_len=%lu and p->nc=%u\n", p->download_schedule_len, p->nc);
-#endif
     }
     hci++;
   }
@@ -382,13 +393,15 @@ INTERNAL_LINKAGE void list_dir(struct peer *peer, char *dname) {
   struct stat stat;
 
   dir = opendir(dname);
-  if (dir == NULL)
+  if (dir == NULL) {
     return;
+  }
 
   while (1) {
     struct dirent *dirent = readdir(dir);
-    if (dirent == NULL)
+    if (dirent == NULL) {
       break;
+    }
 
     if (dirent->d_type == DT_REG) {
       f = malloc(sizeof(struct file_list_entry));
@@ -416,11 +429,17 @@ INTERNAL_LINKAGE void process_file(struct file_list_entry *file_entry,
                                    struct peer *peer) {
   char *buf;
   unsigned char digest[20 + 1];
-  int fd, r;
-  uint64_t x, nc, nl, c, rd;
+  int fd;
+  int r;
+  uint64_t x;
+  uint64_t nc;
+  uint64_t nl;
+  uint64_t c;
+  uint64_t rd;
   struct stat stat;
   SHA1Context context;
-  struct node *ret, *root8;
+  struct node *ret;
+  struct node *root8;
   uint32_t chunk_size;
 
   chunk_size = peer->chunk_size;
@@ -434,13 +453,15 @@ INTERNAL_LINKAGE void process_file(struct file_list_entry *file_entry,
   buf = malloc(chunk_size);
 
   nc = stat.st_size / chunk_size;
-  if ((stat.st_size - stat.st_size / chunk_size * chunk_size) > 0)
+  if ((stat.st_size - stat.st_size / chunk_size * chunk_size) > 0) {
     nc++;
+  }
   file_entry->nc = nc;
   d_printf("number of chunks [%u]: %lu\n", chunk_size, nc);
 
   /* compute number of leaves - it is not the same as number of chunks */
   nl = 1 << (order2(nc));
+  d_printf("number of leaves %lu\n", nl);
   file_entry->nl = nl;
 
   file_entry->start_chunk = 0;
@@ -451,8 +472,9 @@ INTERNAL_LINKAGE void process_file(struct file_list_entry *file_entry,
   memset(file_entry->tab_chunk, 0, nl * sizeof(struct chunk));
 
   /* initialize array of chunks */
-  for (x = 0; x < nl; x++)
+  for (x = 0; x < nl; x++) {
     file_entry->tab_chunk[x].state = CH_EMPTY;
+  }
 
   root8 = build_tree(nc, &ret);
   file_entry->tree_root = root8;

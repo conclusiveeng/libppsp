@@ -36,7 +36,6 @@
 #include <time.h>
 
 #include "mt.h"
-//#include "wqueue.h"
 
 #define INTERNAL_LINKAGE __attribute__((__visibility__("hidden")))
 
@@ -80,21 +79,12 @@ struct node_cache_entry {
   //	struct slist_node_cache next;
 };
 
-#if 0
-SLIST_HEAD(wqueue_head, wqueue_entry);
-struct wqueue_entry {
-	char *msg;
-	uint16_t msg_len;
-	SLIST_ENTRY(wqueue_entry) next;
-};
-#else
 STAILQ_HEAD(wqueue_head, wqueue_entry);
 struct wqueue_entry {
   char *msg;
   uint16_t msg_len;
   STAILQ_ENTRY(wqueue_entry) next;
 };
-#endif
 
 struct have_cache {
   uint32_t start_chunk;
@@ -292,20 +282,20 @@ struct peer {
             leecher pov */
 };
 
-void add_peer_to_list(struct slist_peers *, struct peer *);
+void add_peer_to_list(struct slist_peers * /*list_head*/, struct peer * /*p*/);
 void print_peer_list(struct slist_peers *);
-int remove_peer_from_list(struct slist_peers *, struct peer *);
-struct peer *ip_port_to_peer(struct peer *, struct slist_peers *,
-                             struct sockaddr_in *);
-struct peer *new_peer(struct sockaddr_in *, int, int);
-struct peer *new_seeder(struct sockaddr_in *, int);
-void cleanup_peer(struct peer *);
-void cleanup_all_dead_peers(struct slist_peers *);
-void create_download_schedule(struct peer *);
-int32_t create_download_schedule_sbs(struct peer *, uint32_t, uint32_t);
-int32_t swift_create_download_schedule_sbs(struct peer *, uint32_t, uint32_t);
-int all_chunks_downloaded(struct peer *);
-void create_file_list(struct peer *, char *);
-void process_file(struct file_list_entry *, struct peer *);
+int remove_peer_from_list(struct slist_peers * /*list_head*/, struct peer * /*p*/);
+struct peer *ip_port_to_peer(struct peer * /*seeder*/, struct slist_peers * /*list_head*/,
+                             struct sockaddr_in * /*client*/);
+struct peer *new_peer(struct sockaddr_in * /*sa*/, int /*n*/, int /*sockfd*/);
+struct peer *new_seeder(struct sockaddr_in * /*sa*/, int /*n*/);
+void cleanup_peer(struct peer * /*p*/);
+void cleanup_all_dead_peers(struct slist_peers * /*list_head*/);
+void create_download_schedule(struct peer * /*p*/);
+int32_t create_download_schedule_sbs(struct peer * /*p*/, uint32_t /*start_chunk*/, uint32_t /*end_chunk*/);
+int32_t swift_create_download_schedule_sbs(struct peer * /*p*/, uint32_t /*start_chunk*/, uint32_t /*end_chunk*/);
+int all_chunks_downloaded(struct peer * /*p*/);
+void create_file_list(struct peer * /*peer*/, char * /*dname*/);
+void process_file(struct file_list_entry * /*file_entry*/, struct peer * /*peer*/);
 
 #endif /* _PEER_H_ */

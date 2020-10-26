@@ -56,19 +56,19 @@ typedef struct {
 
 typedef int64_t ppspp_handle_t; /**< seeder or leecher handle */
 
-ppspp_handle_t swift_seeder_create(ppspp_seeder_params_t *);
-int swift_seeder_add_seeder(ppspp_handle_t, struct sockaddr_in *);
-int swift_seeder_remove_seeder(ppspp_handle_t, struct sockaddr_in *);
-void swift_seeder_add_file_or_directory(ppspp_handle_t, char *);
-int swift_seeder_remove_file_or_directory(ppspp_handle_t, char *);
-void swift_seeder_run(ppspp_handle_t);
-void swift_seeder_close(ppspp_handle_t);
-ppspp_handle_t swift_leecher_create(ppspp_leecher_params_t *);
-int swift_leecher_get_metadata(ppspp_handle_t, ppspp_metadata_t *);
-uint32_t swift_prepare_chunk_range(ppspp_handle_t, uint32_t, uint32_t);
-void swift_leecher_fetch_chunk_to_fd(ppspp_handle_t, int);
-int32_t swift_leecher_fetch_chunk_to_buf(ppspp_handle_t, uint8_t *);
-void swift_leecher_close(ppspp_handle_t);
-void swift_leecher_run(ppspp_handle_t);
+ppspp_handle_t swift_seeder_create(ppspp_seeder_params_t * /*params*/);
+int swift_seeder_add_seeder(ppspp_handle_t /*handle*/, struct sockaddr_in * /*sa*/);
+int swift_seeder_remove_seeder(ppspp_handle_t /*handle*/, struct sockaddr_in * /*sa*/);
+void swift_seeder_add_file_or_directory(ppspp_handle_t /*handle*/, char * /*name*/);
+int swift_seeder_remove_file_or_directory(ppspp_handle_t /*handle*/, char * /*name*/);
+void swift_seeder_run(ppspp_handle_t /*handle*/);
+void swift_seeder_close(ppspp_handle_t /*handle*/);
+ppspp_handle_t swift_leecher_create(ppspp_leecher_params_t * /*params*/);
+int swift_leecher_get_metadata(ppspp_handle_t /*handle*/, ppspp_metadata_t * /*meta*/);
+uint32_t swift_prepare_chunk_range(ppspp_handle_t /*handle*/, uint32_t /*start_chunk*/, uint32_t /*end_chunk*/);
+void swift_leecher_fetch_chunk_to_fd(ppspp_handle_t /*handle*/, int /*fd*/);
+int32_t swift_leecher_fetch_chunk_to_buf(ppspp_handle_t /*handle*/, uint8_t * /*transfer_buf*/);
+void swift_leecher_close(ppspp_handle_t /*handle*/);
+void swift_leecher_run(ppspp_handle_t /*handle*/);
 
 #endif /* _PPSPP_SWIFT_H_ */

@@ -36,6 +36,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "ppspp_swift.h"
 
 int debug;
@@ -56,18 +57,33 @@ void ascii_sha_to_bin(char *sha_ascii, uint8_t *bin) {
 }
 
 int main(int argc, char *argv[]) {
-  char *fname1, *fdname, *fname2, usage, *peer_list, *colon, *comma, *last_char,
-      *ch, *sa;
+  char *fname1;
+  char *fdname;
+  char *fname2;
+  char usage;
+  char *peer_list;
+  char *colon;
+  char *sa;
   char *sha_demanded;
-  char buf_ip_addr[24], buf_ip_port[64];
-  uint8_t swift;
-  int opt, chunk_size, type, sia, port, file_exist, fd;
+  char buf_ip_port[64];
+  int opt;
+  int chunk_size;
+  int type;
+  int port;
+  int file_exist;
+  int fd;
   uint32_t timeout;
-  struct sockaddr_in sa_in;
   ppspp_seeder_params_t seeder_params;
   ppspp_leecher_params_t leecher_params;
   ppspp_metadata_t meta;
-  ppspp_handle_t seeder_handle, leecher_handle;
+  ppspp_handle_t seeder_handle;
+  ppspp_handle_t leecher_handle;
+#if MULTIPLE_SEEDERS
+  char *comma, *last_char, *ch;
+  char buf_ip_addr[24];
+  int sia;
+  struct sockaddr_in sa_in;
+#endif
 
   chunk_size = 1024;
   fdname = fname1 = NULL;
@@ -79,7 +95,6 @@ int main(int argc, char *argv[]) {
   sha_demanded = NULL;
   port = 6778;
   sa = NULL;
-  swift = 0;
   while ((opt = getopt(argc, argv, "a:c:f:hp:s:t:v")) != -1) {
     switch (opt) {
     case 'a': /* remote address of seeder */
@@ -94,10 +109,10 @@ int main(int argc, char *argv[]) {
     case 'h': /* help/usage */
       usage = 1;
       break;
-#if 0
-			case 'l':				/* peer IP list separated by ':' */
-				peer_list = optarg;
-				break;
+#if MULTIPLE_SEEDERS
+    case 'l': /* peer IP list separated by ':' */
+      peer_list = optarg;
+      break;
 #endif
     case 'p': /* UDP port number of seeder */
       port = atoi(optarg);
@@ -131,10 +146,12 @@ int main(int argc, char *argv[]) {
     printf("			example: -f ./filename\n");
     printf("			example: -f /path/to/directory\n");
     printf("-h:			this help\n");
-#if 0
-		printf("-l:			list of pairs of IP address and udp port of other seeders, separated by comma ','\n");
-		printf("			valid only for SEEDER\n");
-		printf("			example: -l 192.168.1.1:6778,192.168.1.2:6778,192.168.1.4:6778\n");
+#if MULTIPLE_SEEDERS
+    printf("-l:			list of pairs of IP address and udp port of "
+           "other seeders, separated by comma ','\n");
+    printf("			valid only for SEEDER\n");
+    printf("			example: -l "
+           "192.168.1.1:6778,192.168.1.2:6778,192.168.1.4:6778\n");
 #endif
     printf("-p port:		UDP listening port number, valid only on "
            "SEEDER side, default 6778\n");
@@ -157,8 +174,6 @@ int main(int argc, char *argv[]) {
            argv[0]);
     exit(0);
   }
-
-  swift = 1; /* set libswift mode compatibility for good */
 
   if (fname1 != NULL) {
     type = SEEDER_TYPE;
@@ -205,6 +220,7 @@ int main(int argc, char *argv[]) {
 
     seeder_handle = swift_seeder_create(&seeder_params);
 
+#if MULTIPLE_SEEDERS
     if (peer_list != NULL) {
       ch = peer_list;
 
@@ -241,6 +257,7 @@ int main(int argc, char *argv[]) {
         ch = last_char + 2;
       }
     }
+#endif
 
     if (fdname != NULL) {
       swift_seeder_add_file_or_directory(seeder_handle, fdname);
@@ -263,7 +280,7 @@ int main(int argc, char *argv[]) {
     /* get metadata for demanded sha file */
     file_exist = swift_leecher_get_metadata(leecher_handle, &meta);
     if (file_exist == 0) {
-      sprintf(meta.file_name, sha_demanded);
+      sprintf(meta.file_name, "%s", sha_demanded);
       unlink(meta.file_name);
       fd = open(meta.file_name, O_WRONLY | O_CREAT, 0644);
       if (fd < 0) {
@@ -271,7 +288,7 @@ int main(int argc, char *argv[]) {
                errno, strerror(errno));
         abort();
       }
-#if 1
+#if FILE_DESCRIPTOR_TRANSFER
       /* run 1 (non-blocking) leecher thread with state machine */
       swift_leecher_run(leecher_handle);
 
@@ -282,7 +299,8 @@ int main(int argc, char *argv[]) {
       swift_leecher_fetch_chunk_to_fd(leecher_handle, fd);
 
       swift_leecher_close(leecher_handle);
-#else
+#endif
+#if BUFFER_TRANSFER
       /* transfering with buffer transfer method */
 
       /* run 1 (non-blocking) leecher thread with state machine */

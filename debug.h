@@ -32,6 +32,7 @@
 extern int debug;
 
 #define DEBUG 1
+#define __FILENAME__ strrchr("/" __FILE__, '/') + 1
 
 #if DEBUG
 #define _assert(cond, format, ...)                                             \
@@ -45,8 +46,10 @@ extern int debug;
 
 #define d_printf(format, ...)                                                  \
   do {                                                                         \
-    if (debug > 0)                                                             \
+    if (debug > 0) {                                                           \
+      printf("%s:%d %s():", __FILENAME__, __LINE__, __func__);                 \
       printf(format, __VA_ARGS__);                                             \
+    }                                                                          \
   } while (0)
 
 #else

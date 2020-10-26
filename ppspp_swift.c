@@ -139,7 +139,9 @@ int swift_seeder_remove_seeder(ppspp_handle_t handle, struct sockaddr_in *sa) {
  */
 void swift_seeder_add_file_or_directory(ppspp_handle_t handle, char *name) {
   char sha[40 + 1];
-  int st, s, y;
+  int st;
+  int s;
+  int y;
   struct stat stat;
   struct file_list_entry *f;
   struct peer *local_seeder;
@@ -168,14 +170,15 @@ void swift_seeder_add_file_or_directory(ppspp_handle_t handle, char *name) {
   SLIST_FOREACH(f, &local_seeder->file_list_head, next) {
     /* does the tree already exist for given file? */
     if (f->tree_root == NULL) { /* no - so create tree for it */
-      printf("processing: %s  ", f->path);
+      printf("processing: %s \n", f->path);
       fflush(stdout);
       process_file(f, local_seeder);
 
       memset(sha, 0, sizeof(sha));
       s = 0;
-      for (y = 0; y < 20; y++)
-        s += sprintf(sha + s, "%02x", f->tree_root->sha[y] & 0xff);
+      for (y = 0; y < 20; y++) {
+	s += sprintf(sha + s, "%02x", f->tree_root->sha[y] & 0xff);
+      }
       printf("sha1: %s\n", sha);
     }
   }
@@ -209,7 +212,8 @@ INTERNAL_LINKAGE void swift_remove_and_free(ppspp_handle_t handle,
  * @return Return status of removing file or directory
  */
 int swift_seeder_remove_file_or_directory(ppspp_handle_t handle, char *name) {
-  char *c, *buf;
+  char *c;
+  char *buf;
   int ret;
   struct file_list_entry *f;
   struct stat stat;
@@ -355,8 +359,9 @@ int swift_leecher_get_metadata(ppspp_handle_t handle, ppspp_metadata_t *meta) {
       meta->start_chunk = local_leecher->start_chunk;
       meta->end_chunk = local_leecher->end_chunk;
     }
-  } else
+  } else {
     ret = -ENOENT; /* file does not exist for demanded SHA on seeder */
+  }
 
   /* response is in local_leecher */
   return ret;
