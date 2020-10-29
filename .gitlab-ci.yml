@@ -8,8 +8,8 @@ build:
   # instead of calling g++ directly you can also use some build toolkit like make
   # install the necessary build tools when needed
   before_script:
-    - apt update && apt -y install make cmake
-    - mkidr build && cd build
+    - sudo apt update && sudo apt -y install make cmake
+    - mkdir build && cd build
   script:
     - cmake ..
     - make
