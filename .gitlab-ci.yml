@@ -1,4 +1,3 @@
-# This file is a template, and might need editing before it works on your project.
 # use the official gcc image, based on debian
 # can use verions as well, like gcc:5.2
 # see https://hub.docker.com/_/gcc/
@@ -9,9 +8,8 @@ build:
   # instead of calling g++ directly you can also use some build toolkit like make
   # install the necessary build tools when needed
   before_script:
-     - apt update && apt -y install make cmake
-  build_dir:
-     - mkidr build && cd build
+    - apt update && apt -y install make cmake
+    - mkidr build && cd build
   script:
     - cmake ..
     - make
@@ -24,7 +22,7 @@ build:
       #     - "*.o"
 
 # run tests using the binary built before
-test:
-  stage: test
-  script:
-    - ./runmytests.sh
+#test:
+#  stage: test
+#  script:
+#    - ./runmytests.sh
