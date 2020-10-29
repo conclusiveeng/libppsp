@@ -23,25 +23,21 @@
  * SUCH DAMAGE.
  */
 
+#include "ppspp_swift.h"
+#include "debug.h"
+#include "mt.h"
+#include "net.h"
+#include "net_swift.h"
+#include "peer.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/queue.h>
-#include <sys/socket.h>
 #include <sys/stat.h>
-#include <unistd.h>
-
-#include "debug.h"
-#include "mt.h"
-#include "net.h"
-#include "net_swift.h"
-#include "peer.h"
-#include "ppspp_protocol.h"
-#include "ppspp_swift.h"
-#include "sha1.h"
 
 /**
  * @file ppspp.c
@@ -54,7 +50,9 @@
  *
  * @return Handle of just created seeder
  */
-ppspp_handle_t swift_seeder_create(ppspp_seeder_params_t *params) {
+ppspp_handle_t
+swift_seeder_create(ppspp_seeder_params_t *params)
+{
   ppspp_handle_t handle;
   struct peer *local_seeder;
 
@@ -82,7 +80,9 @@ ppspp_handle_t swift_seeder_create(ppspp_seeder_params_t *params) {
  *
  * @return Return status of adding new seeder
  */
-int swift_seeder_add_seeder(ppspp_handle_t handle, struct sockaddr_in *sa) {
+int
+swift_seeder_add_seeder(ppspp_handle_t handle, struct sockaddr_in *sa)
+{
   int ret;
   struct other_seeders_entry *ss;
   struct peer *local_seeder;
@@ -110,7 +110,9 @@ int swift_seeder_add_seeder(ppspp_handle_t handle, struct sockaddr_in *sa) {
  *
  * @return Return status of removing seeder
  */
-int swift_seeder_remove_seeder(ppspp_handle_t handle, struct sockaddr_in *sa) {
+int
+swift_seeder_remove_seeder(ppspp_handle_t handle, struct sockaddr_in *sa)
+{
   int ret;
   struct other_seeders_entry *e;
   struct peer *local_seeder;
@@ -118,13 +120,12 @@ int swift_seeder_remove_seeder(ppspp_handle_t handle, struct sockaddr_in *sa) {
   local_seeder = (struct peer *)handle;
 
   ret = 0;
-  SLIST_FOREACH(e, &local_seeder->other_seeders_list_head, next) {
+  SLIST_FOREACH(e, &local_seeder->other_seeders_list_head, next)
+  {
     d_printf("%s:%u\n", inet_ntoa(e->sa.sin_addr), ntohs(e->sa.sin_port));
     if (memcmp(&sa->sin_addr, &e->sa.sin_addr, sizeof(e->sa.sin_addr)) == 0) {
-      d_printf("entry to remove found - removing: %s:%u\n",
-               inet_ntoa(e->sa.sin_addr), ntohs(e->sa.sin_port));
-      SLIST_REMOVE(&local_seeder->other_seeders_list_head, e,
-                   other_seeders_entry, next);
+      d_printf("entry to remove found - removing: %s:%u\n", inet_ntoa(e->sa.sin_addr), ntohs(e->sa.sin_port));
+      SLIST_REMOVE(&local_seeder->other_seeders_list_head, e, other_seeders_entry, next);
     }
   }
 
@@ -137,7 +138,9 @@ int swift_seeder_remove_seeder(ppspp_handle_t handle, struct sockaddr_in *sa) {
  * @param[in] handle Handle of seeder
  * @param[in] name Path to the file or directory
  */
-void swift_seeder_add_file_or_directory(ppspp_handle_t handle, char *name) {
+void
+swift_seeder_add_file_or_directory(ppspp_handle_t handle, char *name)
+{
   char sha[40 + 1];
   int st;
   int s;
@@ -167,7 +170,8 @@ void swift_seeder_add_file_or_directory(ppspp_handle_t handle, char *name) {
     SLIST_INSERT_HEAD(&local_seeder->file_list_head, f, next);
   }
 
-  SLIST_FOREACH(f, &local_seeder->file_list_head, next) {
+  SLIST_FOREACH(f, &local_seeder->file_list_head, next)
+  {
     /* does the tree already exist for given file? */
     if (f->tree_root == NULL) { /* no - so create tree for it */
       printf("processing: %s \n", f->path);
@@ -189,8 +193,10 @@ void swift_seeder_add_file_or_directory(ppspp_handle_t handle, char *name) {
  *
  * @param[in] f File entry to remove
  */
-INTERNAL_LINKAGE void swift_remove_and_free(ppspp_handle_t handle,
-                                            struct file_list_entry *f) {
+INTERNAL_LINKAGE
+void
+swift_remove_and_free(ppspp_handle_t handle, struct file_list_entry *f)
+{
   struct peer *local_seeder;
 
   local_seeder = (struct peer *)handle;
@@ -211,7 +217,9 @@ INTERNAL_LINKAGE void swift_remove_and_free(ppspp_handle_t handle,
  *
  * @return Return status of removing file or directory
  */
-int swift_seeder_remove_file_or_directory(ppspp_handle_t handle, char *name) {
+int
+swift_seeder_remove_file_or_directory(ppspp_handle_t handle, char *name)
+{
   char *c;
   char *buf;
   int ret;
@@ -224,10 +232,11 @@ int swift_seeder_remove_file_or_directory(ppspp_handle_t handle, char *name) {
   ret = 0;
   lstat(name, &stat);
   if (stat.st_mode & S_IFREG) { /* does the user want to remove file? */
-    SLIST_FOREACH(f, &local_seeder->file_list_head, next) {
+    SLIST_FOREACH(f, &local_seeder->file_list_head, next)
+    {
       if (strcmp(f->path, name) == 0) {
-        d_printf("file to remove found: %s\n", name);
-        swift_remove_and_free(handle, f);
+	d_printf("file to remove found: %s\n", name);
+	swift_remove_and_free(handle, f);
       }
     }
   } else if (stat.st_mode & S_IFDIR) { /* does the user want to remove files
@@ -242,13 +251,12 @@ int swift_seeder_remove_file_or_directory(ppspp_handle_t handle, char *name) {
       d_printf("adding / to dir name: %s => %s\n", name, buf);
     }
 
-    SLIST_FOREACH(f, &local_seeder->file_list_head, next) {
-      c = strstr(
-          f->path,
-          buf); /* compare current file entry with directory name to remove */
-      if (c == f->path) { /* if both matches */
-        d_printf("removing file: %s\n", f->path);
-        swift_remove_and_free(handle, f);
+    SLIST_FOREACH(f, &local_seeder->file_list_head, next)
+    {
+      c = strstr(f->path, buf); /* compare current file entry with directory name to remove */
+      if (c == f->path) {       /* if both matches */
+	d_printf("removing file: %s\n", f->path);
+	swift_remove_and_free(handle, f);
       }
     }
     free(buf);
@@ -262,7 +270,9 @@ int swift_seeder_remove_file_or_directory(ppspp_handle_t handle, char *name) {
  *
  * @param[in] handle Handle of seeder
  */
-void swift_seeder_run(ppspp_handle_t handle) {
+void
+swift_seeder_run(ppspp_handle_t handle)
+{
   struct peer *local_seeder;
 
   local_seeder = (struct peer *)handle;
@@ -274,7 +284,9 @@ void swift_seeder_run(ppspp_handle_t handle) {
  *
  * @param[in] handle Handle of seeder
  */
-void swift_seeder_close(ppspp_handle_t handle) {
+void
+swift_seeder_close(ppspp_handle_t handle)
+{
   struct peer *local_seeder;
 
   local_seeder = (struct peer *)handle;
@@ -289,7 +301,9 @@ void swift_seeder_close(ppspp_handle_t handle) {
  *
  * @return Handle of just created leecher
  */
-ppspp_handle_t swift_leecher_create(ppspp_leecher_params_t *params) {
+ppspp_handle_t
+swift_leecher_create(ppspp_leecher_params_t *params)
+{
   ppspp_handle_t handle;
   struct peer *local_leecher;
 
@@ -303,8 +317,7 @@ ppspp_handle_t swift_leecher_create(ppspp_leecher_params_t *params) {
     local_leecher->current_seeder = NULL;
     local_leecher->tree = NULL;
     local_leecher->tree_root = NULL;
-    memcpy(&local_leecher->seeder_addr, &params->seeder_addr,
-           sizeof(struct sockaddr_in));
+    memcpy(&local_leecher->seeder_addr, &params->seeder_addr, sizeof(struct sockaddr_in));
     memcpy(&local_leecher->sha_demanded, params->sha_demanded, 20);
 
     swift_net_leecher_create(local_leecher);
@@ -319,7 +332,9 @@ ppspp_handle_t swift_leecher_create(ppspp_leecher_params_t *params) {
  *
  * @param[in] handle Handle of leecher
  */
-void swift_leecher_run(ppspp_handle_t handle) {
+void
+swift_leecher_run(ppspp_handle_t handle)
+{
   struct peer *local_leecher;
 
   local_leecher = (struct peer *)handle;
@@ -338,7 +353,9 @@ void swift_leecher_run(ppspp_handle_t handle) {
  * On success return 0
  * On error returns value below 0
  */
-int swift_leecher_get_metadata(ppspp_handle_t handle, ppspp_metadata_t *meta) {
+int
+swift_leecher_get_metadata(ppspp_handle_t handle, ppspp_metadata_t *meta)
+{
   int ret;
   struct peer *local_leecher;
 
@@ -379,8 +396,9 @@ int swift_leecher_get_metadata(ppspp_handle_t handle, ppspp_metadata_t *meta) {
  * swift_leecher_fetch_chunk_to_buf() procedure if he/she choosen
  * transferring buffer method instead of transferring vie file descriptor
  */
-uint32_t swift_prepare_chunk_range(ppspp_handle_t handle, uint32_t start_chunk,
-                                   uint32_t end_chunk) {
+uint32_t
+swift_prepare_chunk_range(ppspp_handle_t handle, uint32_t start_chunk, uint32_t end_chunk)
+{
   uint32_t buf_size;
   struct peer *local_leecher;
 
@@ -392,12 +410,9 @@ uint32_t swift_prepare_chunk_range(ppspp_handle_t handle, uint32_t start_chunk,
     local_leecher->download_schedule = NULL;
   }
 
-  local_leecher->download_schedule =
-      malloc(local_leecher->nl * sizeof(struct schedule_entry));
-  memset(local_leecher->download_schedule, 0,
-         local_leecher->nl * sizeof(struct schedule_entry));
-  buf_size =
-      swift_create_download_schedule_sbs(local_leecher, start_chunk, end_chunk);
+  local_leecher->download_schedule = malloc(local_leecher->nl * sizeof(struct schedule_entry));
+  memset(local_leecher->download_schedule, 0, local_leecher->nl * sizeof(struct schedule_entry));
+  buf_size = swift_create_download_schedule_sbs(local_leecher, start_chunk, end_chunk);
   local_leecher->download_schedule_idx = 0;
 
   return buf_size;
@@ -409,7 +424,9 @@ uint32_t swift_prepare_chunk_range(ppspp_handle_t handle, uint32_t start_chunk,
  * @param[in] handle Handle of leecher
  * @param[in] fd File descriptor of opened by user file
  */
-void swift_leecher_fetch_chunk_to_fd(ppspp_handle_t handle, int fd) {
+void
+swift_leecher_fetch_chunk_to_fd(ppspp_handle_t handle, int fd)
+{
   struct peer *local_leecher;
 
   local_leecher = (struct peer *)handle;
@@ -429,8 +446,9 @@ void swift_leecher_fetch_chunk_to_fd(ppspp_handle_t handle, int fd) {
  *
  * @return Return number of returned valid bytes in passed by user buffer
  */
-int32_t swift_leecher_fetch_chunk_to_buf(ppspp_handle_t handle,
-                                         uint8_t *transfer_buf) {
+int32_t
+swift_leecher_fetch_chunk_to_buf(ppspp_handle_t handle, uint8_t *transfer_buf)
+{
   struct peer *local_leecher;
 
   local_leecher = (struct peer *)handle;
@@ -450,7 +468,9 @@ int32_t swift_leecher_fetch_chunk_to_buf(ppspp_handle_t handle,
  *
  * @param[in] handle Handle of leecher
  */
-void swift_leecher_close(ppspp_handle_t handle) {
+void
+swift_leecher_close(ppspp_handle_t handle)
+{
   struct peer *local_leecher;
 
   local_leecher = (struct peer *)handle;

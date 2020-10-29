@@ -23,6 +23,9 @@
  * SUCH DAMAGE.
  */
 
+#include "peer.h"
+#include "debug.h"
+#include "sha1.h"
 #include <arpa/inet.h>
 #include <dirent.h>
 #include <fcntl.h>
@@ -32,29 +35,26 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/queue.h>
-#include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/types.h>
+#include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
-
-#include "debug.h"
-#include "peer.h"
-#include "sha1.h"
 
 /*
  * add element to the end of the list
  */
-INTERNAL_LINKAGE void add_peer_to_list(struct slist_peers *list_head,
-                                       struct peer *p) {
+INTERNAL_LINKAGE
+void
+add_peer_to_list(struct slist_peers *list_head, struct peer *p)
+{
   struct peer *pd;
 
-  d_printf("add new peer to list: %#lx  %s:%u\n", (uint64_t)p,
-           inet_ntoa(p->leecher_addr.sin_addr),
+  d_printf("add new peer to list: %#lx  %s:%u\n", (uint64_t)p, inet_ntoa(p->leecher_addr.sin_addr),
            ntohs(p->leecher_addr.sin_port));
 
   /* check for possible duplicates */
-  SLIST_FOREACH(pd, list_head, snext) {
+  SLIST_FOREACH(pd, list_head, snext)
+  {
     if (pd == p) {
       d_printf("%s", "this element already exist in the list\n");
       return;
@@ -67,7 +67,8 @@ INTERNAL_LINKAGE void add_peer_to_list(struct slist_peers *list_head,
   } else {
     struct peer *last = NULL;
     /* look for last element in the list */
-    SLIST_FOREACH(pd, list_head, snext) {
+    SLIST_FOREACH(pd, list_head, snext)
+    {
       if (SLIST_NEXT(pd, snext) == NULL) {
 	last = pd;
       }
@@ -80,19 +81,23 @@ INTERNAL_LINKAGE void add_peer_to_list(struct slist_peers *list_head,
   }
 }
 
-INTERNAL_LINKAGE int remove_peer_from_list(struct slist_peers *list_head,
-                                           struct peer *p) {
+INTERNAL_LINKAGE
+int
+remove_peer_from_list(struct slist_peers *list_head, struct peer *p)
+{
   SLIST_REMOVE(list_head, p, peer, snext);
 
   return 0;
 }
 
-INTERNAL_LINKAGE struct peer *ip_port_to_peer(struct peer *seeder,
-                                              struct slist_peers *list_head,
-                                              struct sockaddr_in *client) {
+INTERNAL_LINKAGE
+struct peer *
+ip_port_to_peer(struct peer *seeder, struct slist_peers *list_head, struct sockaddr_in *client)
+{
   struct peer *p;
 
-  SLIST_FOREACH(p, list_head, snext) {
+  SLIST_FOREACH(p, list_head, snext)
+  {
     if (memcmp(&p->leecher_addr, client, sizeof(struct sockaddr_in)) == 0) {
       return p;
     }
@@ -102,8 +107,10 @@ INTERNAL_LINKAGE struct peer *ip_port_to_peer(struct peer *seeder,
 }
 
 /* seeder side: create new remote peer (LEECHER) */
-INTERNAL_LINKAGE struct peer *new_peer(struct sockaddr_in *sa, int n,
-                                       int sockfd) {
+INTERNAL_LINKAGE
+struct peer *
+new_peer(struct sockaddr_in *sa, int n, int sockfd)
+{
   struct peer *p;
 
   p = malloc(sizeof(struct peer));
@@ -114,8 +121,7 @@ INTERNAL_LINKAGE struct peer *new_peer(struct sockaddr_in *sa, int n,
   memset(p, 0, sizeof(struct peer));
   memcpy(&p->leecher_addr, sa, sizeof(struct sockaddr_in));
 
-  d_printf("new peer[%u]: %#lx   IP: %s:%u\n", p->thread_num, (uint64_t)p,
-           inet_ntoa(p->leecher_addr.sin_addr),
+  d_printf("new peer[%u]: %#lx   IP: %s:%u\n", p->thread_num, (uint64_t)p, inet_ntoa(p->leecher_addr.sin_addr),
            ntohs(p->leecher_addr.sin_port));
 
   p->recv_buf = malloc(n); /* allocate receiving buffer */
@@ -132,7 +138,10 @@ INTERNAL_LINKAGE struct peer *new_peer(struct sockaddr_in *sa, int n,
 }
 
 /* leecher side: create new remote peer (SEEDER) */
-INTERNAL_LINKAGE struct peer *new_seeder(struct sockaddr_in *sa, int n) {
+INTERNAL_LINKAGE
+struct peer *
+new_seeder(struct sockaddr_in *sa, int n)
+{
   struct peer *p;
 
   p = malloc(sizeof(struct peer));
@@ -157,9 +166,11 @@ INTERNAL_LINKAGE struct peer *new_seeder(struct sockaddr_in *sa, int n) {
   return p;
 }
 
-INTERNAL_LINKAGE void cleanup_peer(struct peer *p) {
-  d_printf("cleaning up peer[%u]: %#lx   IP: %s:%u\n", p->thread_num,
-           (uint64_t)p, inet_ntoa(p->leecher_addr.sin_addr),
+INTERNAL_LINKAGE
+void
+cleanup_peer(struct peer *p)
+{
+  d_printf("cleaning up peer[%u]: %#lx   IP: %s:%u\n", p->thread_num, (uint64_t)p, inet_ntoa(p->leecher_addr.sin_addr),
            ntohs(p->leecher_addr.sin_port));
 
   /* method1 only - wait for pthread, destroy mutex and condition variable */
@@ -191,10 +202,14 @@ INTERNAL_LINKAGE void cleanup_peer(struct peer *p) {
 }
 
 /* remove all the marked peers */
-INTERNAL_LINKAGE void cleanup_all_dead_peers(struct slist_peers *list_head) {
+INTERNAL_LINKAGE
+void
+cleanup_all_dead_peers(struct slist_peers *list_head)
+{
   struct peer *p;
 
-  SLIST_FOREACH(p, list_head, snext) {
+  SLIST_FOREACH(p, list_head, snext)
+  {
     if (p->to_remove != 0) { /* is this peer (leecher) marked to remove? */
       cleanup_peer(p);
     }
@@ -205,7 +220,10 @@ INTERNAL_LINKAGE void cleanup_all_dead_peers(struct slist_peers *list_head) {
 /*
  * basing on chunk array - create download schedule (array)
  */
-INTERNAL_LINKAGE void create_download_schedule(struct peer *p) {
+INTERNAL_LINKAGE
+void
+create_download_schedule(struct peer *p)
+{
   uint64_t o;
   uint64_t old_o;
 
@@ -238,10 +256,8 @@ INTERNAL_LINKAGE void create_download_schedule(struct peer *p) {
     p->download_schedule[p->download_schedule_len].end = o - 1;
     p->download_schedule_len++;
 
-    _assert(
-        (p->chunk[o].downloaded == CH_NO) || (p->chunk[o].downloaded == CH_YES),
-        "p->chunk[o].downloaded should have CH_NO or CH_YES, but have: %d\n",
-        p->chunk[o].downloaded);
+    _assert((p->chunk[o].downloaded == CH_NO) || (p->chunk[o].downloaded == CH_YES),
+            "p->chunk[o].downloaded should have CH_NO or CH_YES, but have: %d\n", p->chunk[o].downloaded);
     _assert(p->download_schedule_len <= p->nc,
             "p->download_schedule_len should be <= p->nc, but "
             "p->download_schedule_len=%lu and p->nc=%u\n",
@@ -252,9 +268,10 @@ INTERNAL_LINKAGE void create_download_schedule(struct peer *p) {
 /*
  * basing on chunk array - create download schedule (array)
  */
-INTERNAL_LINKAGE int32_t create_download_schedule_sbs(struct peer *p,
-                                                      uint32_t start_chunk,
-                                                      uint32_t end_chunk) {
+INTERNAL_LINKAGE
+int32_t
+create_download_schedule_sbs(struct peer *p, uint32_t start_chunk, uint32_t end_chunk)
+{
   int32_t ret;
   uint32_t last_chunk;
   uint64_t o;
@@ -266,8 +283,8 @@ INTERNAL_LINKAGE int32_t create_download_schedule_sbs(struct peer *p,
   last_chunk = start_chunk;
 
   if (start_chunk > p->end_chunk) {
-    d_printf("error: range: %u-%u is outside of the allowed range (%u-%u)\n",
-             start_chunk, end_chunk, p->start_chunk, p->end_chunk);
+    d_printf("error: range: %u-%u is outside of the allowed range (%u-%u)\n", start_chunk, end_chunk, p->start_chunk,
+             p->end_chunk);
     return -1;
   }
 
@@ -305,8 +322,10 @@ INTERNAL_LINKAGE int32_t create_download_schedule_sbs(struct peer *p,
   return ret;
 }
 
-INTERNAL_LINKAGE int32_t swift_create_download_schedule_sbs(
-    struct peer *p, uint32_t start_chunk, uint32_t end_chunk) {
+INTERNAL_LINKAGE
+int32_t
+swift_create_download_schedule_sbs(struct peer *p, uint32_t start_chunk, uint32_t end_chunk)
+{
   int32_t ret;
   int32_t hci;
   uint32_t last_chunk;
@@ -321,15 +340,14 @@ INTERNAL_LINKAGE int32_t swift_create_download_schedule_sbs(
   last_chunk = start_chunk;
 
   if (start_chunk > p->end_chunk) {
-    d_printf("error: range: %u-%u is outside of the allowed range (%u-%u)\n",
-             start_chunk, end_chunk, p->start_chunk, p->end_chunk);
+    d_printf("error: range: %u-%u is outside of the allowed range (%u-%u)\n", start_chunk, end_chunk, p->start_chunk,
+             p->end_chunk);
     return -1;
   }
 
   p->hashes_per_mtu = 256;
 
-  _assert(p->num_have_cache > 0, "%s\n",
-          "peer->num_have_cache must be > 0, but it isn't");
+  _assert(p->num_have_cache > 0, "%s\n", "peer->num_have_cache must be > 0, but it isn't");
 
   hci = 0;
   while (hci < p->num_have_cache) {
@@ -368,7 +386,10 @@ INTERNAL_LINKAGE int32_t swift_create_download_schedule_sbs(
   return ret;
 }
 
-INTERNAL_LINKAGE int all_chunks_downloaded(struct peer *p) {
+INTERNAL_LINKAGE
+int
+all_chunks_downloaded(struct peer *p)
+{
   int ret;
   uint64_t x;
 
@@ -386,7 +407,10 @@ INTERNAL_LINKAGE int all_chunks_downloaded(struct peer *p) {
   return ret;
 }
 
-INTERNAL_LINKAGE void list_dir(struct peer *peer, char *dname) {
+INTERNAL_LINKAGE
+void
+list_dir(struct peer *peer, char *dname)
+{
   DIR *dir;
   char newdir[1024];
   struct file_list_entry *f;
@@ -412,8 +436,7 @@ INTERNAL_LINKAGE void list_dir(struct peer *peer, char *dname) {
       SLIST_INSERT_HEAD(&peer->file_list_head, f, next);
     }
 
-    if ((dirent->d_type == DT_DIR) && (strcmp(dirent->d_name, ".") != 0) &&
-        (strcmp(dirent->d_name, "..") != 0)) {
+    if ((dirent->d_type == DT_DIR) && (strcmp(dirent->d_name, ".") != 0) && (strcmp(dirent->d_name, "..") != 0)) {
       snprintf(newdir, sizeof(newdir) - 1, "%s/%s", dname, dirent->d_name);
       list_dir(peer, newdir);
     }
@@ -421,12 +444,17 @@ INTERNAL_LINKAGE void list_dir(struct peer *peer, char *dname) {
   closedir(dir);
 }
 
-INTERNAL_LINKAGE void create_file_list(struct peer *peer, char *dname) {
+INTERNAL_LINKAGE
+void
+create_file_list(struct peer *peer, char *dname)
+{
   list_dir(peer, dname);
 }
 
-INTERNAL_LINKAGE void process_file(struct file_list_entry *file_entry,
-                                   struct peer *peer) {
+INTERNAL_LINKAGE
+void
+process_file(struct file_list_entry *file_entry, struct peer *peer)
+{
   char *buf;
   unsigned char digest[20 + 1];
   int fd;

@@ -2,9 +2,9 @@
 #define _WQUEUE_H_
 
 #include <stdint.h>
-#include <sys/queue.h>
 
-#include "peer.h"
+struct wqueue_entry;
+struct wqueue_head;
 
 void wq_init(struct wqueue_head * /*wh*/);
 void wq_append(struct wqueue_head * /*wh*/, struct wqueue_entry * /*e*/);

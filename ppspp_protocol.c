@@ -23,31 +23,27 @@
  * SUCH DAMAGE.
  */
 
+#include "ppspp_protocol.h"
+#include "debug.h"
+#include "mt.h"
+#include "net.h"
+#include "peer.h"
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <libgen.h>
+#include <netinet/in.h>
+#include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/queue.h>
+#include <unistd.h>
 #ifdef __FreeBSD__
 #include <sys/endian.h>
 #endif
 #ifdef __gnu_linux__
 #include <endian.h>
 #endif
-#include <arpa/inet.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <libgen.h>
-#include <netinet/in.h>
-#include <stdlib.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-
-#include "debug.h"
-#include "mt.h"
-#include "net.h"
-#include "peer.h"
-#include "ppspp_protocol.h"
-#include "sha1.h"
 
 /*
  * serialize handshake options in memory in form of list
@@ -58,8 +54,10 @@
  * out params:
  * 	ptr - pointer to buffer where the serialized options will be placed
  */
-INTERNAL_LINKAGE int make_handshake_options(char *ptr,
-                                            struct proto_opt_str *pos) {
+INTERNAL_LINKAGE
+int
+make_handshake_options(char *ptr, struct proto_opt_str *pos)
+{
   unsigned char *d;
   int ret;
 
@@ -131,8 +129,7 @@ INTERNAL_LINKAGE int make_handshake_options(char *ptr,
   if (pos->opt_map & (1 << LIVE_DISC_WIND)) {
     *d = LIVE_DISC_WIND;
     d++;
-    if ((pos->chunk_addr_method == 0) ||
-        (pos->chunk_addr_method == 2)) { /* 32 or 64 bit addresses */
+    if ((pos->chunk_addr_method == 0) || (pos->chunk_addr_method == 2)) { /* 32 or 64 bit addresses */
       *(uint32_t *)d = htobe32(*(uint32_t *)pos->live_disc_wind);
       d += sizeof(uint32_t);
     } else {
@@ -241,9 +238,10 @@ INTERNAL_LINKAGE int make_handshake_options(char *ptr,
  * 	ptr - pointer to buffer where data will be stored
  *
  */
-INTERNAL_LINKAGE int make_handshake_request(char *ptr, uint32_t dest_chan_id,
-                                            uint32_t src_chan_id, char *opts,
-                                            int opt_len) {
+INTERNAL_LINKAGE
+int
+make_handshake_request(char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len)
+{
   char *d;
   int ret;
 
@@ -281,9 +279,10 @@ INTERNAL_LINKAGE int make_handshake_request(char *ptr, uint32_t dest_chan_id,
  * 	ptr - pointer to buffer where data will be stored
  *
  */
-INTERNAL_LINKAGE int make_handshake_have(char *ptr, uint32_t dest_chan_id,
-                                         uint32_t src_chan_id, char *opts,
-                                         int opt_len, struct peer *peer) {
+INTERNAL_LINKAGE
+int
+make_handshake_have(char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len, struct peer *peer)
+{
   char *d;
   int ret;
   int len;
@@ -327,9 +326,11 @@ INTERNAL_LINKAGE int make_handshake_have(char *ptr, uint32_t dest_chan_id,
  * is set or not if set - make proper HAVE subrange in other words - make HAVE
  * cache
  */
-INTERNAL_LINKAGE int swift_make_handshake_have(char *ptr, uint32_t dest_chan_id,
-                                               uint32_t src_chan_id, char *opts,
-                                               int opt_len, struct peer *peer) {
+INTERNAL_LINKAGE
+int
+swift_make_handshake_have(char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len,
+                          struct peer *peer)
+{
   char *d;
   int ret;
   int len;
@@ -346,8 +347,7 @@ INTERNAL_LINKAGE int swift_make_handshake_have(char *ptr, uint32_t dest_chan_id,
   peer->num_have_cache = 0;
 
   d = ptr + len;
-  nc =
-      peer->file_list_entry->end_chunk - peer->file_list_entry->start_chunk + 1;
+  nc = peer->file_list_entry->end_chunk - peer->file_list_entry->start_chunk + 1;
 
   b = 31; /* starting bit for scanning of bits */
   i = 0;  /* iterator */
@@ -393,7 +393,10 @@ INTERNAL_LINKAGE int swift_make_handshake_have(char *ptr, uint32_t dest_chan_id,
  * 	ptr - pointer to buffer where data will be stored
  *
  */
-INTERNAL_LINKAGE int make_handshake_finish(char *ptr, struct peer *peer) {
+INTERNAL_LINKAGE
+int
+make_handshake_finish(char *ptr, struct peer *peer)
+{
   unsigned char *d;
   int ret;
 
@@ -429,9 +432,10 @@ INTERNAL_LINKAGE int make_handshake_finish(char *ptr, struct peer *peer) {
  * out params:
  * 	ptr - pointer to buffer where data of this request should be placed
  */
-INTERNAL_LINKAGE int make_request(char *ptr, uint32_t dest_chan_id,
-                                  uint32_t start_chunk, uint32_t end_chunk,
-                                  struct peer *peer) {
+INTERNAL_LINKAGE
+int
+make_request(char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32_t end_chunk, struct peer *peer)
+{
   char *d;
   int ret;
 
@@ -463,8 +467,10 @@ INTERNAL_LINKAGE int make_request(char *ptr, uint32_t dest_chan_id,
  * make packet with data of our seeder which shares complete file
  * list of seeders is taken from commandline with "-l" option
  */
-INTERNAL_LINKAGE int make_pex_resp(char *ptr, struct peer *peer,
-                                   struct peer *we) {
+INTERNAL_LINKAGE
+int
+make_pex_resp(char *ptr, struct peer *peer, struct peer *we)
+{
   char *d;
   int ret;
   int addr_size;
@@ -493,13 +499,13 @@ INTERNAL_LINKAGE int make_pex_resp(char *ptr, struct peer *peer,
   addr_size = 4 + 2; /* 4 - ip, 2- port */
   max_pex = space / addr_size;
 
-  d_printf("we're sending PEX_RESP to: %s\n",
-           inet_ntoa(peer->leecher_addr.sin_addr));
+  d_printf("we're sending PEX_RESP to: %s\n", inet_ntoa(peer->leecher_addr.sin_addr));
 
   /* IP addresses taken from "-l" commandline option: -l
    * ip1:port1,ip2:port2,ip3:port3 ...etc */
   pex = 0;
-  SLIST_FOREACH(e, &we->other_seeders_list_head, next) {
+  SLIST_FOREACH(e, &we->other_seeders_list_head, next)
+  {
     memcpy(d, &e->sa.sin_addr, sizeof(struct in_addr)); /* IP */
     d += sizeof(struct in_addr);
     *(uint16_t *)d = e->sa.sin_port; /* UDP port */
@@ -527,8 +533,10 @@ INTERNAL_LINKAGE int make_pex_resp(char *ptr, struct peer *peer,
  * out params:
  * 	ptr - pointer to buffer where INTEGRITY message should be placed
  */
-INTERNAL_LINKAGE int make_integrity(char *ptr, struct peer *peer,
-                                    struct peer *we) {
+INTERNAL_LINKAGE
+int
+make_integrity(char *ptr, struct peer *peer, struct peer *we)
+{
   char *d;
   int y;
   int ret;
@@ -565,8 +573,10 @@ INTERNAL_LINKAGE int make_integrity(char *ptr, struct peer *peer,
  * uses bitmap for remembering which nodes have already been sent in INTEGRITY
  *
  */
-INTERNAL_LINKAGE int swift_make_integrity_reverse(char *ptr, struct peer *peer,
-                                                  struct peer *we) {
+INTERNAL_LINKAGE
+int
+swift_make_integrity_reverse(char *ptr, struct peer *peer, struct peer *we)
+{
   char *d;
   int ret;
   int ic;
@@ -596,10 +606,8 @@ INTERNAL_LINKAGE int swift_make_integrity_reverse(char *ptr, struct peer *peer,
   *(uint32_t *)d = htobe32(peer->dest_chan_id);
   d += sizeof(uint32_t);
 
-  _assert(peer->file_list_entry != NULL, "%s",
-          "peer->file_list_entry should be != NULL\n");
-  _assert(peer->integrity_bmp != NULL, "%s",
-          "peer->integrity_bmp should be != NULL\n");
+  _assert(peer->file_list_entry != NULL, "%s", "peer->file_list_entry should be != NULL\n");
+  _assert(peer->integrity_bmp != NULL, "%s", "peer->integrity_bmp should be != NULL\n");
 
   it = malloc(1024 * sizeof(struct integrity_temp));
   _assert(it != NULL, "%s", "it should be != NULL\n");
@@ -609,8 +617,7 @@ INTERNAL_LINKAGE int swift_make_integrity_reverse(char *ptr, struct peer *peer,
   _assert(it2 != NULL, "%s", "it2 should be != NULL\n");
   itn2 = 0;
 
-  _assert(peer->curr_chunk <= peer->file_list_entry->nc,
-          "curr_chunk must be <= nc, but curr_chunk: %lu and nc: %u\n",
+  _assert(peer->curr_chunk <= peer->file_list_entry->nc, "curr_chunk must be <= nc, but curr_chunk: %lu and nc: %u\n",
           peer->curr_chunk, peer->file_list_entry->nc);
 
   /* to be compatible with libswift determine subranges
@@ -621,8 +628,7 @@ INTERNAL_LINKAGE int swift_make_integrity_reverse(char *ptr, struct peer *peer,
    * weight 4 for b1 set it will be next subrange 4..5 - because b1 has weight 2
    * for b0 set it will be next subrange 6..6 - because b0 has weight 1
    */
-  nc =
-      peer->file_list_entry->end_chunk - peer->file_list_entry->start_chunk + 1;
+  nc = peer->file_list_entry->end_chunk - peer->file_list_entry->start_chunk + 1;
   b = 31;
   i = 0;
   v = 0;
@@ -636,16 +642,14 @@ INTERNAL_LINKAGE int swift_make_integrity_reverse(char *ptr, struct peer *peer,
       it[itn].end_chunk = v_end;     /* end of subrange */
 
       v_root = v_start + v_end;
-      e = &peer->file_list_entry
-               ->tree[v_root]; /* "e" is subroot of subtree v..v+(1<<b)-1 */
+      e = &peer->file_list_entry->tree[v_root]; /* "e" is subroot of subtree v..v+(1<<b)-1 */
 
       if (!(peer->integrity_bmp[v_root / 8] & (1 << (v_root % 8)))) {
-        memcpy(it[itn].sha, e->sha, 20);
-        d_printf("it[%d] %u..%u\n", itn, it[itn].start_chunk,
-                 it[itn].end_chunk);
-        itn++;
-        /* update INTEGRITY bitmap */
-        peer->integrity_bmp[v_root / 8] |= (1 << (v_root % 8));
+	memcpy(it[itn].sha, e->sha, 20);
+	d_printf("it[%d] %u..%u\n", itn, it[itn].start_chunk, it[itn].end_chunk);
+	itn++;
+	/* update INTEGRITY bitmap */
+	peer->integrity_bmp[v_root / 8] |= (1 << (v_root % 8));
       }
       v = v + (1 << b);
     }
@@ -659,17 +663,16 @@ INTERNAL_LINKAGE int swift_make_integrity_reverse(char *ptr, struct peer *peer,
    * of INTEGRITY to be compatible with libswift
    */
 
-  n = &peer->file_list_entry
-           ->tree[peer->curr_chunk * 2]; /* node for given curr_chunk */
+  n = &peer->file_list_entry->tree[peer->curr_chunk * 2]; /* node for given curr_chunk */
 
   /* looks in HAVE cache for the subrange where there is curr_chunk */
   ic = 0;
   f = 0;
   while (ic < peer->num_have_cache) {
-    d_printf("have_cache[%d]: start: %u  end: %u\n", ic,
-             peer->have_cache[ic].start_chunk, peer->have_cache[ic].end_chunk);
-    if ((peer->curr_chunk >= peer->have_cache[ic].start_chunk) &&
-        (peer->curr_chunk <= peer->have_cache[ic].end_chunk)) {
+    d_printf("have_cache[%d]: start: %u  end: %u\n", ic, peer->have_cache[ic].start_chunk,
+             peer->have_cache[ic].end_chunk);
+    if ((peer->curr_chunk >= peer->have_cache[ic].start_chunk)
+        && (peer->curr_chunk <= peer->have_cache[ic].end_chunk)) {
       f = 1;
       break;
     }
@@ -681,10 +684,8 @@ INTERNAL_LINKAGE int swift_make_integrity_reverse(char *ptr, struct peer *peer,
   /* determine subroot for curr_chunk and given HAVE subtree
    * "ic" is pointing to index of subrange in peer->have_cache
    */
-  n_subroot = &peer->file_list_entry->tree[peer->have_cache[ic].start_chunk +
-                                           peer->have_cache[ic].end_chunk];
-  d_printf("subroot for subrange: %u..%u is: %d\n",
-           peer->have_cache[ic].start_chunk, peer->have_cache[ic].end_chunk,
+  n_subroot = &peer->file_list_entry->tree[peer->have_cache[ic].start_chunk + peer->have_cache[ic].end_chunk];
+  d_printf("subroot for subrange: %u..%u is: %d\n", peer->have_cache[ic].start_chunk, peer->have_cache[ic].end_chunk,
            n_subroot->number);
 
   while ((n != n_subroot) && (n->parent != NULL)) {
@@ -716,8 +717,7 @@ INTERNAL_LINKAGE int swift_make_integrity_reverse(char *ptr, struct peer *peer,
   if (itn2 > 0) {
     iti2 = itn2 - 1;
     while (iti2 >= 0) {
-      d_printf("it2[%d] %u..%u\n", iti2, it2[iti2].start_chunk,
-               it2[iti2].end_chunk);
+      d_printf("it2[%d] %u..%u\n", iti2, it2[iti2].start_chunk, it2[iti2].end_chunk);
       it[itn].start_chunk = it2[iti2].start_chunk;
       it[itn].end_chunk = it2[iti2].end_chunk;
       memcpy(it[itn].sha, it2[iti2].sha, 20);
@@ -728,8 +728,7 @@ INTERNAL_LINKAGE int swift_make_integrity_reverse(char *ptr, struct peer *peer,
 
   /* finally for each of generated subranges - generate INTEGRITY entries */
   for (iti = 0; iti < itn; iti++) {
-    d_printf("INTEGRITY[%d] (%u..%u)\n", iti, it[iti].start_chunk,
-             it[iti].end_chunk);
+    d_printf("INTEGRITY[%d] (%u..%u)\n", iti, it[iti].start_chunk, it[iti].end_chunk);
     *d = INTEGRITY;
     d++;
     *(uint32_t *)d = htobe32(it[iti].start_chunk);
@@ -759,7 +758,10 @@ INTERNAL_LINKAGE int swift_make_integrity_reverse(char *ptr, struct peer *peer,
  * out params:
  * 	ptr - pointer to buffer where data will be placed
  */
-INTERNAL_LINKAGE int make_data(char *ptr, struct peer *peer) {
+INTERNAL_LINKAGE
+int
+make_data(char *ptr, struct peer *peer)
+{
   char *d;
   int ret;
   int fd;
@@ -809,7 +811,10 @@ INTERNAL_LINKAGE int make_data(char *ptr, struct peer *peer) {
   return ret;
 }
 
-INTERNAL_LINKAGE int swift_make_data(char *ptr, struct peer *peer) {
+INTERNAL_LINKAGE
+int
+swift_make_data(char *ptr, struct peer *peer)
+{
   char *d;
   int ret;
   int fd;
@@ -863,7 +868,10 @@ INTERNAL_LINKAGE int swift_make_data(char *ptr, struct peer *peer) {
 /* this procedure is not sending dest_chan_id (4 bytes) on the beginning because
  * DATA message can be concatenated with another kind of message
  */
-INTERNAL_LINKAGE int swift_make_data_no_chanid(char *ptr, struct peer *peer) {
+INTERNAL_LINKAGE
+int
+swift_make_data_no_chanid(char *ptr, struct peer *peer)
+{
   char *d;
   int ret;
   int fd;
@@ -921,7 +929,10 @@ INTERNAL_LINKAGE int swift_make_data_no_chanid(char *ptr, struct peer *peer) {
  * out params:
  * 	ptr - pointer to buffer where data should be placed
  */
-INTERNAL_LINKAGE int make_ack(char *ptr, struct peer *peer) {
+INTERNAL_LINKAGE
+int
+make_ack(char *ptr, struct peer *peer)
+{
   char *d;
   int ret;
   uint64_t delay_sample;
@@ -948,7 +959,10 @@ INTERNAL_LINKAGE int make_ack(char *ptr, struct peer *peer) {
   return ret;
 }
 
-INTERNAL_LINKAGE int swift_make_have_ack(char *ptr, struct peer *peer) {
+INTERNAL_LINKAGE
+int
+swift_make_have_ack(char *ptr, struct peer *peer)
+{
   char *d;
   int ret;
   uint64_t delay_sample;
@@ -990,7 +1004,10 @@ INTERNAL_LINKAGE int swift_make_have_ack(char *ptr, struct peer *peer) {
  * 	peer - structure describing peer (LEECHER or SEEDER)
  * 	ptr - pointer to data buffer which should be parsed
  */
-INTERNAL_LINKAGE int dump_options(char *ptr, struct peer *peer) {
+INTERNAL_LINKAGE
+int
+dump_options(char *ptr, struct peer *peer)
+{
   char *d;
   char buf[40 + 1];
   int swarm_len;
@@ -1191,15 +1208,16 @@ INTERNAL_LINKAGE int dump_options(char *ptr, struct peer *peer) {
 
     /* find file name for given received SHA1 hash from leecher */
     if (peer->seeder != NULL) { /* is this proc called by seeder? */
-      SLIST_FOREACH(fi, &peer->seeder->file_list_head, next) {
-        if (memcmp(fi->tree_root->sha, peer->sha_demanded, 20) == 0) {
-          strcpy(peer->fname, basename(fi->path));
-          peer->fname_len = strlen(peer->fname);
-          peer->file_size = fi->file_size;
-          /* set pointer to selected file by leecher using SHA1 hash */
-          peer->file_list_entry = fi;
-          break;
-        }
+      SLIST_FOREACH(fi, &peer->seeder->file_list_head, next)
+      {
+	if (memcmp(fi->tree_root->sha, peer->sha_demanded, 20) == 0) {
+	  strcpy(peer->fname, basename(fi->path));
+	  peer->fname_len = strlen(peer->fname);
+	  peer->file_size = fi->file_size;
+	  /* set pointer to selected file by leecher using SHA1 hash */
+	  peer->file_list_entry = fi;
+	  break;
+	}
       }
     }
   }
@@ -1208,8 +1226,7 @@ INTERNAL_LINKAGE int dump_options(char *ptr, struct peer *peer) {
     d_printf("%s", "end option\n");
     d++;
   } else {
-    d_printf("error: should be END_OPTION(0xff) but is: d[%td]: %d\n", d - ptr,
-             *d & 0xff);
+    d_printf("error: should be END_OPTION(0xff) but is: d[%td]: %d\n", d - ptr, *d & 0xff);
     abort();
   }
 
@@ -1225,7 +1242,10 @@ INTERNAL_LINKAGE int dump_options(char *ptr, struct peer *peer) {
   return ret;
 }
 
-INTERNAL_LINKAGE int swift_dump_options(char *ptr, struct peer *peer) {
+INTERNAL_LINKAGE
+int
+swift_dump_options(char *ptr, struct peer *peer)
+{
   char *d;
   int swarm_len;
   int x;
@@ -1262,13 +1282,14 @@ INTERNAL_LINKAGE int swift_dump_options(char *ptr, struct peer *peer) {
      * so don't print them */
 
     if (1) {
-      SLIST_FOREACH(fi, &peer->seeder->file_list_head, next) {
-        if (memcmp(fi->tree_root->sha, d, 20) == 0) {
-          /* set pointer to selected file by leecher using SHA1 hash */
-          peer->file_list_entry = fi;
-          d_printf("leecher wants file: %s\n", fi->path);
-          break;
-        }
+      SLIST_FOREACH(fi, &peer->seeder->file_list_head, next)
+      {
+	if (memcmp(fi->tree_root->sha, d, 20) == 0) {
+	  /* set pointer to selected file by leecher using SHA1 hash */
+	  peer->file_list_entry = fi;
+	  d_printf("leecher wants file: %s\n", fi->path);
+	  break;
+	}
       }
     }
 
@@ -1405,8 +1426,7 @@ INTERNAL_LINKAGE int swift_dump_options(char *ptr, struct peer *peer) {
     d_printf("%s", "end option\n");
     d++;
   } else {
-    d_printf("error: should be END_OPTION(0xff) but is: d[%td]: %d\n", d - ptr,
-             *d & 0xff);
+    d_printf("error: should be END_OPTION(0xff) but is: d[%td]: %d\n", d - ptr, *d & 0xff);
     abort();
   }
 
@@ -1431,8 +1451,10 @@ INTERNAL_LINKAGE int swift_dump_options(char *ptr, struct peer *peer) {
  * 	req_len - length of buffer pointed by ptr
  * 	peer - pointer to struct describing LEECHER
  */
-INTERNAL_LINKAGE int dump_handshake_request(char *ptr, int req_len,
-                                            struct peer *peer) {
+INTERNAL_LINKAGE
+int
+dump_handshake_request(char *ptr, int req_len, struct peer *peer)
+{
   char *d;
   uint32_t dest_chan_id;
   uint32_t src_chan_id;
@@ -1470,8 +1492,10 @@ INTERNAL_LINKAGE int dump_handshake_request(char *ptr, int req_len,
   return ret;
 }
 
-INTERNAL_LINKAGE int swift_dump_handshake_request(char *ptr, int req_len,
-                                                  struct peer *peer) {
+INTERNAL_LINKAGE
+int
+swift_dump_handshake_request(char *ptr, int req_len, struct peer *peer)
+{
   char *d;
   uint32_t src_chan_id;
   int ret;
@@ -1501,8 +1525,7 @@ INTERNAL_LINKAGE int swift_dump_handshake_request(char *ptr, int req_len,
    */
   if (peer->integrity_bmp == NULL) {
     peer->integrity_bmp = malloc(2 * peer->file_list_entry->nl / 8);
-    _assert(peer->integrity_bmp != NULL, "%s\n",
-            "peer->integrity_bmp should be != NULL");
+    _assert(peer->integrity_bmp != NULL, "%s\n", "peer->integrity_bmp should be != NULL");
     memset(peer->integrity_bmp, 0, 2 * peer->file_list_entry->nl / 8);
   } else {
     d_printf("%s", "integrity_bmp already allocated\n");
@@ -1528,8 +1551,10 @@ INTERNAL_LINKAGE int swift_dump_handshake_request(char *ptr, int req_len,
  * 	resp_len - length of buffer pointed by ptr
  * 	peer - pointer to struct describing peer
  */
-INTERNAL_LINKAGE int dump_handshake_have(char *ptr, int resp_len,
-                                         struct peer *peer) {
+INTERNAL_LINKAGE
+int
+dump_handshake_have(char *ptr, int resp_len, struct peer *peer)
+{
   char *d;
   int req_len;
   int ret;
@@ -1584,10 +1609,8 @@ INTERNAL_LINKAGE int dump_handshake_have(char *ptr, int resp_len,
     /* don't create download_schedule[] here for step-by-step mode because it
      * will be created in other procedure for sbs */
     if (peer->sbs_mode == 0) {
-      peer->download_schedule =
-          malloc(peer->nl * sizeof(struct schedule_entry));
-      memset(peer->download_schedule, 0,
-             peer->nl * sizeof(struct schedule_entry));
+      peer->download_schedule = malloc(peer->nl * sizeof(struct schedule_entry));
+      memset(peer->download_schedule, 0, peer->nl * sizeof(struct schedule_entry));
       create_download_schedule(peer);
     }
   } else {
@@ -1603,8 +1626,10 @@ INTERNAL_LINKAGE int dump_handshake_have(char *ptr, int resp_len,
 
 /* for leecher
  */
-INTERNAL_LINKAGE int swift_dump_handshake_have(char *ptr, int resp_len,
-                                               struct peer *peer) {
+INTERNAL_LINKAGE
+int
+swift_dump_handshake_have(char *ptr, int resp_len, struct peer *peer)
+{
   char *d;
   int req_len;
   int ret;
@@ -1615,8 +1640,7 @@ INTERNAL_LINKAGE int swift_dump_handshake_have(char *ptr, int resp_len,
 
   /* allocate memory for HAVE cache - it will be using by leecher scheduler */
   peer->have_cache = malloc(1024 * sizeof(struct have_cache));
-  _assert(peer->have_cache != NULL, "%s\n",
-          "peer->have_cache should be != NULL");
+  _assert(peer->have_cache != NULL, "%s\n", "peer->have_cache should be != NULL");
   peer->num_have_cache = 0;
 
   /* dump HANDSHAKE header and protocol options */
@@ -1639,8 +1663,7 @@ INTERNAL_LINKAGE int swift_dump_handshake_have(char *ptr, int resp_len,
     d++;
 
     nr_chunk = be32toh(*(uint32_t *)d);
-    peer->have_cache[peer->num_have_cache].start_chunk =
-        nr_chunk; /* save start_chunk number in HAVE cache */
+    peer->have_cache[peer->num_have_cache].start_chunk = nr_chunk; /* save start_chunk number in HAVE cache */
     d_printf("start chunk: %u\n", nr_chunk);
     if (nr_chunk < start_chunk) {
       start_chunk = nr_chunk;
@@ -1648,8 +1671,7 @@ INTERNAL_LINKAGE int swift_dump_handshake_have(char *ptr, int resp_len,
     d += sizeof(uint32_t);
 
     nr_chunk = be32toh(*(uint32_t *)d);
-    peer->have_cache[peer->num_have_cache].end_chunk =
-        nr_chunk; /* save end_chunk number in HAVE cache */
+    peer->have_cache[peer->num_have_cache].end_chunk = nr_chunk; /* save end_chunk number in HAVE cache */
     d_printf("end chunk: %u\n", nr_chunk);
     if (nr_chunk > end_chunk) {
       end_chunk = nr_chunk;
@@ -1704,10 +1726,8 @@ INTERNAL_LINKAGE int swift_dump_handshake_have(char *ptr, int resp_len,
     /* don't create download_schedule[] here for step-by-step mode because it
      * will be created in other procedure for sbs */
     if (peer->sbs_mode == 0) {
-      peer->download_schedule =
-          malloc(peer->nl * sizeof(struct schedule_entry));
-      memset(peer->download_schedule, 0,
-             peer->nl * sizeof(struct schedule_entry));
+      peer->download_schedule = malloc(peer->nl * sizeof(struct schedule_entry));
+      memset(peer->download_schedule, 0, peer->nl * sizeof(struct schedule_entry));
       create_download_schedule(peer);
     }
   } else {
@@ -1730,7 +1750,10 @@ INTERNAL_LINKAGE int swift_dump_handshake_have(char *ptr, int resp_len,
  * 	req_len - length of buffer pointed by ptr
  * 	peer - pointer to struct describing LEECHER
  */
-INTERNAL_LINKAGE int dump_request(char *ptr, int req_len, struct peer *peer) {
+INTERNAL_LINKAGE
+int
+dump_request(char *ptr, int req_len, struct peer *peer)
+{
   char *d;
   int ret;
   uint32_t dest_chan_id;
@@ -1759,8 +1782,7 @@ INTERNAL_LINKAGE int dump_request(char *ptr, int req_len, struct peer *peer) {
   d += sizeof(uint32_t);
   d_printf("  end chunk: %u\n", end_chunk);
 
-  _assert(peer->type == LEECHER, "%s\n",
-          "Only leecher is allowed to run this procedure");
+  _assert(peer->type == LEECHER, "%s\n", "Only leecher is allowed to run this procedure");
 
   if (peer->type == LEECHER) {
     peer->start_chunk = start_chunk;
@@ -1784,8 +1806,10 @@ INTERNAL_LINKAGE int dump_request(char *ptr, int req_len, struct peer *peer) {
   return ret;
 }
 
-INTERNAL_LINKAGE int swift_dump_request(char *ptr, int req_len,
-                                        struct peer *peer) {
+INTERNAL_LINKAGE
+int
+swift_dump_request(char *ptr, int req_len, struct peer *peer)
+{
   char *d;
   int ret;
   uint32_t start_chunk;
@@ -1809,8 +1833,7 @@ INTERNAL_LINKAGE int swift_dump_request(char *ptr, int req_len,
   d += sizeof(uint32_t);
   d_printf("  end chunk: %u\n", end_chunk);
 
-  _assert(peer->type == LEECHER, "%s\n",
-          "Only leecher is allowed to run this procedure");
+  _assert(peer->type == LEECHER, "%s\n", "Only leecher is allowed to run this procedure");
 
   if (peer->type == LEECHER) {
     peer->start_chunk = start_chunk;
@@ -1839,8 +1862,10 @@ INTERNAL_LINKAGE int swift_dump_request(char *ptr, int req_len,
  * called by LEECHER
  *
  */
-INTERNAL_LINKAGE int dump_pex_resp(char *ptr, int req_len, struct peer *peer,
-                                   int sockfd) {
+INTERNAL_LINKAGE
+int
+dump_pex_resp(char *ptr, int req_len, struct peer *peer, int sockfd)
+{
   char *d;
   int ret;
   uint16_t pex;
@@ -1865,15 +1890,13 @@ INTERNAL_LINKAGE int dump_pex_resp(char *ptr, int req_len, struct peer *peer,
   }
   d++;
 
-  addr_size = sizeof(sa.sin_addr.s_addr) +
-              sizeof(sa.sin_port); /* 4 bytes IP address, 2 bytes port */
+  addr_size = sizeof(sa.sin_addr.s_addr) + sizeof(sa.sin_port); /* 4 bytes IP address, 2 bytes port */
   space = req_len - (d - ptr);
   max_pex = space / addr_size;
 
   if (peer->current_seeder == NULL) {
     /* add primary seeder as a first entry to the peer_list_head list */
-    memcpy(&sa.sin_addr.s_addr, &peer->seeder_addr.sin_addr.s_addr,
-           sizeof(sa.sin_addr.s_addr));
+    memcpy(&sa.sin_addr.s_addr, &peer->seeder_addr.sin_addr.s_addr, sizeof(sa.sin_addr.s_addr));
     sa.sin_port = peer->seeder_addr.sin_port;
     c = new_seeder(&sa, BUFSIZE);
     c->sockfd = sockfd;
@@ -1922,7 +1945,10 @@ INTERNAL_LINKAGE int dump_pex_resp(char *ptr, int req_len, struct peer *peer,
  * 	req_len - length of buffer pointed by ptr
  * 	peer - pointer to struct describing LEECHER
  */
-INTERNAL_LINKAGE int dump_integrity(char *ptr, int req_len, struct peer *peer) {
+INTERNAL_LINKAGE
+int
+dump_integrity(char *ptr, int req_len, struct peer *peer)
+{
   char *d;
   int ret;
   uint32_t x;
@@ -1982,8 +2008,10 @@ INTERNAL_LINKAGE int dump_integrity(char *ptr, int req_len, struct peer *peer) {
   return ret;
 }
 
-INTERNAL_LINKAGE int swift_dump_integrity(char *ptr, int req_len,
-                                          struct peer *peer) {
+INTERNAL_LINKAGE
+int
+swift_dump_integrity(char *ptr, int req_len, struct peer *peer)
+{
   char *d;
   char sha_buf[40 + 1];
   int ret;
@@ -2059,7 +2087,10 @@ INTERNAL_LINKAGE int swift_dump_integrity(char *ptr, int req_len,
  * 	ack_len - length of buffer pointed by ptr
  * 	peer - pointer to struct describing peer
  */
-INTERNAL_LINKAGE int dump_ack(char *ptr, int ack_len, struct peer *peer) {
+INTERNAL_LINKAGE
+int
+dump_ack(char *ptr, int ack_len, struct peer *peer)
+{
   char *d;
   int ret;
   uint32_t dest_chan_id;
@@ -2098,8 +2129,10 @@ INTERNAL_LINKAGE int dump_ack(char *ptr, int ack_len, struct peer *peer) {
   return ret;
 }
 
-INTERNAL_LINKAGE int swift_dump_have_ack(char *ptr, int ack_len,
-                                         struct peer *peer) {
+INTERNAL_LINKAGE
+int
+swift_dump_have_ack(char *ptr, int ack_len, struct peer *peer)
+{
   char *d;
   int ret;
   uint32_t dest_chan_id;
@@ -2165,14 +2198,19 @@ INTERNAL_LINKAGE int swift_dump_have_ack(char *ptr, int ack_len,
  * return type of message
  */
 INTERNAL_LINKAGE
-uint8_t message_type(char *ptr) {
+uint8_t
+message_type(char *ptr)
+{
   return ptr[4]; /* skip first 4 bytes - there is destination channel id */
 }
 
 /*
  * return type of HANDSHAKE: INIT, FINISH, ERROR
  */
-INTERNAL_LINKAGE uint8_t handshake_type(char *ptr) {
+INTERNAL_LINKAGE
+uint8_t
+handshake_type(char *ptr)
+{
   char *d;
   uint32_t dest_chan_id;
   uint32_t src_chan_id;
@@ -2218,8 +2256,10 @@ INTERNAL_LINKAGE uint8_t handshake_type(char *ptr) {
   return ret;
 }
 
-INTERNAL_LINKAGE uint16_t count_handshake(char *ptr, uint16_t n,
-                                          uint8_t skip_hdr) {
+INTERNAL_LINKAGE
+uint16_t
+count_handshake(char *ptr, uint16_t n, uint8_t skip_hdr)
+{
   char *d;
   int swarm_len;
   uint8_t chunk_addr_method;
@@ -2308,8 +2348,7 @@ INTERNAL_LINKAGE uint16_t count_handshake(char *ptr, uint16_t n,
     d_printf("%s", "end option\n");
     d++;
   } else {
-    d_printf("error: should be END_OPTION(0xff) but is: d[%td]: %d\n", d - ptr,
-             *d & 0xff);
+    d_printf("error: should be END_OPTION(0xff) but is: d[%td]: %d\n", d - ptr, *d & 0xff);
     abort();
   }
 

@@ -27,7 +27,6 @@
 #define _MT_H_
 
 #include <stdint.h>
-#include <sys/queue.h>
 
 enum chunk_state { CH_EMPTY = 0, CH_ACTIVE };
 
@@ -49,10 +48,9 @@ enum node_state {
   SENT /* seeder already sent this sha to leecher */
 };
 struct node {
-  int number; /* number of the node */
-  struct node *left, *right,
-      *parent;         /* if parent == NULL - it is root node of the tree */
-  struct chunk *chunk; /* pointer to chunk */
+  int number;                         /* number of the node */
+  struct node *left, *right, *parent; /* if parent == NULL - it is root node of the tree */
+  struct chunk *chunk;                /* pointer to chunk */
   char sha[20 + 1];
   enum node_state state;
 };

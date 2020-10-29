@@ -26,8 +26,7 @@
 #ifndef _NET_H_
 #define _NET_H_
 
-#include "mt.h"
-#include "peer.h"
+struct peer;
 
 #define BUFSIZE 1500
 

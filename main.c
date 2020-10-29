@@ -23,27 +23,25 @@
  * SUCH DAMAGE.
  */
 
+#include "config.h"
+#include "ppspp_swift.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <libgen.h>
 #include <netinet/in.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
-
-#include "config.h"
-#include "ppspp_swift.h"
 
 int debug;
 
 enum { SEEDER_TYPE = 1, LEECHER_TYPE = 2 };
 
-void ascii_sha_to_bin(char *sha_ascii, uint8_t *bin) {
+void
+ascii_sha_to_bin(char *sha_ascii, uint8_t *bin)
+{
   int y;
   uint8_t b;
   char buf[2 + 1];
@@ -56,7 +54,9 @@ void ascii_sha_to_bin(char *sha_ascii, uint8_t *bin) {
   }
 }
 
-int main(int argc, char *argv[]) {
+int
+main(int argc, char *argv[])
+{
   char *fname1;
   char *fdname;
   char *fname2;
@@ -225,36 +225,34 @@ int main(int argc, char *argv[]) {
       ch = peer_list;
 
       while (ch < peer_list + strlen(peer_list)) {
-        comma = strchr(ch, ',');
-        if (comma != NULL) { /* if comma found */
-          last_char = comma - 1;
-        } else if (ch <
-                   peer_list +
-                       strlen(peer_list)) { /* last IP without ending comma */
-          last_char = peer_list + strlen(peer_list);
-        }
+	comma = strchr(ch, ',');
+	if (comma != NULL) { /* if comma found */
+	  last_char = comma - 1;
+	} else if (ch < peer_list + strlen(peer_list)) { /* last IP without ending comma */
+	  last_char = peer_list + strlen(peer_list);
+	}
 
-        /* copy IP:PORT pair to temporary buffer */
-        memset(buf_ip_port, 0, sizeof(buf_ip_port));
-        memcpy(buf_ip_port, ch, last_char - ch + 1);
+	/* copy IP:PORT pair to temporary buffer */
+	memset(buf_ip_port, 0, sizeof(buf_ip_port));
+	memcpy(buf_ip_port, ch, last_char - ch + 1);
 
-        /* extract IP address */
-        colon = strchr(buf_ip_port, ':');
-        if (colon != NULL) { /* colon found */
-          memset(buf_ip_addr, 0, sizeof(buf_ip_addr));
-          memcpy(buf_ip_addr, buf_ip_port, colon - buf_ip_port);
-        } else {
-          printf("Error: no colon found at: %s\n", buf_ip_port);
-          exit(1);
-        }
+	/* extract IP address */
+	colon = strchr(buf_ip_port, ':');
+	if (colon != NULL) { /* colon found */
+	  memset(buf_ip_addr, 0, sizeof(buf_ip_addr));
+	  memcpy(buf_ip_addr, buf_ip_port, colon - buf_ip_port);
+	} else {
+	  printf("Error: no colon found at: %s\n", buf_ip_port);
+	  exit(1);
+	}
 
-        sia = inet_aton(buf_ip_addr, &sa_in.sin_addr);
-        sa_in.sin_port = htons(atoi(colon + 1));
+	sia = inet_aton(buf_ip_addr, &sa_in.sin_addr);
+	sa_in.sin_port = htons(atoi(colon + 1));
 
-        if (sia == 1) { /* if conversion succeeded */
-          swift_seeder_add_seeder(seeder_handle, &sa_in);
-        }
-        ch = last_char + 2;
+	if (sia == 1) { /* if conversion succeeded */
+	  swift_seeder_add_seeder(seeder_handle, &sa_in);
+	}
+	ch = last_char + 2;
       }
     }
 #endif
@@ -284,17 +282,15 @@ int main(int argc, char *argv[]) {
       unlink(meta.file_name);
       fd = open(meta.file_name, O_WRONLY | O_CREAT, 0644);
       if (fd < 0) {
-        printf("error opening file '%s' for writing: %u %s\n", meta.file_name,
-               errno, strerror(errno));
-        abort();
+	printf("error opening file '%s' for writing: %u %s\n", meta.file_name, errno, strerror(errno));
+	abort();
       }
 #if FILE_DESCRIPTOR_TRANSFER
       /* run 1 (non-blocking) leecher thread with state machine */
       swift_leecher_run(leecher_handle);
 
       /* let the library prepare itself for transfer */
-      swift_prepare_chunk_range(leecher_handle, meta.start_chunk,
-                                meta.end_chunk);
+      swift_prepare_chunk_range(leecher_handle, meta.start_chunk, meta.end_chunk);
 
       swift_leecher_fetch_chunk_to_fd(leecher_handle, fd);
 
@@ -312,10 +308,10 @@ int main(int argc, char *argv[]) {
       transfer_buf = malloc(buf_size);
 
       while ((x <= meta.end_chunk) && (buf_size > 0)) {
-        size = swift_leecher_fetch_chunk_to_buf(leecher_handle, transfer_buf);
-        write(fd, transfer_buf, size);
-        x += 1000;
-        buf_size = swift_prepare_chunk_range(leecher_handle, x, x + 1000 - 1);
+	size = swift_leecher_fetch_chunk_to_buf(leecher_handle, transfer_buf);
+	write(fd, transfer_buf, size);
+	x += 1000;
+	buf_size = swift_prepare_chunk_range(leecher_handle, x, x + 1000 - 1);
       }
       close(fd);
       swift_leecher_close(leecher_handle);

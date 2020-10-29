@@ -23,31 +23,31 @@
  * SUCH DAMAGE.
  */
 
+#include "net.h"
+#include "config.h"
+#include "debug.h"
+#include "mt.h"
+#include "peer.h"
+#include "ppspp_protocol.h"
+#include "sha1.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <inttypes.h>
 #include <libgen.h>
-#include <mqueue.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/queue.h>
+#include <sys/select.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+#include <sys/time.h>
+#include <time.h>
 #include <unistd.h>
-
-#include "config.h"
-#include "debug.h"
-#include "mt.h"
-#include "net.h"
-#include "peer.h"
-#include "ppspp_protocol.h"
-#include "sha1.h"
 
 #define SEM_NAME "/ppspp"
 

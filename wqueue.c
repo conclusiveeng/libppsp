@@ -1,21 +1,31 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/queue.h>
 
 #include "debug.h"
 #include "peer.h"
 #include "wqueue.h"
 
-INTERNAL_LINKAGE void wq_init(struct wqueue_head *wh) { STAILQ_INIT(wh); }
+INTERNAL_LINKAGE
+void
+wq_init(struct wqueue_head *wh)
+{
+  STAILQ_INIT(wh);
+}
 
 /* add entry "e" to wqueue pointed by "wh" */
-INTERNAL_LINKAGE void wq_append(struct wqueue_head *wh,
-                                struct wqueue_entry *e) {
+INTERNAL_LINKAGE
+void
+wq_append(struct wqueue_head *wh, struct wqueue_entry *e)
+{
   STAILQ_INSERT_TAIL(wh, e, next);
 }
 
-INTERNAL_LINKAGE int wq_send(struct wqueue_head *wh, char *buf,
-                             uint16_t buf_len) {
+INTERNAL_LINKAGE
+int
+wq_send(struct wqueue_head *wh, char *buf, uint16_t buf_len)
+{
   struct wqueue_entry *e;
 
   e = malloc(sizeof(struct wqueue_entry));
@@ -28,8 +38,10 @@ INTERNAL_LINKAGE int wq_send(struct wqueue_head *wh, char *buf,
   return 0;
 }
 
-INTERNAL_LINKAGE int wq_receive(struct wqueue_head *wh, char *buf,
-                                uint16_t buf_len) {
+INTERNAL_LINKAGE
+int
+wq_receive(struct wqueue_head *wh, char *buf, uint16_t buf_len)
+{
   int ret;
   struct wqueue_entry *e;
 
@@ -37,9 +49,7 @@ INTERNAL_LINKAGE int wq_receive(struct wqueue_head *wh, char *buf,
 
   if (!STAILQ_EMPTY(wh)) {
     e = STAILQ_FIRST(wh);
-    _assert(e->msg_len <= buf_len,
-            "message len (%u) is bigger than buffer(%u)\n", e->msg_len,
-            buf_len);
+    _assert(e->msg_len <= buf_len, "message len (%u) is bigger than buffer(%u)\n", e->msg_len, buf_len);
     memcpy(buf, e->msg, e->msg_len);
     ret = e->msg_len;
     STAILQ_REMOVE_HEAD(wh, next);
@@ -53,8 +63,10 @@ INTERNAL_LINKAGE int wq_receive(struct wqueue_head *wh, char *buf,
 }
 
 /* peek first element from queue without removing it */
-INTERNAL_LINKAGE int wq_peek(struct wqueue_head *wh, char *buf,
-                             uint16_t buf_len) {
+INTERNAL_LINKAGE
+int
+wq_peek(struct wqueue_head *wh, char *buf, uint16_t buf_len)
+{
   int ret;
   struct wqueue_entry *e;
 
@@ -62,9 +74,7 @@ INTERNAL_LINKAGE int wq_peek(struct wqueue_head *wh, char *buf,
 
   if (!STAILQ_EMPTY(wh)) {
     e = STAILQ_FIRST(wh);
-    _assert(e->msg_len <= buf_len,
-            "message len (%u) is bigger than buffer(%u)\n", e->msg_len,
-            buf_len);
+    _assert(e->msg_len <= buf_len, "message len (%u) is bigger than buffer(%u)\n", e->msg_len, buf_len);
     memcpy(buf, e->msg, e->msg_len);
     ret = e->msg_len;
   } else {
@@ -75,7 +85,10 @@ INTERNAL_LINKAGE int wq_peek(struct wqueue_head *wh, char *buf,
 }
 
 /* count number of elements */
-INTERNAL_LINKAGE int wq_no_elements(struct wqueue_head *wh) {
+INTERNAL_LINKAGE
+int
+wq_no_elements(struct wqueue_head *wh)
+{
   int ret;
   struct wqueue_entry *i;
 

@@ -26,16 +26,14 @@
 #ifndef _PEER_H_
 #define _PEER_H_
 
-#include <dirent.h>
+#include "mt.h"
 #include <mqueue.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <semaphore.h>
 #include <stdint.h>
-#include <string.h>
 #include <sys/queue.h>
 #include <time.h>
-
-#include "mt.h"
 
 #define INTERNAL_LINKAGE __attribute__((__visibility__("hidden")))
 
@@ -150,37 +148,35 @@ struct peer {
 
   uint32_t src_chan_id;
   uint32_t dest_chan_id;
-  struct peer *seeder; /* pointer to seeder peer struct - used on seeder side in
-                          threads */
+  struct peer *seeder;        /* pointer to seeder peer struct - used on seeder side in
+                                 threads */
   struct peer *local_leecher; /* pointer to local leecher peer struct - used on
                                  leecher side in threads */
-  struct node *tree; /* pointer to beginning (index 0) array with tree nodes */
-  struct node *tree_root;  /* pointer to root of the tree */
-  struct chunk *chunk;     /* array of chunks */
-  uint32_t nl;             /* number of leaves */
-  uint32_t nc;             /* number of chunks */
-  uint64_t num_series;     /* number of series */
-  uint64_t hashes_per_mtu; /* number of hashes that fit MTU size, for example if
-                              == 5 then series are 0..4, 5..9, 10..14 */
+  struct node *tree;          /* pointer to beginning (index 0) array with tree nodes */
+  struct node *tree_root;     /* pointer to root of the tree */
+  struct chunk *chunk;        /* array of chunks */
+  uint32_t nl;                /* number of leaves */
+  uint32_t nc;                /* number of chunks */
+  uint64_t num_series;        /* number of series */
+  uint64_t hashes_per_mtu;    /* number of hashes that fit MTU size, for example if
+                                 == 5 then series are 0..4, 5..9, 10..14 */
   uint8_t sha_demanded[20];
-  uint8_t seeder_has_file; /* flag on leecher side: 1 = seeder has file for
-                              which we have demanded in ->sha_demanded[], 0 =
-                              seeder has not file */
-  uint8_t fetch_schedule;  /* 0 = peer is not allowed to get next schedule from
-                              download_schedule array */
-  uint8_t after_seeder_switch; /* 0 = still downloading from primary seeder, 1 =
-                                  switched to another seeder after connection
-                                  lost */
-  struct schedule_entry
-      *download_schedule; /* leecher side: array of elements of pair: begin,end
-                             of chunks, max number of index: peer->nl-1 */
-  uint64_t download_schedule_len; /* number of indexes of allocated array
-                                     "download_schedule", 0 = all chunks
-                                     downloaded */
-  volatile uint64_t
-      download_schedule_idx; /* index (iterator) for download_schedule array */
-  pthread_mutex_t download_schedule_mutex; /* mutex for "download_schedule"
-                                              array protection */
+  uint8_t seeder_has_file;                  /* flag on leecher side: 1 = seeder has file for
+                                               which we have demanded in ->sha_demanded[], 0 =
+                                               seeder has not file */
+  uint8_t fetch_schedule;                   /* 0 = peer is not allowed to get next schedule from
+                                               download_schedule array */
+  uint8_t after_seeder_switch;              /* 0 = still downloading from primary seeder, 1 =
+                                               switched to another seeder after connection
+                                               lost */
+  struct schedule_entry *download_schedule; /* leecher side: array of elements of pair: begin,end
+                                               of chunks, max number of index: peer->nl-1 */
+  uint64_t download_schedule_len;           /* number of indexes of allocated array
+                                               "download_schedule", 0 = all chunks
+                                               downloaded */
+  volatile uint64_t download_schedule_idx;  /* index (iterator) for download_schedule array */
+  pthread_mutex_t download_schedule_mutex;  /* mutex for "download_schedule"
+                                               array protection */
 
   /* for thread */
   uint8_t finishing;
@@ -196,11 +192,10 @@ struct peer {
   uint8_t d_last_recv, d_last_send;
 
   /* network things */
-  uint16_t port; /* seeder: udp port number to bind to */
-  struct sockaddr_in
-      leecher_addr; /* leecher address: IP/PORT from seeder point of view */
-  struct sockaddr_in seeder_addr; /* primary seeder IP/PORT address from leecher
-                                     point of view */
+  uint16_t port;                   /* seeder: udp port number to bind to */
+  struct sockaddr_in leecher_addr; /* leecher address: IP/PORT from seeder point of view */
+  struct sockaddr_in seeder_addr;  /* primary seeder IP/PORT address from leecher
+                                      point of view */
   char *recv_buf;
   char *send_buf;
 
@@ -252,18 +247,13 @@ struct peer {
   struct peer *current_seeder; /* leecher side: points to one element of the
                                   list seeders in ->snext */
 
-  pthread_mutex_t
-      peers_list_head_mutex; /* mutex for protecting peers_list_head */
-  struct slist_peers
-      peers_list_head; /* seeder: list of connected leechers, leecher: ? */
-  struct slist_seeders
-      other_seeders_list_head; /* seeder: list of other (alternative) seeders
-                                  maintained by primary seeder */
-  struct slisthead
-      file_list_head; /* seeder: head of list of files shared by seeder */
-  struct file_list_entry
-      *file_list_entry; /* seeder side: pointer to file choosen by leecher using
-                           SHA1 hash */
+  pthread_mutex_t peers_list_head_mutex;        /* mutex for protecting peers_list_head */
+  struct slist_peers peers_list_head;           /* seeder: list of connected leechers, leecher: ? */
+  struct slist_seeders other_seeders_list_head; /* seeder: list of other (alternative) seeders
+                                                   maintained by primary seeder */
+  struct slisthead file_list_head;              /* seeder: head of list of files shared by seeder */
+  struct file_list_entry *file_list_entry;      /* seeder side: pointer to file choosen by leecher using
+                                                   SHA1 hash */
 
   struct slist_node_cache cache;
   struct wqueue_head hi_wqueue;

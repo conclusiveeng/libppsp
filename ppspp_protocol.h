@@ -26,8 +26,9 @@
 #ifndef _PPSPP_PROTOCOL_H_
 #define _PPSPP_PROTOCOL_H_
 
-#include "mt.h"
-#include "peer.h"
+#include <stdint.h>
+
+struct peer;
 
 /* handshake protocol options */
 enum proto_options {

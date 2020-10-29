@@ -22,25 +22,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <libgen.h>
-#include <netinet/in.h>
+#include "mt.h"
+#include "debug.h"
+#include "peer.h"
+#include "sha1.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-
-#include "debug.h"
-#include "mt.h"
-#include "net.h"
-#include "peer.h"
-#include "ppspp_protocol.h"
-#include "sha1.h"
 
 /*
  * returns rounded order of 32-bit variable

@@ -26,6 +26,7 @@
 #ifndef _PPSPP_SWIFT_H_
 #define _PPSPP_SWIFT_H_
 
+#include <netinet/in.h>
 #include <stdint.h>
 
 /**
