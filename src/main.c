@@ -132,7 +132,7 @@ main(int argc, char *argv[])
   }
 
   if (usage || (argc == 1)) {
-    printf("Peer-to-Peer Streaming Peer Protocol\n");
+    printf("Peregrine - Peer-to-Peer Streaming Peer Protocol - DEMO CLIENT\n");
     printf("usage:\n");
     printf("%s: -acfhpstv\n", argv[0]);
     printf("-a ip_address:port:	numeric IP address and udp port of the remote "

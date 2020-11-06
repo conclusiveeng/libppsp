@@ -5,8 +5,8 @@ libdir=${prefix}/lib
 sharedlibdir=${prefix}/lib
 includedir=${prefix}/include
 
-Name: libppspp
-Description: Peer-to-Peer Streaming Peer Protocol library
+Name: libperegrine
+Description: Peregrine - Peer-to-Peer Streaming Peer Protocol library
 Version: @VERSION@
 Cflags: -I${includedir} ${cflags}
 Libs: -L${libdir} -Wl,-rpath -Wl,${libdir} -lppspp

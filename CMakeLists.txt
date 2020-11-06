@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.2)
 
-project(ppspp
+project(peregrine
         VERSION 0.4
         LANGUAGES C
         DESCRIPTION "Peer-to-Peer Streaming Peer Protocol")
@@ -30,12 +30,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS, 1)
 
 # Set this if .deb file should be build into different directory
 # set(CPACK_OUTPUT_FILE_PREFIX ${CMAKE_INSTALL_PREFIX}/pkg)
+set(PEREGRINE_INSTALL_INCLUDE_DIR include)
+set(PEREGRINE_INSTALL_BIN_DIR bin)
+set(PEREGRINE_INSTALL_LIB_DIR lib)
 
-set(PPSPP_INSTALL_INCLUDE_DIR include)
-set(PPSPP_INSTALL_BIN_DIR bin)
-set(PPSPP_INSTALL_LIB_DIR lib)
-
-set(PPSPP_HEADERS_DIR include/ppspp)
+set(PEREGRINE_HEADERS_DIR include/peregrine)
 
 # Geneatre .deb package
 set(CPACK_GENERATOR "DEB")
@@ -49,6 +48,6 @@ if (DOXYGEN_FOUND)
 doxygen_add_docs(docs ALL ${CMAKE_SOURCE_DIR})
 endif(DOXYGEN_FOUND)
 
-include_directories(${PPSPP_INSTALL_INCLUDE_DIR})
+include_directories(${PEREGRINE_INSTALL_INCLUDE_DIR})
 
 add_subdirectory(src)

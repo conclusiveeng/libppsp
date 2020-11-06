@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.2)
-project(ppspp_bin)
+project(peregrine_demo)
 
-add_subdirectory(libppspp)
+add_subdirectory(libperegrine)
 set(SOURCE_FILES main.c)
-include_directories(libppspp)
+include_directories(libperegrine)
 
-add_executable(ppspp_bin ${SOURCE_FILES})
-set_target_properties(ppspp_bin PROPERTIES OUTPUT_NAME ppspp)
-target_link_libraries(ppspp_bin ppspp pthread rt)
-install(TARGETS ppspp_bin DESTINATION ${PPSPP_INSTALL_BIN_DIR})
+add_executable(peregrine_demo ${SOURCE_FILES})
+set_target_properties(peregrine_demo PROPERTIES OUTPUT_NAME peregrine)
+target_link_libraries(peregrine_demo peregrine pthread rt)
+install(TARGETS peregrine_demo DESTINATION ${PEREGRINE_INSTALL_BIN_DIR})
