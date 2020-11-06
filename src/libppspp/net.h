@@ -30,11 +30,6 @@ struct peer;
 
 #define BUFSIZE 1500
 
-int net_seeder(struct peer * /*seeder*/);
-int net_leecher_continuous(struct peer *);
-int preliminary_connection_sbs(struct peer * /*local_peer*/);
-void net_leecher_create(struct peer * /*local_peer*/);
-int net_leecher_sbs(struct peer * /*local_peer*/);
 void net_leecher_fetch_chunk(struct peer * /*local_peer*/);
 void net_leecher_close(struct peer * /*local_peer*/);
 

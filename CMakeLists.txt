@@ -6,8 +6,7 @@ project(ppspp
         DESCRIPTION "Peer-to-Peer Streaming Peer Protocol")
 
 # gcovr coverage make flags
-# set(GCOV_LINK_FLAGS "-lgcov --coverage")
-# set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${GCOV_LINK_FLAGS}")
+# set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage -lgcov")
 # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g --coverage -fprofile-arcs -ftest-coverage")
 
 set(CMAKE_C_STANDARD 11)

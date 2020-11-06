@@ -83,19 +83,3 @@ wq_peek(struct wqueue_head *wh, char *buf, uint16_t buf_len)
 
   return ret;
 }
-
-/* count number of elements */
-INTERNAL_LINKAGE
-int
-wq_no_elements(struct wqueue_head *wh)
-{
-  int ret;
-  struct wqueue_entry *i;
-
-  ret = 0;
-  if (!STAILQ_EMPTY(wh)) {
-    STAILQ_FOREACH(i, wh, next) { ret++; }
-  }
-
-  return ret;
-}

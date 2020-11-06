@@ -143,115 +143,6 @@ build_tree(int num_chunks, struct node **ret)
   return rot;
 }
 
-/*
- * extends the tree by order (8 ->16, 16->32, 32->64, etc)
- * in params:
- * 	orig_tree - pointer to original tree for extending
- * 	orig_num_chunks - number of leaves of original tree
- * out params:
- * 	ret - pointer to index [0] of he new created tree
- */
-INTERNAL_LINKAGE
-struct node *
-extend_tree(struct node *orig_tree, int orig_num_chunks, struct node **ret)
-{
-  int x;
-  int l;
-  int si;
-  int h;
-  int nc;
-  int left;
-  int right;
-  int parent;
-  int root_idx;
-  int root_idx_012;
-  int root_idx_456;
-  struct node *rot;
-  struct node *tt;
-  struct node min;
-  struct node max;
-
-  d_printf("extending tree - num_chunks: %d => %d\n", orig_num_chunks, orig_num_chunks * 2);
-
-  h = order2(orig_num_chunks);
-  nc = 1 << h;
-  d_printf("order2(%d): %d\n", orig_num_chunks, h);
-  d_printf("num_chunks(orig): %d  after_correction: %d\n", orig_num_chunks, nc);
-
-  /* list the tree */
-#if 0
-	for (l = 1; l <= h + 1; l++) {		/* go through levels of the tree starting from bottom */
-		int first_idx = (1 << (l - 1)) -1;  /* first index to show on given level: 0, 1, 3, 7, 15 */
-		for (si = first_idx; si < 2 * nc; si += (1 << l)) {	/* si - sibling index */
-			d_printf("%d ", si);
-		}
-		d_printf("%s", "\n");
-	}
-#endif
-
-  /* allocate array of nodes for the new tree (2 times more of the leaves than
-   * original tree */
-  tt = malloc(2 * 2 * nc * sizeof(struct node));
-  *ret = tt; /* return pointer to index [0] of the new tree */
-
-  /* initialize the nodes of the new tree */
-#if 1
-  for (x = 0; x < 2 * 2 * nc; x++) {
-    tt[x].number = x;
-    tt[x].chunk = NULL;
-    tt[x].left = tt[x].right = tt[x].parent = NULL;
-    tt[x].state = INITIALIZED;
-  }
-#endif
-
-  /* copy SHA hashes of the original tree */
-  for (x = 0; x < nc; x++) {
-    memcpy(tt[x].sha, orig_tree[x].sha, 20);
-  }
-
-  /* compute height and number of leaves for the new created tree */
-  h++;
-  nc = 2 * nc;
-
-  /* find extreme left and right nodes for old tree */
-  interval_min_max(&orig_tree[(1 << (h - 1)) - 1], &min, &max); /* for example: 0-14 */
-
-  /* linking nodes */
-  for (l = 1; l <= h; l++) {
-    int first_idx = (1 << (l - 1)) - 1;
-    for (si = first_idx; si < 2 * nc; si += (2 << l)) {
-      left = si;
-      right = (si | (1 << l));
-      parent = (left + right) / 2;
-      tt[left].parent = &tt[parent];
-      tt[right].parent = &tt[parent];
-      tt[parent].left = &tt[left];
-      tt[parent].right = &tt[right];
-    }
-  }
-
-  /* link both trees */
-  root_idx_012 = (1 << (h - 1)) - 1;
-  root_idx_456 = root_idx_012 + (1 << h);
-
-  root_idx = (1 << h) - 1;
-
-  tt[root_idx_012].parent = &tt[root_idx]; /* parent for left node */
-  tt[root_idx_456].parent = &tt[root_idx]; /* parent for right node */
-
-  tt[root_idx].left = &tt[root_idx_012];  /* left child of the parent */
-  tt[root_idx].right = &tt[root_idx_456]; /* right child of the parent */
-
-  tt[root_idx].number = root_idx;
-
-  free(orig_tree);
-
-  d_printf("extend root node: %d  %d\n", root_idx, tt[root_idx].number);
-
-  rot = &tt[root_idx];
-  return rot;
-}
-
 INTERNAL_LINKAGE
 int
 update_chunk(struct node *t, unsigned int cn, struct chunk *c)
@@ -311,40 +202,6 @@ show_tree_root_based(struct node *t)
 #endif
 }
 
-/*
- * find uncle for node "n" in tree with root "t"
- */
-INTERNAL_LINKAGE
-struct node *
-find_uncle(struct node *t, struct node *n)
-{
-  struct node *p;
-  struct node *gp;
-  struct node *u;
-
-  p = n->parent;
-  if (p == NULL) {
-    return NULL;
-  }
-  gp = p->parent;
-  if (gp == NULL) {
-    return NULL;
-  }
-
-  if (p == gp->right) { /* if parent is right child of grandparent - then uncle is
-                         left child of the grandparent */
-    u = gp->left;
-  }
-  if (p == gp->left) { /* if parent is left child of grandparent - then uncle is
-                        right child of the grandparent */
-    u = gp->right;
-  }
-
-  d_printf("node: %d   parent: %d  grandparent: %d  uncle: %d\n", n->number, p->number, gp->number, u->number);
-
-  return u;
-}
-
 INTERNAL_LINKAGE
 struct node *
 find_sibling(struct node *n)
@@ -369,33 +226,6 @@ find_sibling(struct node *n)
   d_printf("node: %d   parent: %d  sibling: %d\n", n->number, p->number, s->number);
 
   return s;
-}
-
-/*
- * looks for min and max index going through the tree - extremely left and right
- *
- */
-INTERNAL_LINKAGE
-void
-list_interval(struct node *i)
-{
-  struct node *c;
-  struct node *min;
-  struct node *max;
-
-  c = i;
-  while (c->left != NULL) {
-    c = c->left;
-  }
-  min = c;
-
-  c = i;
-  while (c->right != NULL) {
-    c = c->right;
-  }
-  max = c;
-
-  d_printf("root: %d  interval  min: %d  max: %d\n", i->number, min->number, max->number);
 }
 
 /*

@@ -830,7 +830,7 @@ swift_net_seeder(struct peer *seeder)
 #if MQ_SYNC
 	sm = mq_send(p->mq, buf, n, 0);
 #else
-	swift_semaph_post(p->sem);         /* wake up seeder worker */
+	swift_semaph_post(p->sem); /* wake up seeder worker */
 #endif
 
 	continue;
@@ -853,7 +853,7 @@ swift_net_seeder(struct peer *seeder)
 #if MQ_SYNC
 	  sm = mq_send(p->mq, buf, n, 0); /* send finishing message */
 #else
-	  swift_semaph_post(p->sem);       /* wake up seeder worker and allow him finish his work */
+	  swift_semaph_post(p->sem); /* wake up seeder worker and allow him finish his work */
 #endif
 
 	  p->finishing = 1; /* set the flag for finishing the thread */
@@ -883,7 +883,7 @@ swift_net_seeder(struct peer *seeder)
 #if MQ_SYNC
       sm = mq_send(p->mq, buf, n, 0);
 #else
-      swift_semaph_post(p->sem);           /* wake up seeder worker */
+      swift_semaph_post(p->sem); /* wake up seeder worker */
 #endif
       continue;
     }
@@ -903,7 +903,7 @@ swift_net_seeder(struct peer *seeder)
 #if MQ_SYNC
       sm = mq_send(p->mq, buf, n, 0);
 #else
-      swift_semaph_post(p->sem);           /* wake up seeder worker */
+      swift_semaph_post(p->sem); /* wake up seeder worker */
 #endif
       continue;
     }
@@ -1309,7 +1309,8 @@ swift_net_seeder_mq(struct peer *seeder)
 	  free(p->integrity_bmp);
 	  free(p->data_bmp);
 	}
-	continue;
+	continue; // uncomment this for demonized operation
+	          // break;
       }
     }
 
