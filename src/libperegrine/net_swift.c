@@ -23,10 +23,10 @@
  * SUCH DAMAGE.
  */
 
+#include "net_swift.h"
 #include "config.h"
 #include "debug.h"
 #include "mt.h"
-#include "net.h"
 #include "peer.h"
 #include "ppspp_protocol.h"
 #include "sha1.h"
@@ -56,6 +56,8 @@
 #define MQ_NAME  "/mq"
 
 extern int h_errno;
+
+uint8_t remove_dead_peers;
 
 INTERNAL_LINKAGE
 sem_t *

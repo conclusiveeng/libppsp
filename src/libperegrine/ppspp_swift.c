@@ -26,7 +26,6 @@
 #include "ppspp_swift.h"
 #include "debug.h"
 #include "mt.h"
-#include "net.h"
 #include "net_swift.h"
 #include "peer.h"
 #include <arpa/inet.h>
@@ -435,7 +434,7 @@ swift_leecher_fetch_chunk_to_fd(ppspp_handle_t handle, int fd)
   local_leecher->fd = fd;
   local_leecher->transfer_method = M_FD;
 
-  net_leecher_fetch_chunk(local_leecher);
+  swift_net_leecher_fetch_chunk(local_leecher);
 }
 
 /**
@@ -458,7 +457,7 @@ swift_leecher_fetch_chunk_to_buf(ppspp_handle_t handle, uint8_t *transfer_buf)
   local_leecher->transfer_method = M_BUF;
   local_leecher->tx_bytes = 0;
 
-  net_leecher_fetch_chunk(local_leecher);
+  swift_net_leecher_fetch_chunk(local_leecher);
 
   return local_leecher->tx_bytes;
 }
@@ -475,5 +474,5 @@ swift_leecher_close(ppspp_handle_t handle)
 
   local_leecher = (struct peer *)handle;
   local_leecher->cmd = CMD_FINISH;
-  net_leecher_close(local_leecher);
+  swift_net_leecher_close(local_leecher);
 }

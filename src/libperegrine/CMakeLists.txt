@@ -4,7 +4,7 @@ project(libperegrine C)
 get_filename_component(PARENT_DIR .. REALPATH DIRECTORY)
 message(${PARENT_DIR}/debug.h)
 
-set(SOURCE_FILES mt.c ppspp_protocol.c net.c net_swift.c peer.c sha1.c ppspp_swift.c wqueue.c)
+set(SOURCE_FILES mt.c ppspp_protocol.c net_swift.c peer.c sha1.c ppspp_swift.c wqueue.c)
 
 add_library(peregrine SHARED ${SOURCE_FILES})
 
