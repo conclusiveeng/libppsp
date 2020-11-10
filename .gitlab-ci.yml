@@ -11,8 +11,8 @@ build:
     - cpack
   artifacts:
     paths:
-      - build/src/ppspp
-      - build/libppspp/libppspp.so
+      - build/src/peregrine
+      - build/libperegrine/libperegrine.so
       - build/*.deb
 
 #test:
