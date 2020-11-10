@@ -26,9 +26,12 @@
 #ifndef _PPSPP_PROTOCOL_H_
 #define _PPSPP_PROTOCOL_H_
 
+#include <netinet/in.h>
+#include <stddef.h>
 #include <stdint.h>
 
 struct peer;
+struct in_addr;
 
 /* handshake protocol options */
 enum proto_options {
@@ -87,6 +90,71 @@ struct proto_opt_str {
   uint32_t opt_map; /* bitmap - which of the fields above have any data */
 };
 
+struct msg_handshake {
+  uint32_t src_channel_id;
+  uint8_t protocol_options[];
+} __attribute__((packed));
+
+struct msg_have {
+  uint32_t start_chunk;
+  uint32_t end_chunk;
+} __attribute__((packed));
+
+struct msg_data {
+  uint32_t start_chunk;
+  uint32_t end_chunk;
+  uint64_t timestamp;
+  uint8_t data[];
+} __attribute__((packed));
+
+struct msg_ack {
+  uint32_t start_chunk;
+  uint32_t end_chunk;
+  uint64_t sample;
+};
+
+struct msg_integrity {
+  uint32_t end_chunk;
+  uint8_t hash[256];
+} __attribute__((packed));
+
+struct msg_signed_integrity {
+  uint32_t start_chunk;
+  uint32_t end_chunk;
+  uint64_t timestamp;
+  uint8_t signature[];
+} __attribute__((packed));
+
+struct msg_request {
+  uint32_t start_chunk;
+  uint32_t end_chunk;
+} __attribute__((packed));
+
+struct msg_cancel {
+  uint32_t start_chunk;
+  uint32_t end_chunk;
+} __attribute__((packed));
+
+struct msg_pex_resv4 {
+  in_addr_t ip_address;
+  uint16_t port;
+} __attribute__((packed));
+
+struct msg {
+  uint8_t message_type;
+  union {
+    struct msg_handshake handshake;
+    struct msg_have have;
+    struct msg_data data;
+    struct msg_ack ack;
+    struct msg_integrity integrity;
+    struct msg_pex_resv4 pex_resv4;
+    struct msg_signed_integrity signed_integrity;
+    struct msg_request request;
+    struct msg_cancel cancel;
+  };
+} __attribute__((packed));
+
 // tylko do testow - dla odwrocenia wysylania danych - tzn wysylania od konca -
 // tak jak to robi swift
 struct integrity_temp {
@@ -128,7 +196,7 @@ int dump_integrity(char * /*ptr*/, int /*req_len*/, struct peer * /*peer*/);
 int swift_dump_integrity(char * /*ptr*/, int /*req_len*/, struct peer * /*peer*/);
 int dump_ack(char * /*ptr*/, int /*ack_len*/, struct peer * /*peer*/);
 int swift_dump_have_ack(char * /*ptr*/, int /*ack_len*/, struct peer * /*peer*/);
-uint8_t message_type(char * /*ptr*/);
+uint8_t message_type(const char * /*ptr*/);
 uint8_t handshake_type(char * /*ptr*/);
 
 uint16_t count_handshake(char * /*ptr*/, uint16_t /*n*/, uint8_t /*skip_hdr*/);

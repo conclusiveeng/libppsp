@@ -28,6 +28,7 @@
 #include "mt.h"
 #include "net_swift.h"
 #include "peer.h"
+#include "proto_helper.h"
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <libgen.h>
@@ -242,27 +243,14 @@ INTERNAL_LINKAGE
 int
 make_handshake_request(char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len)
 {
-  char *d;
-  int ret;
+  size_t pos = 0;
 
-  d = ptr;
+  pos += pack_dest_chan(ptr + pos, dest_chan_id);
+  pos += pack_handshake(ptr + pos, src_chan_id, opts, opt_len);
 
-  *(uint32_t *)d = htobe32(dest_chan_id);
-  d += sizeof(uint32_t);
+  d_printf("returning %d bytes\n", pos);
 
-  *d = HANDSHAKE;
-  d++;
-
-  *(uint32_t *)d = htobe32(src_chan_id);
-  d += sizeof(uint32_t);
-
-  memcpy(d, opts, opt_len);
-  d += opt_len;
-
-  ret = d - ptr;
-  d_printf("%s: returning %d bytes\n", __func__, ret);
-
-  return ret;
+  return (pos);
 }
 
 /*
@@ -436,31 +424,18 @@ INTERNAL_LINKAGE
 int
 make_request(char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32_t end_chunk, struct peer *peer)
 {
-  char *d;
-  int ret;
+  size_t pos = 0;
 
-  d = ptr;
-
-  *(uint32_t *)d = htobe32(peer->dest_chan_id); /* set target channel id */
-  d += sizeof(uint32_t);
-
-  *d = REQUEST;
-  d++;
-
-  *(uint32_t *)d = htobe32(start_chunk);
-  d += sizeof(uint32_t);
-  *(uint32_t *)d = htobe32(end_chunk);
-  d += sizeof(uint32_t);
+  pos += pack_dest_chan(ptr + pos, dest_chan_id);
+  pos += pack_request(ptr + pos, start_chunk, end_chunk);
 
   if (peer->pex_required == 1) {
-    *d = PEX_REQ;
-    d++;
+    pos += pack_pex_req(ptr + pos);
   }
 
-  ret = d - ptr;
-  d_printf("%s: returning %d bytes\n", __func__, ret);
+  d_printf("returning %d bytes\n", pos);
 
-  return ret;
+  return (pos);
 }
 
 /*
@@ -478,6 +453,7 @@ make_pex_resp(char *ptr, struct peer *peer, struct peer *we)
   uint16_t max_pex;
   uint16_t pex;
   struct other_seeders_entry *e;
+  size_t pos = 0;
 
   /* first - check if there are any entries in alternative seeders list */
   /* if list is empty then return 0 and don't send any response for PEX_REQ */
@@ -485,13 +461,7 @@ make_pex_resp(char *ptr, struct peer *peer, struct peer *we)
     return 0;
   }
 
-  d = ptr;
-
-  *(uint32_t *)d = htobe32(peer->dest_chan_id);
-  d += sizeof(uint32_t);
-
-  *d = PEX_RESV4;
-  d++;
+  pos += pack_dest_chan(ptr + pos, peer->dest_chan_id);
 
   /* calculate amount of available space in UDP payload */
   /* 1500 - 20(ip) - 8(udp) - 4(chanid) */
@@ -506,20 +476,17 @@ make_pex_resp(char *ptr, struct peer *peer, struct peer *we)
   pex = 0;
   SLIST_FOREACH(e, &we->other_seeders_list_head, next)
   {
-    memcpy(d, &e->sa.sin_addr, sizeof(struct in_addr)); /* IP */
-    d += sizeof(struct in_addr);
-    *(uint16_t *)d = e->sa.sin_port; /* UDP port */
-    d += sizeof(e->sa.sin_port);
+    pos += pack_pex_resv4(ptr + pos, e->sa.sin_addr.s_addr, e->sa.sin_port);
+
     pex++;
     if (pex >= max_pex) {
       break;
     }
   }
 
-  ret = d - ptr;
-  d_printf("%s: returning %d bytes\n", __func__, ret);
+  d_printf("returning %d bytes\n", pos);
 
-  return ret;
+  return pos;
 }
 
 /*
@@ -762,53 +729,14 @@ INTERNAL_LINKAGE
 int
 make_data(char *ptr, struct peer *peer)
 {
-  char *d;
-  int ret;
-  int fd;
-  int l;
-  uint64_t timestamp;
+  size_t pos = 0;
 
-  d = ptr;
+  pos += pack_dest_chan(ptr + pos, peer->dest_chan_id);
+  pos += swift_make_data_no_chanid(ptr + pos, peer);
 
-  *(uint32_t *)d = htobe32(peer->dest_chan_id);
-  d += sizeof(uint32_t);
+  d_printf("returning %d bytes\n", pos);
 
-  *d = DATA;
-  d++;
-
-  *(uint32_t *)d = htobe32(peer->start_chunk);
-  d += sizeof(uint32_t);
-  *(uint32_t *)d = htobe32(peer->end_chunk);
-  d += sizeof(uint32_t);
-
-  timestamp = 0x12345678f11ff00f; /* temporarily */
-  *(uint64_t *)d = htobe64(timestamp);
-  d += sizeof(uint64_t);
-
-  fd = open(peer->file_list_entry->path, O_RDONLY);
-  if (fd < 0) {
-    d_printf("error opening file2: %s\n", peer->file_list_entry->path);
-    abort();
-    return -1;
-  }
-
-  lseek(fd, peer->curr_chunk * peer->chunk_size, SEEK_SET);
-
-  l = read(fd, d, peer->chunk_size);
-  if (l < 0) {
-    d_printf("error reading file: %s\n", peer->fname);
-    close(fd);
-    return -1;
-  }
-
-  close(fd);
-
-  d += l;
-
-  ret = d - ptr;
-  d_printf("%s: returning %d bytes\n", __func__, ret);
-
-  return ret;
+  return (pos);
 }
 
 INTERNAL_LINKAGE
@@ -872,26 +800,12 @@ INTERNAL_LINKAGE
 int
 swift_make_data_no_chanid(char *ptr, struct peer *peer)
 {
-  char *d;
-  int ret;
+  size_t pos = 0;
   int fd;
   int l;
-  uint64_t timestamp;
+  uint64_t timestamp = 0x12345678f11ff00f;
 
-  d = ptr;
-
-  *d = DATA;
-  d++;
-
-  *(uint32_t *)d = htobe32(peer->curr_chunk);
-  d += sizeof(uint32_t);
-  *(uint32_t *)d = htobe32(peer->curr_chunk);
-
-  d += sizeof(uint32_t);
-
-  timestamp = 0x12345678f11ff00f; /* temporarily */
-  *(uint64_t *)d = htobe64(timestamp);
-  d += sizeof(uint64_t);
+  pos += pack_data(ptr + pos, peer->curr_chunk, peer->curr_chunk, timestamp);
 
   fd = open(peer->file_list_entry->path, O_RDONLY);
   if (fd < 0) {
@@ -902,7 +816,7 @@ swift_make_data_no_chanid(char *ptr, struct peer *peer)
 
   lseek(fd, peer->curr_chunk * peer->chunk_size, SEEK_SET);
 
-  l = read(fd, d, peer->chunk_size);
+  l = read(fd, ptr + pos, peer->chunk_size);
   if (l < 0) {
     d_printf("error reading file: %s\n", peer->fname);
     close(fd);
@@ -911,12 +825,11 @@ swift_make_data_no_chanid(char *ptr, struct peer *peer)
 
   close(fd);
 
-  d += l;
+  pos += l;
 
-  ret = d - ptr;
-  d_printf("%s: returning %d bytes\n", __func__, ret);
+  d_printf("returning %d bytes\n", pos);
 
-  return ret;
+  return pos;
 }
 
 /*
@@ -929,6 +842,7 @@ swift_make_data_no_chanid(char *ptr, struct peer *peer)
  * out params:
  * 	ptr - pointer to buffer where data should be placed
  */
+
 INTERNAL_LINKAGE
 int
 make_ack(char *ptr, struct peer *peer)
@@ -963,38 +877,15 @@ INTERNAL_LINKAGE
 int
 swift_make_have_ack(char *ptr, struct peer *peer)
 {
-  char *d;
-  int ret;
-  uint64_t delay_sample;
+  size_t pos = 0;
+  uint64_t delay_sample = 0x12345678ABCDEF;
+  pos += pack_dest_chan(ptr, peer->dest_chan_id);
+  pos += pack_have(ptr + pos, peer->curr_chunk, peer->curr_chunk);
+  pos += pack_ack(ptr + pos, peer->curr_chunk, peer->curr_chunk, delay_sample);
 
-  d = ptr;
+  d_printf("returning %d bytes\n", pos);
 
-  *(uint32_t *)d = htobe32(peer->dest_chan_id);
-  d += sizeof(uint32_t);
-
-  *d = HAVE;
-  d++;
-
-  *(uint32_t *)d = htobe32(peer->curr_chunk);
-  d += sizeof(uint32_t);
-  *(uint32_t *)d = htobe32(peer->curr_chunk);
-  d += sizeof(uint32_t);
-
-  *d = ACK;
-  d++;
-
-  *(uint32_t *)d = htobe32(peer->curr_chunk);
-  d += sizeof(uint32_t);
-  *(uint32_t *)d = htobe32(peer->curr_chunk);
-  d += sizeof(uint32_t);
-
-  delay_sample = 0x12345678ABCDEF; /* temporarily */
-  *(uint64_t *)d = htobe64(delay_sample);
-  d += sizeof(uint64_t);
-
-  ret = d - ptr;
-
-  return ret;
+  return (pos);
 }
 
 /*
@@ -2199,9 +2090,10 @@ swift_dump_have_ack(char *ptr, int ack_len, struct peer *peer)
  */
 INTERNAL_LINKAGE
 uint8_t
-message_type(char *ptr)
+message_type(const char *ptr)
 {
-  return ptr[4]; /* skip first 4 bytes - there is destination channel id */
+  const struct msg *msg = (const struct msg *)&ptr[4];
+  return (msg->message_type);
 }
 
 /*
