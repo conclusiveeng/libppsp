@@ -619,7 +619,7 @@ swift_seeder_worker(void *data)
 
       d_printf("%s", "REQ\n");
 
-      dump_request(recv_buf, recv_len, p);
+      swift_dump_request(recv_buf, recv_len, p);
 
       if (p->pex_required == 1) { /* does the leecher want PEX? */
 	p->sm_seeder = SM_SEND_PEX_RESP;
