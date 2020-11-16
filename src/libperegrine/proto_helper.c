@@ -1,5 +1,6 @@
 #include "proto_helper.h"
 #include "ppspp_protocol.h"
+#include <string.h>
 
 size_t
 pack_handshake(void *dptr, uint32_t src_channel_id, uint8_t *options, size_t optlen)
