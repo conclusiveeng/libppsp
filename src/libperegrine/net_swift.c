@@ -1929,7 +1929,7 @@ swift_leecher_worker_sbs(void *data)
       d_printf("begin: %lu   end: %lu\n", begin, end);
 
       /* create REQUEST  */
-      request_len = make_request(request, 0xfeedbabe, begin, end, p);
+      request_len = make_request(request, p->dest_chan_id, begin, end, p);
 
       _assert((long unsigned int)request_len <= sizeof(request),
               "%s but request_len has value: %d and sizeof(request): %zu\n",
