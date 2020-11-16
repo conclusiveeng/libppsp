@@ -50,20 +50,20 @@
  * serialize handshake options in memory in form of list
  *
  * in params:
- * 	pos -  pointer to structure with options
+ * 	cfg_ptr -  pointer to structure with configuration of protocol
  *
  * out params:
- * 	ptr - pointer to buffer where the serialized options will be placed
+ * 	opts_ptr - pointer to buffer where the serialized options will be placed
  */
 INTERNAL_LINKAGE
 int
-make_handshake_options(uint8_t *ptr, struct proto_opt_str *pos)
+make_proto_config_to_opts(uint8_t *opts_ptr, const struct proto_config *cfg_ptr)
 {
-  unsigned char *d;
+  uint8_t *d;
   int ret;
 
-  d = (unsigned char *)ptr;
-  if (pos->opt_map & (1 << VERSION)) {
+  d = (unsigned char *)opts_ptr;
+  if (cfg_ptr->opt_map & (1 << VERSION)) {
     *d = VERSION;
     d++;
     *d = 1;
@@ -73,7 +73,7 @@ make_handshake_options(uint8_t *ptr, struct proto_opt_str *pos)
     return -1;
   }
 
-  if (pos->opt_map & (1 << MINIMUM_VERSION)) {
+  if (cfg_ptr->opt_map & (1 << MINIMUM_VERSION)) {
     *d = MINIMUM_VERSION;
     d++;
     *d = 1;
@@ -83,19 +83,19 @@ make_handshake_options(uint8_t *ptr, struct proto_opt_str *pos)
     return -1;
   }
 
-  if (pos->opt_map & (1 << SWARM_ID)) {
+  if (cfg_ptr->opt_map & (1 << SWARM_ID)) {
     *d = SWARM_ID;
     d++;
-    *(uint16_t *)d = htobe16(pos->swarm_id_len & 0xffff);
-    d += sizeof(pos->swarm_id_len);
-    memcpy(d, pos->swarm_id, pos->swarm_id_len);
-    d += pos->swarm_id_len;
+    *(uint16_t *)d = htobe16(cfg_ptr->swarm_id_len & 0xffff);
+    d += sizeof(cfg_ptr->swarm_id_len);
+    memcpy(d, cfg_ptr->swarm_id, cfg_ptr->swarm_id_len);
+    d += cfg_ptr->swarm_id_len;
   }
 
-  if (pos->opt_map & (1 << CONTENT_PROT_METHOD)) {
+  if (cfg_ptr->opt_map & (1 << CONTENT_PROT_METHOD)) {
     *d = CONTENT_PROT_METHOD;
     d++;
-    *d = pos->content_prot_method & 0xff;
+    *d = cfg_ptr->content_prot_method & 0xff;
     d++;
   } else {
     d_printf("%s", "no content_integrity_protection_method specified - it's "
@@ -103,38 +103,38 @@ make_handshake_options(uint8_t *ptr, struct proto_opt_str *pos)
     return -1;
   }
 
-  if (pos->opt_map & (1 << MERKLE_HASH_FUNC)) {
+  if (cfg_ptr->opt_map & (1 << MERKLE_HASH_FUNC)) {
     *d = MERKLE_HASH_FUNC;
     d++;
-    *d = pos->merkle_hash_func & 0xff;
+    *d = cfg_ptr->merkle_hash_func & 0xff;
     d++;
   }
 
-  if (pos->opt_map & (1 << LIVE_SIGNATURE_ALG)) {
+  if (cfg_ptr->opt_map & (1 << LIVE_SIGNATURE_ALG)) {
     *d = LIVE_SIGNATURE_ALG;
     d++;
-    *d = pos->live_signature_alg & 0xff;
+    *d = cfg_ptr->live_signature_alg & 0xff;
     d++;
   }
 
-  if (pos->opt_map & (1 << CHUNK_ADDR_METHOD)) {
+  if (cfg_ptr->opt_map & (1 << CHUNK_ADDR_METHOD)) {
     *d = CHUNK_ADDR_METHOD;
     d++;
-    *d = pos->chunk_addr_method & 0xff;
+    *d = cfg_ptr->chunk_addr_method & 0xff;
     d++;
   } else {
     d_printf("%s", "no chunk_addr_method specified - it's obligatory!\n");
     return -1;
   }
 
-  if (pos->opt_map & (1 << LIVE_DISC_WIND)) {
+  if (cfg_ptr->opt_map & (1 << LIVE_DISC_WIND)) {
     *d = LIVE_DISC_WIND;
     d++;
-    if ((pos->chunk_addr_method == 0) || (pos->chunk_addr_method == 2)) { /* 32 or 64 bit addresses */
-      *(uint32_t *)d = htobe32(*(uint32_t *)pos->live_disc_wind);
+    if ((cfg_ptr->chunk_addr_method == 0) || (cfg_ptr->chunk_addr_method == 2)) { /* 32 or 64 bit addresses */
+      *(uint32_t *)d = htobe32(*(uint32_t *)cfg_ptr->live_disc_wind);
       d += sizeof(uint32_t);
     } else {
-      *(uint64_t *)d = htobe64(*(uint64_t *)pos->live_disc_wind);
+      *(uint64_t *)d = htobe64(*(uint64_t *)cfg_ptr->live_disc_wind);
       d += sizeof(uint64_t);
     }
   } else {
@@ -142,20 +142,20 @@ make_handshake_options(uint8_t *ptr, struct proto_opt_str *pos)
     /* return -1; */
   }
 
-  if (pos->opt_map & (1 << SUPPORTED_MSGS)) {
+  if (cfg_ptr->opt_map & (1 << SUPPORTED_MSGS)) {
     *d = SUPPORTED_MSGS;
     d++;
-    *d = pos->supported_msgs_len & 0xff;
+    *d = cfg_ptr->supported_msgs_len & 0xff;
     d++;
-    memcpy(d, pos->supported_msgs, pos->supported_msgs_len & 0xff);
-    d += pos->supported_msgs_len & 0xff;
+    memcpy(d, cfg_ptr->supported_msgs, cfg_ptr->supported_msgs_len & 0xff);
+    d += cfg_ptr->supported_msgs_len & 0xff;
   }
 
-  if (pos->opt_map & (1 << CHUNK_SIZE)) {
+  if (cfg_ptr->opt_map & (1 << CHUNK_SIZE)) {
     *d = CHUNK_SIZE;
     d++;
-    *(uint32_t *)d = htobe32((uint32_t)(pos->chunk_size & 0xffffffff));
-    d += sizeof(pos->chunk_size);
+    *(uint32_t *)d = htobe32((uint32_t)(cfg_ptr->chunk_size & 0xffffffff));
+    d += sizeof(cfg_ptr->chunk_size);
   } else {
     d_printf("%s", "no chunk_size specified - it's obligatory!\n");
     /* return -1; */
@@ -168,10 +168,10 @@ make_handshake_options(uint8_t *ptr, struct proto_opt_str *pos)
    * uint8_t  = FILE_SIZE marker = 10
    * uint64_t = big-endian encoded length of file
    */
-  if (pos->opt_map & (1 << FILE_SIZE)) {
+  if (cfg_ptr->opt_map & (1 << FILE_SIZE)) {
     *d = FILE_SIZE;
     d++;
-    *(uint64_t *)d = htobe64(pos->file_size);
+    *(uint64_t *)d = htobe64(cfg_ptr->file_size);
     d += sizeof(uint64_t);
   } else {
     d_printf("%s", "no file_size specified - it's obligatory!\n");
@@ -186,14 +186,14 @@ make_handshake_options(uint8_t *ptr, struct proto_opt_str *pos)
    * uint8_t = length of the file name
    * uint8_t [0..255] file name
    */
-  if (pos->opt_map & (1 << FILE_NAME)) {
+  if (cfg_ptr->opt_map & (1 << FILE_NAME)) {
     *d = FILE_NAME;
     d++;
-    *d = pos->file_name_len & 0xff;
+    *d = cfg_ptr->file_name_len & 0xff;
     d++;
     memset(d, 0, 255);
-    memcpy(d, pos->file_name, pos->file_name_len);
-    d += pos->file_name_len;
+    memcpy(d, cfg_ptr->file_name, cfg_ptr->file_name_len);
+    d += cfg_ptr->file_name_len;
   } else {
     d_printf("%s", "no file_name specified - it's obligatory!\n");
     /* return -1; */
@@ -208,10 +208,10 @@ make_handshake_options(uint8_t *ptr, struct proto_opt_str *pos)
    * SEEDER
    */
 
-  if (pos->opt_map & (1 << FILE_HASH)) {
+  if (cfg_ptr->opt_map & (1 << FILE_HASH)) {
     *d = FILE_HASH;
     d++;
-    memcpy(d, pos->sha_demanded, 20);
+    memcpy(d, cfg_ptr->sha_demanded, 20);
     d += 20;
   } else {
     d_printf("%s", "no file_hash specified - it's obligatory!\n");
@@ -221,7 +221,7 @@ make_handshake_options(uint8_t *ptr, struct proto_opt_str *pos)
   *d = END_OPTION; /* end the list of options with 0xff marker */
   d++;
 
-  ret = d - (unsigned char *)ptr;
+  ret = d - (uint8_t *)opts_ptr;
   d_printf("%s returning: %d bytes\n", __func__, ret);
 
   return ret;
@@ -260,8 +260,8 @@ make_handshake_request(char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, u
  */
 INTERNAL_LINKAGE
 int
-swift_make_handshake_have(char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, uint8_t *opts, int opt_len,
-                          struct peer *peer)
+make_handshake_have(char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, uint8_t *opts, int opt_len,
+                    struct peer *peer)
 {
   char *d;
   int ret;
@@ -437,7 +437,7 @@ make_pex_resp(char *ptr, struct peer *peer, struct peer *we)
  */
 INTERNAL_LINKAGE
 int
-swift_make_integrity_reverse(char *ptr, struct peer *peer, struct peer *we)
+make_integrity_reverse(char *ptr, struct peer *peer, struct peer *we)
 {
   char *d;
   int ret;
@@ -612,7 +612,7 @@ swift_make_integrity_reverse(char *ptr, struct peer *peer, struct peer *we)
 
 INTERNAL_LINKAGE
 int
-swift_make_data(char *ptr, struct peer *peer)
+make_data(char *ptr, struct peer *peer)
 {
   char *d;
   int ret;
@@ -669,7 +669,7 @@ swift_make_data(char *ptr, struct peer *peer)
  */
 INTERNAL_LINKAGE
 int
-swift_make_data_no_chanid(char *ptr, struct peer *peer)
+make_data_no_chanid(char *ptr, struct peer *peer)
 {
   size_t pos = 0;
   int fd;
@@ -705,7 +705,7 @@ swift_make_data_no_chanid(char *ptr, struct peer *peer)
 
 INTERNAL_LINKAGE
 int
-swift_make_have_ack(char *ptr, struct peer *peer)
+make_have_ack(char *ptr, struct peer *peer)
 {
   size_t pos = 0;
   uint64_t delay_sample = 0x12345678ABCDEF;
@@ -1267,7 +1267,7 @@ swift_dump_handshake_request(char *ptr, int req_len, struct peer *peer)
  */
 INTERNAL_LINKAGE
 int
-swift_dump_handshake_have(char *ptr, int resp_len, struct peer *peer)
+dump_handshake_have(char *ptr, int resp_len, struct peer *peer)
 {
   char *d;
   int req_len;
@@ -1382,7 +1382,7 @@ swift_dump_handshake_have(char *ptr, int resp_len, struct peer *peer)
 
 INTERNAL_LINKAGE
 int
-swift_dump_request(char *ptr, int req_len, struct peer *peer)
+dump_request(char *ptr, int req_len, struct peer *peer)
 {
   char *d;
   int ret;
@@ -1433,7 +1433,7 @@ swift_dump_request(char *ptr, int req_len, struct peer *peer)
 
 INTERNAL_LINKAGE
 int
-swift_dump_integrity(char *ptr, int req_len, struct peer *peer)
+dump_integrity(char *ptr, int req_len, struct peer *peer)
 {
   char *d;
   char sha_buf[40 + 1];
@@ -1503,7 +1503,7 @@ swift_dump_integrity(char *ptr, int req_len, struct peer *peer)
 
 INTERNAL_LINKAGE
 int
-swift_dump_have_ack(char *ptr, int ack_len, struct peer *peer)
+dump_have_ack(char *ptr, int ack_len, struct peer *peer)
 {
   char *d;
   int ret;

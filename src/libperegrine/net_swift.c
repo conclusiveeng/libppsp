@@ -441,7 +441,7 @@ swift_seeder_worker(void *data)
   char handshake_resp[256];
   struct peer *p;
   struct peer *we;
-  struct proto_opt_str pos;
+  struct proto_config pos;
   struct timespec ts;
   char mq_buf[BUFSIZE + 1];
   int wait_for_cmd;
@@ -457,7 +457,7 @@ swift_seeder_worker(void *data)
 
   d_printf("%s", "worker started\n");
 
-  memset(&pos, 0, sizeof(struct proto_opt_str));
+  memset(&pos, 0, sizeof(struct proto_config));
   memset(&opts, 0, sizeof(opts));
 
   /* prepare structure as a set of parameters to make_handshake_options() proc
@@ -545,12 +545,12 @@ swift_seeder_worker(void *data)
       memset(pos.file_name, 0, sizeof(pos.file_name));
       memcpy(pos.file_name, p->fname, pos.file_name_len);
 
-      opts_len = make_handshake_options(opts, &pos);
+      opts_len = make_proto_config_to_opts(opts, &pos);
 
       _assert((unsigned long int)opts_len <= sizeof(opts), "%s but has value: %d\n", "opts_len should be <= 1024",
               opts_len);
 
-      h_resp_len = swift_make_handshake_have(handshake_resp, p->dest_chan_id, 0xfeedbabe, opts, opts_len, p);
+      h_resp_len = make_handshake_have(handshake_resp, p->dest_chan_id, 0xfeedbabe, opts, opts_len, p);
 
       _assert((unsigned long int)h_resp_len <= sizeof(handshake_resp), "%s but has value: %d\n",
               "h_resp_len should be <= 256", h_resp_len);
@@ -619,7 +619,7 @@ swift_seeder_worker(void *data)
 
       d_printf("%s", "REQ\n");
 
-      swift_dump_request(recv_buf, recv_len, p);
+      dump_request(recv_buf, recv_len, p);
 
       if (p->pex_required == 1) { /* does the leecher want PEX? */
 	p->sm_seeder = SM_SEND_PEX_RESP;
@@ -657,13 +657,13 @@ swift_seeder_worker(void *data)
     }
 
     if (p->sm_seeder == SW_SEND_INTEGRITY_DATA) {
-      n = swift_make_integrity_reverse(p->send_buf, p, we);
+      n = make_integrity_reverse(p->send_buf, p, we);
       _assert(n <= BUFSIZE, "%s but n has value: %d and BUFSIZE: %d\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
       /* send INTEGRITY with data */
       p->curr_chunk = p->start_chunk; /* set beginning number of chunk for DATA0 */
 
-      data_payload_len = swift_make_data_no_chanid(p->send_buf + n, p);
+      data_payload_len = make_data_no_chanid(p->send_buf + n, p);
 
       _assert((uint32_t)data_payload_len <= we->chunk_size + 4 + 1 + 4 + 4 + 8,
               "%s but data_payload_len has value: %d and we->chunk_size: %u\n",
@@ -698,7 +698,7 @@ swift_seeder_worker(void *data)
     if (p->sm_seeder == SW_HAVE_ACK) {
       clock_gettime(CLOCK_MONOTONIC, &p->ts_last_recv);
 
-      n = swift_dump_have_ack(recv_buf, recv_len, p);
+      n = dump_have_ack(recv_buf, recv_len, p);
 
       if (n != recv_len) {
 	if (n > recv_len) {
@@ -928,13 +928,13 @@ on_handshake(struct peer *p, void *recv_buf, uint16_t recv_len)
   char swarm_id[] = "swarm_id";
   char handshake_resp[256];
   struct peer *we;
-  struct proto_opt_str pos;
+  struct proto_config pos;
 
   clientlen = sizeof(struct sockaddr_in);
   we = p->seeder; /* our data (seeder) */
   sockfd = p->sockfd;
 
-  memset(&pos, 0, sizeof(struct proto_opt_str));
+  memset(&pos, 0, sizeof(struct proto_config));
   memset(&opts, 0, sizeof(opts));
 
   /* prepare structure as a set of parameters to make_handshake_options() proc
@@ -970,12 +970,12 @@ on_handshake(struct peer *p, void *recv_buf, uint16_t recv_len)
   pos.opt_map |= (1 << CHUNK_ADDR_METHOD);
 
   swift_dump_handshake_request(recv_buf, recv_len, p);
-  opts_len = make_handshake_options(opts, &pos);
+  opts_len = make_proto_config_to_opts(opts, &pos);
 
   _assert((unsigned long int)opts_len <= sizeof(opts), "%s but has value: %d\n", "opts_len should be <= 1024",
           opts_len);
 
-  h_resp_len = swift_make_handshake_have(handshake_resp, p->dest_chan_id, 0xfeedbabe, opts, opts_len, p);
+  h_resp_len = make_handshake_have(handshake_resp, p->dest_chan_id, 0xfeedbabe, opts, opts_len, p);
 
   _assert((unsigned long int)h_resp_len <= sizeof(handshake_resp), "%s but has value: %d\n",
           "h_resp_len should be <= 256", h_resp_len);
@@ -1027,7 +1027,7 @@ on_request(struct peer *p, void *recv_buf, uint16_t recv_len)
 
   clientlen = sizeof(struct sockaddr_in);
 
-  swift_dump_request(recv_buf, recv_len, p);
+  dump_request(recv_buf, recv_len, p);
 
   p->curr_chunk = p->start_chunk; /* set beginning number of chunk for DATA0 */
 
@@ -1038,7 +1038,7 @@ on_request(struct peer *p, void *recv_buf, uint16_t recv_len)
       p->curr_chunk++;
     }
 
-    n = swift_make_integrity_reverse(p->send_buf, p, p->seeder);
+    n = make_integrity_reverse(p->send_buf, p, p->seeder);
 
     _assert(n <= BUFSIZE, "%s but n has value: %d and BUFSIZE: %d\n", "n should be <= BUFSIZE", n, BUFSIZE);
 
@@ -1050,7 +1050,7 @@ on_request(struct peer *p, void *recv_buf, uint16_t recv_len)
 
       /* yes there is enough space so we can send INTEGRITY and DATA together in
        * one frame */
-      data_payload_len = swift_make_data_no_chanid(p->send_buf + n, p);
+      data_payload_len = make_data_no_chanid(p->send_buf + n, p);
 
       _assert((uint32_t)data_payload_len <= p->seeder->chunk_size + 4 + 1 + 4 + 4 + 8,
               "%s but data_payload_len has value: %d and we->chunk_size: %u\n",
@@ -1079,7 +1079,7 @@ on_request(struct peer *p, void *recv_buf, uint16_t recv_len)
       }
 
       /* next send DATA message with chunk's data */
-      data_payload_len = swift_make_data(p->send_buf, p);
+      data_payload_len = make_data(p->send_buf, p);
 
       _assert((uint32_t)data_payload_len <= p->seeder->chunk_size + 4 + 1 + 4 + 4 + 8,
               "%s but data_payload_len has value: %d and we->chunk_size: %u\n",
@@ -1142,7 +1142,7 @@ swift_seeder_worker_mq(void *data)
 {
   uint8_t opts[1024]; /* buffer for encoded options */
   struct peer *p;
-  struct proto_opt_str pos;
+  struct proto_config pos;
   char mq_buf[BUFSIZE + 1];
   ssize_t st;
 
@@ -1150,7 +1150,7 @@ swift_seeder_worker_mq(void *data)
 
   d_printf("%s", "worker started\n");
 
-  memset(&pos, 0, sizeof(struct proto_opt_str));
+  memset(&pos, 0, sizeof(struct proto_config));
   memset(&opts, 0, sizeof(opts));
 
   while (p->finishing == 0) {
@@ -1741,11 +1741,11 @@ swift_leecher_worker_sbs(void *data)
   struct node *cn;
   socklen_t len;
   SHA1Context context;
-  struct proto_opt_str pos;
+  struct proto_config pos;
   struct timeval tv;
   fd_set fs;
 
-  memset(&pos, 0, sizeof(struct proto_opt_str));
+  memset(&pos, 0, sizeof(struct proto_config));
   memset(&opts, 0, sizeof(opts));
   memset(&handshake_req, 0, sizeof(handshake_req));
 
@@ -1797,7 +1797,7 @@ swift_leecher_worker_sbs(void *data)
 #endif
 
   /* for leecher */
-  opts_len = make_handshake_options(opts, &pos);
+  opts_len = make_proto_config_to_opts(opts, &pos);
   dump_options(opts, p);
   d_printf("%s", "\n\ninitial handshake:\n");
 
@@ -1883,7 +1883,7 @@ swift_leecher_worker_sbs(void *data)
       buffer[n] = '\0';
 
       d_printf("server replied with %d bytes\n", n);
-      swift_dump_handshake_have(buffer, n, p);
+      dump_handshake_have(buffer, n, p);
 
       if ((p->after_seeder_switch == 1) && (prev_chunk_size != local_peer->chunk_size)) {
 	d_printf("previous and current seeder have different chunk size: %u vs %u\n", prev_chunk_size,
@@ -2026,7 +2026,7 @@ swift_leecher_worker_sbs(void *data)
 
     if (p->sm_leecher == SM_INTEGRITY) {
       d_printf("server sent INTEGRITY: %d\n", n);
-      r = swift_dump_integrity(buffer, n, local_peer); /* copy SHA hashes to local_peer->chunk[] */
+      r = dump_integrity(buffer, n, local_peer); /* copy SHA hashes to local_peer->chunk[] */
       if (r != n) {
 	d_printf("there are some bytes %d remaining for further parse\n", n - r);
       }
@@ -2144,7 +2144,7 @@ swift_leecher_worker_sbs(void *data)
     if (p->sm_leecher == SW_SEND_HAVE_ACK) {
       /* create ACK message to confirm that chunk in last DATA datagram has been
        * transferred correctly */
-      ack_len = swift_make_have_ack(buffer, p);
+      ack_len = make_have_ack(buffer, p);
 
       _assert(ack_len <= BUFSIZE, "%s but ack_len has value: %lu and BUFSIZE: %d\n", "ack_len should be <= BUFSIZE",
               ack_len, BUFSIZE);
@@ -2267,47 +2267,47 @@ swift_preliminary_connection_sbs(struct peer *local_peer)
   int h_req_len;
   struct sockaddr_in servaddr;
   socklen_t len;
-  struct proto_opt_str pos;
+  struct proto_config cfg;
   struct timeval tv;
   fd_set fs;
 
-  memset(&pos, 0, sizeof(struct proto_opt_str));
+  memset(&cfg, 0, sizeof(struct proto_config));
   memset(&opts, 0, sizeof(opts));
   memset(&handshake_req, 0, sizeof(handshake_req));
 
   /* prepare structure as a set of parameters to make_handshake_options() proc
    */
-  pos.version = 1;
-  pos.minimum_version = 1;
-  pos.swarm_id = local_peer->sha_demanded;
-  pos.swarm_id_len = 20;
-  pos.content_prot_method = 1; /* merkle hash tree */
-  pos.merkle_hash_func = 0;    /* 0 = sha-1 */
-  pos.live_signature_alg = 5;  /* number from dnssec - taken from file swift/livesig.h:48 */
-  pos.chunk_addr_method = 2;   /* 2 = 32 bit chunk ranges */
-  *(unsigned int *)pos.live_disc_wind = 0x12345678;
-  pos.supported_msgs_len = 2;                   /* 2 bytes of bitmap of serviced commands */
-  *(unsigned int *)pos.supported_msgs = 0xffff; /* bitmap - we are servicing all of the commands from RFC*/
-  pos.chunk_size = local_peer->chunk_size;
-  pos.file_size = local_peer->file_size;
-  pos.file_name_len = local_peer->fname_len;
-  memset(pos.file_name, 0, sizeof(pos.file_name)); /* do we need this here? */
-  memcpy(pos.file_name, local_peer->fname, local_peer->fname_len);
-  memcpy(pos.sha_demanded, local_peer->sha_demanded, 20); /* leecher demands file with hash given in "-s" command line
+  cfg.version = 1;
+  cfg.minimum_version = 1;
+  cfg.swarm_id = local_peer->sha_demanded;
+  cfg.swarm_id_len = 20;
+  cfg.content_prot_method = 1; /* merkle hash tree */
+  cfg.merkle_hash_func = 0;    /* 0 = sha-1 */
+  cfg.live_signature_alg = 5;  /* number from dnssec - taken from file swift/livesig.h:48 */
+  cfg.chunk_addr_method = 2;   /* 2 = 32 bit chunk ranges */
+  *(unsigned int *)cfg.live_disc_wind = 0x12345678;
+  cfg.supported_msgs_len = 2;                   /* 2 bytes of bitmap of serviced commands */
+  *(unsigned int *)cfg.supported_msgs = 0xffff; /* bitmap - we are servicing all of the commands from RFC*/
+  cfg.chunk_size = local_peer->chunk_size;
+  cfg.file_size = local_peer->file_size;
+  cfg.file_name_len = local_peer->fname_len;
+  memset(cfg.file_name, 0, sizeof(cfg.file_name)); /* do we need this here? */
+  memcpy(cfg.file_name, local_peer->fname, local_peer->fname_len);
+  memcpy(cfg.sha_demanded, local_peer->sha_demanded, 20); /* leecher demands file with hash given in "-s" command line
                                                              parameter */
 
   /* mark the options we want to pass to make_handshake_options() (which ones
    * are valid) */
-  pos.opt_map = 0;
-  pos.opt_map |= (1 << VERSION);
-  pos.opt_map |= (1 << MINIMUM_VERSION);
-  pos.opt_map |= (1 << SWARM_ID);
-  pos.opt_map |= (1 << CONTENT_PROT_METHOD);
-  pos.opt_map |= (1 << MERKLE_HASH_FUNC);
-  pos.opt_map |= (1 << LIVE_SIGNATURE_ALG);
-  pos.opt_map |= (1 << CHUNK_ADDR_METHOD);
-  pos.opt_map |= (1 << LIVE_DISC_WIND);
-  pos.opt_map |= (1 << SUPPORTED_MSGS);
+  cfg.opt_map = 0;
+  cfg.opt_map |= (1 << VERSION);
+  cfg.opt_map |= (1 << MINIMUM_VERSION);
+  cfg.opt_map |= (1 << SWARM_ID);
+  cfg.opt_map |= (1 << CONTENT_PROT_METHOD);
+  cfg.opt_map |= (1 << MERKLE_HASH_FUNC);
+  cfg.opt_map |= (1 << LIVE_SIGNATURE_ALG);
+  cfg.opt_map |= (1 << CHUNK_ADDR_METHOD);
+  cfg.opt_map |= (1 << LIVE_DISC_WIND);
+  cfg.opt_map |= (1 << SUPPORTED_MSGS);
 #if LIB_SWIFT_PPSPP_EXT
   pos.opt_map |= (1 << CHUNK_SIZE);
   pos.opt_map |= (1 << FILE_SIZE);
@@ -2316,7 +2316,7 @@ swift_preliminary_connection_sbs(struct peer *local_peer)
 #endif
 
   /* for leecher */
-  opts_len = make_handshake_options(opts, &pos);
+  opts_len = make_proto_config_to_opts(opts, &cfg);
   d_printf("%s", "\n\ninitial handshake:\n");
 
   /* make initial HANDSHAKE request - serialize dest chan id, src chan id and
@@ -2394,7 +2394,7 @@ swift_preliminary_connection_sbs(struct peer *local_peer)
       local_peer->hashes_per_mtu = (1500 - 20 - 8 - (4 + 1 + 4 + 4 + 8)) / 20;
       d_printf("hashes_per_mtu: %lu\n", local_peer->hashes_per_mtu);
 
-      swift_dump_handshake_have(buffer, n, local_peer);
+      dump_handshake_have(buffer, n, local_peer);
 
       local_peer->seeder_has_file = 1; /* seeder has file for our hash stored in sha_demanded[] */
       /* build the tree */
