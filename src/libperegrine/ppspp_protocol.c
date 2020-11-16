@@ -57,7 +57,7 @@
  */
 INTERNAL_LINKAGE
 int
-make_handshake_options(char *ptr, struct proto_opt_str *pos)
+make_handshake_options(uint8_t *ptr, struct proto_opt_str *pos)
 {
   unsigned char *d;
   int ret;
@@ -241,14 +241,14 @@ make_handshake_options(char *ptr, struct proto_opt_str *pos)
  */
 INTERNAL_LINKAGE
 int
-make_handshake_request(char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len)
+make_handshake_request(char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, uint8_t *opts, int opt_len)
 {
   size_t pos = 0;
 
   pos += pack_dest_chan(ptr + pos, dest_chan_id);
   pos += pack_handshake(ptr + pos, src_chan_id, opts, opt_len);
 
-  d_printf("returning %d bytes\n", pos);
+  d_printf("returning %zu bytes\n", pos);
 
   return (pos);
 }
@@ -260,7 +260,7 @@ make_handshake_request(char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, c
  */
 INTERNAL_LINKAGE
 int
-swift_make_handshake_have(char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, char *opts, int opt_len,
+swift_make_handshake_have(char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, uint8_t *opts, int opt_len,
                           struct peer *peer)
 {
   char *d;
@@ -377,7 +377,7 @@ make_request(char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32_t en
     pos += pack_pex_req(ptr + pos);
   }
 
-  d_printf("returning %d bytes\n", pos);
+  d_printf("returning %zu bytes\n", pos);
 
   return (pos);
 }
@@ -390,8 +390,6 @@ INTERNAL_LINKAGE
 int
 make_pex_resp(char *ptr, struct peer *peer, struct peer *we)
 {
-  char *d;
-  int ret;
   int addr_size;
   uint16_t space;
   uint16_t max_pex;
@@ -428,7 +426,7 @@ make_pex_resp(char *ptr, struct peer *peer, struct peer *we)
     }
   }
 
-  d_printf("returning %d bytes\n", pos);
+  d_printf("returning %zu bytes\n", pos);
 
   return pos;
 }
@@ -700,7 +698,7 @@ swift_make_data_no_chanid(char *ptr, struct peer *peer)
 
   pos += l;
 
-  d_printf("returning %d bytes\n", pos);
+  d_printf("returning %zu bytes\n", pos);
 
   return pos;
 }
@@ -715,7 +713,7 @@ swift_make_have_ack(char *ptr, struct peer *peer)
   pos += pack_have(ptr + pos, peer->curr_chunk, peer->curr_chunk);
   pos += pack_ack(ptr + pos, peer->curr_chunk, peer->curr_chunk, delay_sample);
 
-  d_printf("returning %d bytes\n", pos);
+  d_printf("returning %zu bytes\n", pos);
 
   return (pos);
 }
@@ -729,9 +727,9 @@ swift_make_have_ack(char *ptr, struct peer *peer)
  */
 INTERNAL_LINKAGE
 int
-dump_options(char *ptr, struct peer *peer)
+dump_options(uint8_t *ptr, struct peer *peer)
 {
-  char *d;
+  uint8_t *d;
   char buf[40 + 1];
   int swarm_len;
   int x;
@@ -967,9 +965,9 @@ dump_options(char *ptr, struct peer *peer)
 
 INTERNAL_LINKAGE
 int
-swift_dump_options(char *ptr, struct peer *peer)
+swift_dump_options(uint8_t *ptr, struct peer *peer)
 {
-  char *d;
+  uint8_t *d;
   int swarm_len;
   int x;
   int ret;
@@ -1207,7 +1205,7 @@ dump_handshake_request(char *ptr, int req_len, struct peer *peer)
 
   d_printf("%s", "\n");
 
-  opt_len = dump_options(d, peer);
+  opt_len = dump_options((uint8_t *)d, peer);
 
   ret = d + opt_len - ptr;
   d_printf("%s returning: %d bytes\n", __func__, ret);
@@ -1240,7 +1238,7 @@ swift_dump_handshake_request(char *ptr, int req_len, struct peer *peer)
                                        from seeders's handshake response */
   d += sizeof(uint32_t);
 
-  opt_len = swift_dump_options(d, peer);
+  opt_len = swift_dump_options((uint8_t *)d, peer);
 
   /* allocate memory for integrity bitmap for mark which tree nodes has already
    * been sent do leecher (swift compatibility mode) it will replace

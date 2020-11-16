@@ -436,7 +436,7 @@ swift_seeder_worker(void *data)
   int y;
   char *bn;
   char buf[40 + 1];
-  char opts[1024]; /* buffer for encoded options */
+  uint8_t opts[1024]; /* buffer for encoded options */
   char swarm_id[] = "swarm_id";
   char handshake_resp[256];
   struct peer *p;
@@ -924,7 +924,7 @@ on_handshake(struct peer *p, void *recv_buf, uint16_t recv_len)
   int y;
   char *bn;
   char buf[40 + 1];
-  char opts[1024]; /* buffer for encoded options */
+  uint8_t opts[1024]; /* buffer for encoded options */
   char swarm_id[] = "swarm_id";
   char handshake_resp[256];
   struct peer *we;
@@ -1140,7 +1140,7 @@ INTERNAL_LINKAGE
 void *
 swift_seeder_worker_mq(void *data)
 {
-  char opts[1024]; /* buffer for encoded options */
+  uint8_t opts[1024]; /* buffer for encoded options */
   struct peer *p;
   struct proto_opt_str pos;
   char mq_buf[BUFSIZE + 1];
@@ -1712,7 +1712,7 @@ void *
 swift_leecher_worker_sbs(void *data)
 {
   char buffer[BUFSIZE];
-  char opts[1024]; /* buffer for encoded options */
+  uint8_t opts[1024]; /* buffer for encoded options */
   char handshake_req[256];
   char request[256];
   unsigned char digest[20];
@@ -2259,7 +2259,7 @@ int
 swift_preliminary_connection_sbs(struct peer *local_peer)
 {
   char buffer[BUFSIZE];
-  char opts[1024]; /* buffer for encoded options */
+  uint8_t opts[1024]; /* buffer for encoded options */
   char handshake_req[256];
   int sockfd;
   int n;

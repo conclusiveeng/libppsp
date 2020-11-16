@@ -163,10 +163,10 @@ struct integrity_temp {
   uint8_t sha[20];
 };
 
-int make_handshake_options(char * /*ptr*/, struct proto_opt_str * /*pos*/);
-int make_handshake_request(char * /*ptr*/, uint32_t /*dest_chan_id*/, uint32_t /*src_chan_id*/, char * /*opts*/,
+int make_handshake_options(uint8_t * /*ptr*/, struct proto_opt_str * /*pos*/);
+int make_handshake_request(char * /*ptr*/, uint32_t /*dest_chan_id*/, uint32_t /*src_chan_id*/, uint8_t * /*opts*/,
                            int /*opt_len*/);
-int swift_make_handshake_have(char * /*ptr*/, uint32_t /*dest_chan_id*/, uint32_t /*src_chan_id*/, char * /*opts*/,
+int swift_make_handshake_have(char * /*ptr*/, uint32_t /*dest_chan_id*/, uint32_t /*src_chan_id*/, uint8_t * /*opts*/,
                               int /*opt_len*/, struct peer * /*peer*/);
 int make_handshake_finish(char * /*ptr*/, struct peer * /*peer*/);
 int make_request(char * /*ptr*/, uint32_t /*dest_chan_id*/, uint32_t /*start_chunk*/, uint32_t /*end_chunk*/,
@@ -177,8 +177,8 @@ int swift_make_integrity_reverse(char * /*ptr*/, struct peer * /*peer*/, struct 
 int swift_make_data(char * /*ptr*/, struct peer * /*peer*/);
 int swift_make_data_no_chanid(char * /*ptr*/, struct peer * /*peer*/);
 int swift_make_have_ack(char * /*ptr*/, struct peer * /*peer*/);
-int dump_options(char *ptr, struct peer * /*peer*/);
-int swift_dump_options(char *ptr, struct peer * /*peer*/);
+int dump_options(uint8_t *ptr, struct peer * /*peer*/);
+int swift_dump_options(uint8_t *ptr, struct peer * /*peer*/);
 int dump_handshake_request(char * /*ptr*/, int /*req_len*/, struct peer * /*peer*/);
 int swift_dump_handshake_request(char * /*ptr*/, int /*req_len*/, struct peer * /*peer*/);
 int swift_seeder_dump_handshake_have(char *, int, struct peer *);
