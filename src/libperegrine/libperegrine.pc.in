@@ -3,10 +3,10 @@ exec_prefix=@CMAKE_INSTALL_PREFIX@
 cflags=@PKGCONFIG_C_FLAGS@
 libdir=${prefix}/lib
 sharedlibdir=${prefix}/lib
-includedir=${prefix}/include
+includedir=${prefix}/include/libperegrine
 
 Name: libperegrine
 Description: Peregrine - Peer-to-Peer Streaming Peer Protocol library
-Version: @VERSION@
+Version: @PKGCONFIG_VERSION@
 Cflags: -I${includedir} ${cflags}
-Libs: -L${libdir} -Wl,-rpath -Wl,${libdir} -lppspp
+Libs: -L${libdir} -Wl,-rpath -Wl,${libdir} -libperegrine
