@@ -23,34 +23,45 @@
  * SUCH DAMAGE.
  */
 
+#ifndef _MT_H_
+#define _MT_H_
 
-#ifndef _DEBUG_H_
-#define _DEBUG_H_
+#include <stdint.h>
 
-#include <pthread.h>
-#include <signal.h>
+enum chunk_state { CH_EMPTY = 0, CH_ACTIVE };
 
-extern int debug;
+enum chunk_downloaded { CH_NO = 0, CH_YES };
 
-#define DEBUG 1
+struct chunk {
+  uint64_t offset; /* offset in file where chunk begins [bytes] */
+  uint32_t len;    /* length of the chunk */
+  char sha[20 + 1];
+  struct node *node;
+  enum chunk_state state;
+  enum chunk_downloaded downloaded;
+};
 
-#if DEBUG
-#define _assert(cond, format, ...) do {					\
-	if (!(cond)) {							\
-		printf("*** %s:%u %s() [%#lx] Assertion failed: " format,	\
-		__FILE__, __LINE__, __func__, pthread_self(), __VA_ARGS__);	\
-		abort(); }						\
-} while(0)
+enum node_state {
+  EMPTY = 0,
+  INITIALIZED,
+  ACTIVE,
+  SENT /* seeder already sent this sha to leecher */
+};
+struct node {
+  int number;                         /* number of the node */
+  struct node *left, *right, *parent; /* if parent == NULL - it is root node of the tree */
+  struct chunk *chunk;                /* pointer to chunk */
+  char sha[20 + 1];
+  enum node_state state;
+};
 
-#define d_printf(format, ...) do {					\
-	if (debug > 0)							\
-		printf(format, __VA_ARGS__);				\
-} while(0)
+int order2(uint32_t /*val*/);
+struct node *build_tree(int /*num_chunks*/, struct node ** /*ret*/);
+void show_tree_root_based(struct node * /*t*/);
+struct node *find_sibling(struct node * /*n*/);
+void interval_min_max(struct node * /*i*/, struct node * /*min*/, struct node * /*max*/);
+void dump_tree(struct node * /*t*/, int /*l*/);
+void dump_chunk_tab(struct chunk * /*c*/, int /*l*/);
+void update_sha(struct node * /*t*/, int /*num_chunks*/);
 
-#else
-
-#define _assert(cond, format, ...) do {} while(0)
-#define d_printf(format, ...) do {} while(0)
-
-#endif
-#endif /* _DEBUG_H_ */
+#endif /* _MT_H_ */
