@@ -26,7 +26,7 @@
 #include "ppspp_protocol.h"
 #include "debug.h"
 #include "mt.h"
-#include "net_swift.h"
+#include "net.h"
 #include "peer.h"
 #include "proto_helper.h"
 #include <arpa/inet.h>

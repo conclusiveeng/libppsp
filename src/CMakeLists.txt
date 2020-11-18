@@ -3,7 +3,7 @@ project(peregrine_demo)
 
 add_subdirectory(libperegrine)
 set(SOURCE_FILES main.c)
-include_directories(libperegrine)
+include_directories(libperegrine/include)
 
 add_executable(peregrine_demo ${SOURCE_FILES})
 set_target_properties(peregrine_demo PROPERTIES OUTPUT_NAME peregrine)

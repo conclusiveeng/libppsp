@@ -26,11 +26,11 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
-#define BUFFER_TRANSFER 0
+#define BUFFER_TRANSFER          0
 #define FILE_DESCRIPTOR_TRANSFER 1
-#define MULTIPLE_SEEDERS 0
-#define MQ_SYNC 0
-#define LIB_SWIFT_PPSPP_EXT 0 /* Incompatible Extenstions to libswift */
+#define MULTIPLE_SEEDERS         0
+#define MQ_SYNC                  0
+#define LIB_SWIFT_PPSPP_EXT      0 /* Incompatible Extenstions to libswift */
 
 #if BUFFER_TRANSFER && FILE_DESCRIPTOR_TRANSFER
 #error BUFFER_TRANSFER and FILE_DESCRIPTOR_TRANSFER cannot be enabled at the same time!

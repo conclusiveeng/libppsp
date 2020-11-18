@@ -23,7 +23,7 @@
  * SUCH DAMAGE.
  */
 
-#include "net_swift.h"
+#include "net.h"
 #include "config.h"
 #include "debug.h"
 #include "mt.h"
@@ -741,7 +741,7 @@ swift_seeder_worker(void *data)
 /* UDP datagram server (SEEDER) */
 INTERNAL_LINKAGE
 int
-swift_net_seeder(struct peer *seeder)
+net_seeder(struct peer *seeder)
 {
   int sockfd;
   int optval;
@@ -1195,7 +1195,7 @@ swift_seeder_worker_mq(void *data)
 /* UDP datagram server (SEEDER) */
 INTERNAL_LINKAGE
 int
-swift_net_seeder_mq(struct peer *seeder)
+net_seeder_mq(struct peer *seeder)
 {
   int sockfd;
   int optval;
@@ -2256,7 +2256,7 @@ swift_leecher_worker_sbs(void *data)
 
 INTERNAL_LINKAGE
 int
-swift_preliminary_connection_sbs(struct peer *local_peer)
+net_preliminary_connection_sbs(struct peer *local_peer)
 {
   char buffer[BUFSIZE];
   uint8_t opts[1024]; /* buffer for encoded options */
@@ -2439,7 +2439,7 @@ swift_preliminary_connection_sbs(struct peer *local_peer)
 
 INTERNAL_LINKAGE
 void
-swift_net_leecher_create(struct peer *local_peer)
+net_leecher_create(struct peer *local_peer)
 {
   struct peer *c;
   struct sockaddr_in sa;
@@ -2465,7 +2465,7 @@ swift_net_leecher_create(struct peer *local_peer)
 
 INTERNAL_LINKAGE
 int
-swift_net_leecher_sbs(struct peer *local_peer)
+net_leecher_sbs(struct peer *local_peer)
 {
   int xx;
   struct peer *p;
@@ -2507,7 +2507,7 @@ swift_net_leecher_sbs(struct peer *local_peer)
 
 INTERNAL_LINKAGE
 void
-swift_net_leecher_fetch_chunk(struct peer *local_peer)
+net_leecher_fetch_chunk(struct peer *local_peer)
 {
   struct peer *p;
 
@@ -2528,7 +2528,7 @@ swift_net_leecher_fetch_chunk(struct peer *local_peer)
 
 INTERNAL_LINKAGE
 void
-swift_net_leecher_close(struct peer *local_peer)
+net_leecher_close(struct peer *local_peer)
 {
   uint32_t yy;
   struct peer *p;

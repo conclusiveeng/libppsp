@@ -23,8 +23,9 @@
  * SUCH DAMAGE.
  */
 
-#include "config.h"
-#include "ppspp_swift.h"
+#include "config.h" // FIXME: should not be used by main.c after change file should be removed from public include
+#include "peregrine_leecher.h"
+#include "peregrine_seeder.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -73,11 +74,11 @@ main(int argc, char *argv[])
   int file_exist;
   int fd;
   uint32_t timeout;
-  ppspp_seeder_params_t seeder_params;
-  ppspp_leecher_params_t leecher_params;
-  ppspp_metadata_t meta;
-  ppspp_handle_t seeder_handle;
-  ppspp_handle_t leecher_handle;
+  peregrine_seeder_params_t seeder_params;
+  peregrine_leecher_params_t leecher_params;
+  peregrine_metadata_t meta;
+  peregrine_handle_t seeder_handle;
+  peregrine_handle_t leecher_handle;
 #if MULTIPLE_SEEDERS
   char *comma, *last_char, *ch;
   char buf_ip_addr[24];
@@ -218,7 +219,7 @@ main(int argc, char *argv[])
     seeder_params.timeout = timeout;
     seeder_params.port = port;
 
-    seeder_handle = swift_seeder_create(&seeder_params);
+    seeder_handle = peregrine_seeder_create(&seeder_params);
 
 #if MULTIPLE_SEEDERS
     if (peer_list != NULL) {
@@ -250,7 +251,7 @@ main(int argc, char *argv[])
 	sa_in.sin_port = htons(atoi(colon + 1));
 
 	if (sia == 1) { /* if conversion succeeded */
-	  swift_seeder_add_seeder(seeder_handle, &sa_in);
+	  peregrine_seeder_add_seeder(seeder_handle, &sa_in);
 	}
 	ch = last_char + 2;
       }
@@ -258,14 +259,14 @@ main(int argc, char *argv[])
 #endif
 
     if (fdname != NULL) {
-      swift_seeder_add_file_or_directory(seeder_handle, fdname);
+      peregrine_seeder_add_file_or_directory(seeder_handle, fdname);
     }
 
     printf("Ok, ready for sharing\n");
 
-    swift_seeder_run(seeder_handle);
+    peregrine_seeder_run(seeder_handle);
 
-    swift_seeder_close(seeder_handle);
+    peregrine_seeder_close(seeder_handle);
 
     free(fname2);
 
@@ -273,10 +274,10 @@ main(int argc, char *argv[])
     /* prepare data for step-by-step leecher version */
     leecher_params.timeout = timeout;
     ascii_sha_to_bin(sha_demanded, leecher_params.sha_demanded);
-    leecher_handle = swift_leecher_create(&leecher_params);
+    leecher_handle = peregrine_leecher_create(&leecher_params);
 
     /* get metadata for demanded sha file */
-    file_exist = swift_leecher_get_metadata(leecher_handle, &meta);
+    file_exist = peregrine_leecher_get_metadata(leecher_handle, &meta);
     if (file_exist == 0) {
       sprintf(meta.file_name, "%s", sha_demanded);
       unlink(meta.file_name);
@@ -287,34 +288,34 @@ main(int argc, char *argv[])
       }
 #if FILE_DESCRIPTOR_TRANSFER
       /* run 1 (non-blocking) leecher thread with state machine */
-      swift_leecher_run(leecher_handle);
+      peregrine_leecher_run(leecher_handle);
 
       /* let the library prepare itself for transfer */
-      swift_prepare_chunk_range(leecher_handle, meta.start_chunk, meta.end_chunk);
+      peregrine_prepare_chunk_range(leecher_handle, meta.start_chunk, meta.end_chunk);
 
-      swift_leecher_fetch_chunk_to_fd(leecher_handle, fd);
+      peregrine_leecher_fetch_chunk_to_fd(leecher_handle, fd);
 
-      swift_leecher_close(leecher_handle);
+      peregrine_leecher_close(leecher_handle);
 #endif
 #if BUFFER_TRANSFER
       /* transfering with buffer transfer method */
 
       /* run 1 (non-blocking) leecher thread with state machine */
-      swift_leecher_run(leecher_handle);
+      peregrine_leecher_run(leecher_handle);
 
       x = meta.start_chunk;
       /* let the library prepare itself for transfer */
-      buf_size = swift_prepare_chunk_range(leecher_handle, x, x + 1000 - 1);
+      buf_size = peregrine_prepare_chunk_range(leecher_handle, x, x + 1000 - 1);
       transfer_buf = malloc(buf_size);
 
       while ((x <= meta.end_chunk) && (buf_size > 0)) {
-	size = swift_leecher_fetch_chunk_to_buf(leecher_handle, transfer_buf);
+	size = peregrine_leecher_fetch_chunk_to_buf(leecher_handle, transfer_buf);
 	write(fd, transfer_buf, size);
 	x += 1000;
-	buf_size = swift_prepare_chunk_range(leecher_handle, x, x + 1000 - 1);
+	buf_size = peregrine_prepare_chunk_range(leecher_handle, x, x + 1000 - 1);
       }
       close(fd);
-      swift_leecher_close(leecher_handle);
+      peregrine_leecher_close(leecher_handle);
       free(transfer_buf);
 #endif
     }

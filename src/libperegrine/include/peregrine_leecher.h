@@ -23,53 +23,33 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _PPSPP_SWIFT_H_
-#define _PPSPP_SWIFT_H_
+#ifndef _PEREGRINE_LEECHER_H_
+#define _PEREGRINE_LEECHER_H_
 
 #include <netinet/in.h>
 #include <stdint.h>
 
-/**
- * @file ppspp.h
- */
-
-typedef struct {
-  uint32_t chunk_size; /**< Size of the chunk for seeded files */
-  uint32_t timeout;    /**< Timeout for network communication */
-  uint16_t port;       /**< UDP port number to bind to */
-} ppspp_seeder_params_t;
-
+typedef int64_t peregrine_handle_t;
 typedef struct {
   uint32_t timeout;               /**< Timeout for network communication */
   uint8_t sha_demanded[20];       /**< SHA1 of demanded file */
   struct sockaddr_in seeder_addr; /**< Primary seeder IP/PORT address from
                                      leecher point of view */
-} ppspp_leecher_params_t;
-
-/* metadata of the file published for user of library */
+} peregrine_leecher_params_t;
 typedef struct {
   char file_name[256];  /**< File name for demanded SHA1 hash */
   uint64_t file_size;   /**< Size of the file */
   uint32_t chunk_size;  /**< Size of the chunk */
   uint32_t start_chunk; /**< Number of first chunk in file */
   uint32_t end_chunk;   /**< Number of last chunk in file */
-} ppspp_metadata_t;
+} peregrine_metadata_t;
 
-typedef int64_t ppspp_handle_t; /**< seeder or leecher handle */
+peregrine_handle_t peregrine_leecher_create(peregrine_leecher_params_t *params);
+int peregrine_leecher_get_metadata(peregrine_handle_t handle, peregrine_metadata_t *meta);
+uint32_t peregrine_prepare_chunk_range(peregrine_handle_t handle, uint32_t start_chunk, uint32_t end_chunk);
+void peregrine_leecher_fetch_chunk_to_fd(peregrine_handle_t handle, int fd);
+int32_t peregrine_leecher_fetch_chunk_to_buf(peregrine_handle_t handle, uint8_t *transfer_buf);
+void peregrine_leecher_close(peregrine_handle_t handle);
+void peregrine_leecher_run(peregrine_handle_t handle);
 
-ppspp_handle_t swift_seeder_create(ppspp_seeder_params_t * /*params*/);
-int swift_seeder_add_seeder(ppspp_handle_t /*handle*/, struct sockaddr_in * /*sa*/);
-int swift_seeder_remove_seeder(ppspp_handle_t /*handle*/, struct sockaddr_in * /*sa*/);
-void swift_seeder_add_file_or_directory(ppspp_handle_t /*handle*/, char * /*name*/);
-int swift_seeder_remove_file_or_directory(ppspp_handle_t /*handle*/, char * /*name*/);
-void swift_seeder_run(ppspp_handle_t /*handle*/);
-void swift_seeder_close(ppspp_handle_t /*handle*/);
-ppspp_handle_t swift_leecher_create(ppspp_leecher_params_t * /*params*/);
-int swift_leecher_get_metadata(ppspp_handle_t /*handle*/, ppspp_metadata_t * /*meta*/);
-uint32_t swift_prepare_chunk_range(ppspp_handle_t /*handle*/, uint32_t /*start_chunk*/, uint32_t /*end_chunk*/);
-void swift_leecher_fetch_chunk_to_fd(ppspp_handle_t /*handle*/, int /*fd*/);
-int32_t swift_leecher_fetch_chunk_to_buf(ppspp_handle_t /*handle*/, uint8_t * /*transfer_buf*/);
-void swift_leecher_close(ppspp_handle_t /*handle*/);
-void swift_leecher_run(ppspp_handle_t /*handle*/);
-
-#endif /* _PPSPP_SWIFT_H_ */
+#endif

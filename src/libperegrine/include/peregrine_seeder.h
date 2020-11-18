@@ -23,23 +23,25 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _NET_SWIFT_H_
-#define _NET_SWIFT_H_
+#ifndef _PEREGRINE_SEEDER_H_
+#define _PEREGRINE_SEEDER_H_
 
-#include "mt.h"
-#include "peer.h"
+#include <netinet/in.h>
+#include <stdint.h>
 
-#define BUFSIZE 1500
+typedef int64_t peregrine_handle_t;
+typedef struct {
+  uint32_t chunk_size; /**< Size of the chunk for seeded files */
+  uint32_t timeout;    /**< Timeout for network communication */
+  uint16_t port;       /**< UDP port number to bind to */
+} peregrine_seeder_params_t;
 
-int swift_net_seeder(struct peer *);
-int swift_net_seeder_mq(struct peer *);
-int swift_net_leecher_continuous(struct peer *);
-int swift_preliminary_connection_sbs(struct peer *);
-void swift_net_leecher_create(struct peer *);
-int swift_net_leecher_sbs(struct peer *);
-void swift_net_leecher_fetch_chunk(struct peer *);
-void swift_net_leecher_close(struct peer *);
+peregrine_handle_t peregrine_seeder_create(peregrine_seeder_params_t *params);
+int peregrine_seeder_add_seeder(peregrine_handle_t handle, struct sockaddr_in *sa);
+int peregrine_seeder_remove_seeder(peregrine_handle_t handle, struct sockaddr_in *sa);
+void peregrine_seeder_add_file_or_directory(peregrine_handle_t handle, char *name);
+int peregrine_seeder_remove_file_or_directory(peregrine_handle_t handle, char *name);
+void peregrine_seeder_run(peregrine_handle_t handle);
+void peregrine_seeder_close(peregrine_handle_t handle);
 
-void verify2(int);
-
-#endif /* _NET_SWIFT_H_ */
+#endif
