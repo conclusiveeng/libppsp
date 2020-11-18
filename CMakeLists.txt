@@ -1,24 +1,52 @@
-cmake_minimum_required(VERSION 2.8)
-project(ppspp)
+cmake_minimum_required(VERSION 3.2)
 
-set(VERSION 0.3)
-set(CMAKE_C_FLAGS "-Wall -ggdb3 -std=c11 -D_DEFAULT_SOURCE")
-set(CMAKE_C_CLANG_TIDY clang-tidy -checks=-*,readability-*)
+project(peregrine
+        VERSION 0.4
+        LANGUAGES C
+        DESCRIPTION "Peregrine - a Peer-to-Peer Streaming Peer Protocol client-server")
 
-add_library(ppspp SHARED mt.c ppspp_protocol.c net.c net_swift.c peer.c sha1.c ppspp.c ppspp_swift.c wqueue.c)
-add_executable(ppspp_exe main.c)
+# gcovr coverage make flags
+# set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage -lgcov")
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g --coverage -fprofile-arcs -ftest-coverage")
 
-set_target_properties(ppspp_exe PROPERTIES OUTPUT_NAME ppspp)
-set_target_properties(ppspp PROPERTIES PUBLIC_HEADER ppspp_protocol.h) # fixme this is not a real header
-target_link_libraries(ppspp_exe pthread ppspp rt)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11")
+add_compile_options(-O0 -Wall -Wextra -g -D_DEFAULT_SOURCE)
+# -ggdb3
 
-configure_file(libppspp.pc.in ${CMAKE_CURRENT_BINARY_DIR}/libppspp.pc @ONLY)
+message(STATUS "CMake version   : " "${CMAKE_SYSTEM_VERSION}")
+message(STATUS "Compiler        : " "${CMAKE_C_COMPILER}"    )
+message(STATUS "Operating System: " "${CMAKE_SYSTEM}"        )
+message(STATUS "I am building   : " "${PROJECT_NAME}"        )
 
-install(TARGETS ppspp PUBLIC_HEADER DESTINATION include)
-install(TARGETS ppspp_exe RUNTIME DESTINATION bin)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libppspp.pc
-	DESTINATION /usr/share/pkgconfig)
+# Setup code check using clang-tidy
+set(CMAKE_C_CLANG_TIDY clang-tidy)
 
+# Create compile_comands.json
+set(CMAKE_EXPORT_COMPILE_COMMANDS, 1)
+
+# Set for changing prefix for installation directory
+# set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR}/_install)
+
+# Set this if .deb file should be build into different directory
+# set(CPACK_OUTPUT_FILE_PREFIX ${CMAKE_INSTALL_PREFIX}/pkg)
+
+set(PEREGRINE_INSTALL_INCLUDE_DIR ${CMAKE_INSTALL_PREFIX}/include/libperegrine)
+set(PEREGRINE_INSTALL_BIN_DIR ${CMAKE_INSTALL_PREFIX}/bin)
+set(PEREGRINE_INSTALL_LIB_DIR ${CMAKE_INSTALL_PREFIX}/lib)
+set(PKGCONFIG_C_FLAGS ${CMAKE_C_FLAGS})
+set(PKGCONFIG_VERSION ${CMAKE_PROJECT_VERSION})
+
+# Geneatre .deb package
 set(CPACK_GENERATOR "DEB")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Conclusive Engineering")
 include(CPack)
+
+# Generate documentation
+find_package(Doxygen OPTIONAL_COMPONENTS dot)
+if (DOXYGEN_FOUND)
+#set(DOXYGEN_USE_MDFILE_AS_MAINPAGE "${CMAKE_SOURCE_DIR}/README.md")
+doxygen_add_docs(docs ALL ${CMAKE_SOURCE_DIR})
+endif(DOXYGEN_FOUND)
+
+add_subdirectory(src)
