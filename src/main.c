@@ -63,7 +63,6 @@ main(int argc, char *argv[])
   char *fdname;
   char *fname2;
   char usage;
-  char *peer_list;
   char *colon;
   char *sa;
   char *sha_demanded;
@@ -85,7 +84,6 @@ main(int argc, char *argv[])
   fdname = fname1 = NULL;
   debug = 0;
   usage = 0;
-  peer_list = NULL;
   type = LEECHER_TYPE;
   timeout = 3 * 60; /* 3 minutes timeout as default */
   sha_demanded = NULL;

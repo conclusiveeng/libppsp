@@ -27,7 +27,6 @@
 #define _PEER_H_
 
 #include "mt.h"
-#include <mqueue.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <semaphore.h>
@@ -56,13 +55,6 @@ struct file_list_entry {
   uint32_t end_chunk;
 
   SLIST_ENTRY(file_list_entry) next;
-};
-
-/* list of other (alternative) seeders maintained by primary seeder */
-SLIST_HEAD(slist_seeders, other_seeders_entry);
-struct other_seeders_entry {
-  struct sockaddr_in sa;
-  SLIST_ENTRY(other_seeders_entry) next;
 };
 
 SLIST_HEAD(slist_peers, peer);
@@ -135,7 +127,6 @@ enum state_machine_leech {
   SW_SEND_HAVE_ACK,
 };
 
-enum seed_condition { S_TODO = 1, S_DONE = 2 };
 enum leech_condition { L_SLEEP = 1, L_WAKE };
 enum leech_condition2 { L_TODO = 1, L_DONE };
 enum leech_cmd { CMD_CONNECT = 1, CMD_FETCH = 2, CMD_FINISH = 3 };
@@ -157,7 +148,6 @@ struct peer {
   struct chunk *chunk;        /* array of chunks */
   uint32_t nl;                /* number of leaves */
   uint32_t nc;                /* number of chunks */
-  uint64_t num_series;        /* number of series */
   uint64_t hashes_per_mtu;    /* number of hashes that fit MTU size, for example if
                                  == 5 then series are 0..4, 5..9, 10..14 */
   uint8_t sha_demanded[20];
@@ -188,9 +178,6 @@ struct peer {
   /* timestamp of last received and sent message */
   struct timespec ts_last_recv, ts_last_send;
 
-  /* last received and sent message */
-  uint8_t d_last_recv, d_last_send;
-
   /* network things */
   uint16_t port;                   /* seeder: udp port number to bind to */
   struct sockaddr_in leecher_addr; /* leecher address: IP/PORT from seeder point of view */
@@ -199,7 +186,6 @@ struct peer {
   char *recv_buf;
   char *send_buf;
 
-  uint16_t recv_len;
   int sockfd, fd;
   pthread_mutex_t fd_mutex;
 
@@ -209,20 +195,13 @@ struct peer {
   uint8_t to_remove;
   pthread_mutex_t seeder_mutex;
   pthread_cond_t seeder_mtx_cond;
-  enum seed_condition seeder_cond;
-  mqd_t mq;
 
   pthread_mutex_t leecher_mutex;
   pthread_cond_t leecher_mtx_cond;
   enum leech_condition leecher_cond;
 
-  pthread_mutex_t leecher_mutex2;
-  pthread_cond_t leecher_mtx_cond2;
-  enum leech_condition2 leecher_cond2;
-
   /* controlling leecher step-by-step state machine */
   enum leech_cmd cmd;
-
   uint8_t sbs_mode; /* 0 = continuous state machine and old API, 1 =
                        step-by-step state machine and new API */
   uint32_t chunk_size;
@@ -271,7 +250,6 @@ struct peer {
 };
 
 void add_peer_to_list(struct slist_peers * /*list_head*/, struct peer * /*p*/);
-void print_peer_list(struct slist_peers *);
 int remove_peer_from_list(struct slist_peers * /*list_head*/, struct peer * /*p*/);
 struct peer *ip_port_to_peer(struct peer * /*seeder*/, struct slist_peers * /*list_head*/,
                              struct sockaddr_in * /*client*/);

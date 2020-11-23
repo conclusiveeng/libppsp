@@ -327,7 +327,7 @@ make_handshake_have(char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, uint
  */
 INTERNAL_LINKAGE
 int
-make_handshake_finish(char *ptr, struct peer *peer)
+make_handshake_finish(char *ptr, __attribute__((unused)) struct peer *peer)
 {
   unsigned char *d;
   int ret;
@@ -388,7 +388,8 @@ make_request(char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32_t en
  */
 INTERNAL_LINKAGE
 int
-make_pex_resp(char *ptr, struct peer *peer, struct peer *we)
+make_pex_resp(__attribute__((unused)) char *ptr, __attribute__((unused)) struct peer *peer,
+              __attribute__((unused)) struct peer *we)
 {
 
   return 0;
@@ -443,7 +444,7 @@ make_pex_resp(char *ptr, struct peer *peer, struct peer *we)
  */
 INTERNAL_LINKAGE
 int
-make_integrity_reverse(char *ptr, struct peer *peer, struct peer *we)
+make_integrity_reverse(char *ptr, struct peer *peer, __attribute__((unused)) struct peer *we)
 {
   char *d;
   int ret;
@@ -1180,7 +1181,7 @@ swift_dump_options(uint8_t *ptr, struct peer *peer)
  */
 INTERNAL_LINKAGE
 int
-dump_handshake_request(char *ptr, int req_len, struct peer *peer)
+dump_handshake_request(char *ptr, __attribute__((unused)) int req_len, struct peer *peer)
 {
   char *d;
   uint32_t dest_chan_id;
@@ -1221,7 +1222,7 @@ dump_handshake_request(char *ptr, int req_len, struct peer *peer)
 
 INTERNAL_LINKAGE
 int
-swift_dump_handshake_request(char *ptr, int req_len, struct peer *peer)
+swift_dump_handshake_request(char *ptr, __attribute__((unused)) int req_len, struct peer *peer)
 {
   char *d;
   uint32_t src_chan_id;
@@ -1509,7 +1510,7 @@ dump_integrity(char *ptr, int req_len, struct peer *peer)
 
 INTERNAL_LINKAGE
 int
-dump_have_ack(char *ptr, int ack_len, struct peer *peer)
+dump_have_ack(char *ptr, int ack_len, __attribute__((unused)) struct peer *peer)
 {
   char *d;
   int ret;
@@ -1637,7 +1638,7 @@ handshake_type(char *ptr)
 
 INTERNAL_LINKAGE
 uint16_t
-count_handshake(char *ptr, uint16_t n, uint8_t skip_hdr)
+count_handshake(char *ptr, __attribute__((unused)) uint16_t n, uint8_t skip_hdr)
 {
   char *d;
   int swarm_len;
