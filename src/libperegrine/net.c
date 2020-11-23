@@ -59,7 +59,7 @@ uint8_t remove_dead_peers;
 
 INTERNAL_LINKAGE
 sem_t *
-swift_semaph_init(struct peer *p)
+semaphore_init(struct peer *p)
 {
   sem_t *sem;
 
@@ -79,7 +79,7 @@ swift_semaph_init(struct peer *p)
 
 INTERNAL_LINKAGE
 int
-swift_semaph_post(sem_t *sem)
+semaphore_post(sem_t *sem)
 {
   int s;
 
@@ -94,7 +94,7 @@ swift_semaph_post(sem_t *sem)
 
 INTERNAL_LINKAGE
 int
-swift_semaph_wait(sem_t *sem)
+semaphore_wait(sem_t *sem)
 {
   int s;
 
@@ -109,7 +109,7 @@ swift_semaph_wait(sem_t *sem)
 
 INTERNAL_LINKAGE
 int
-swift_mutex_init(pthread_mutex_t *mutex)
+mutex_init(pthread_mutex_t *mutex)
 {
   int s;
 
@@ -124,7 +124,7 @@ swift_mutex_init(pthread_mutex_t *mutex)
 
 INTERNAL_LINKAGE
 int
-swift_mutex_lock(pthread_mutex_t *mutex)
+mutex_lock(pthread_mutex_t *mutex)
 {
   int s;
 
@@ -139,7 +139,7 @@ swift_mutex_lock(pthread_mutex_t *mutex)
 
 INTERNAL_LINKAGE
 int
-swift_mutex_unlock(pthread_mutex_t *mutex)
+mutex_unlock(pthread_mutex_t *mutex)
 {
   int s;
 
@@ -154,7 +154,7 @@ swift_mutex_unlock(pthread_mutex_t *mutex)
 
 INTERNAL_LINKAGE
 int
-swift_seeder_cond_unlock(struct peer *p)
+seeder_cond_unlock(struct peer *p)
 {
   pthread_mutex_lock(&p->seeder_mutex);
   pthread_cond_signal(&p->seeder_mtx_cond);
@@ -165,7 +165,7 @@ swift_seeder_cond_unlock(struct peer *p)
 
 INTERNAL_LINKAGE
 int
-swift_leecher_cond_lock_init(struct peer *p)
+leecher_cond_lock_init(struct peer *p)
 {
   int s;
 
@@ -187,7 +187,7 @@ swift_leecher_cond_lock_init(struct peer *p)
 
 INTERNAL_LINKAGE
 int
-swift_leecher_cond_sleep(struct peer *p)
+leecher_cond_sleep(struct peer *p)
 {
   pthread_mutex_lock(&p->leecher_mutex);
   do {
@@ -206,7 +206,7 @@ swift_leecher_cond_sleep(struct peer *p)
 
 INTERNAL_LINKAGE
 int
-swift_leecher_cond_set_and_sleep(struct peer *p)
+leecher_cond_set_and_sleep(struct peer *p)
 {
   pthread_mutex_lock(&p->leecher_mutex);
   p->leecher_cond = L_SLEEP;
@@ -226,7 +226,7 @@ swift_leecher_cond_set_and_sleep(struct peer *p)
 
 INTERNAL_LINKAGE
 int
-swift_leecher_cond_wake(struct peer *p)
+leecher_cond_wake(struct peer *p)
 {
   pthread_mutex_lock(&p->leecher_mutex);
   p->leecher_cond = L_WAKE;
@@ -238,7 +238,7 @@ swift_leecher_cond_wake(struct peer *p)
 
 INTERNAL_LINKAGE
 int
-swift_leecher_cond_set(struct peer *p, enum leech_condition val)
+leecher_cond_set(struct peer *p, enum leech_condition val)
 {
   pthread_mutex_lock(&p->leecher_mutex);
   p->leecher_cond = val;
@@ -335,7 +335,7 @@ on_handshake(struct peer *p, void *recv_buf, uint16_t recv_len)
     p->finishing = 1;
     p->to_remove = 1;      /* mark this particular peer to remove by GC */
     remove_dead_peers = 1; /* set global flag for removing dead peers by garbage collector */
-    swift_seeder_cond_unlock(p);
+    seeder_cond_unlock(p);
   }
 
   clock_gettime(CLOCK_MONOTONIC, &p->ts_last_send);
@@ -344,7 +344,7 @@ on_handshake(struct peer *p, void *recv_buf, uint16_t recv_len)
   strcpy(p->fname, basename(p->file_list_entry->path)); /* do we really need this here? */
   p->chunk_size = we->chunk_size;
   p->sm_seeder = SM_WAIT_REQUEST;
-  swift_seeder_cond_unlock(p);
+  seeder_cond_unlock(p);
 
   return 0;
 }
@@ -472,7 +472,7 @@ on_request(struct peer *p, void *recv_buf, uint16_t recv_len)
 /* thread - seeder worker */
 INTERNAL_LINKAGE
 void *
-swift_seeder_worker_mq(void *data)
+seeder_worker_mq(void *data)
 {
   uint8_t opts[1024]; /* buffer for encoded options */
   struct peer *p;
@@ -605,7 +605,7 @@ net_seeder_mq(struct peer *seeder)
 	pthread_mutex_init(&p->low_mutex, NULL);
 
 	/* create worker thread for this client (leecher) */
-	st = pthread_create(&thread, NULL, &swift_seeder_worker_mq, p);
+	st = pthread_create(&thread, NULL, &seeder_worker_mq, p);
 	if (st != 0) {
 	  d_printf("cannot create new thread: %s\n", strerror(errno));
 	  abort();
@@ -723,7 +723,7 @@ print_sha1(const char *s1, int num)
 
 INTERNAL_LINKAGE
 int
-swift_verify_chunk(struct peer *local_peer, struct node *cn)
+verify_chunk(struct peer *local_peer, struct node *cn)
 {
   char buf[40 + 1];
   char bufs[80 + 1];
@@ -1015,7 +1015,7 @@ swift_verify_chunk(struct peer *local_peer, struct node *cn)
 /* leecher worker in step-by-step version */
 INTERNAL_LINKAGE
 void *
-swift_leecher_worker_sbs(void *data)
+leecher_worker_sbs(void *data)
 {
   char buffer[BUFSIZE];
   uint8_t opts[1024]; /* buffer for encoded options */
@@ -1202,7 +1202,7 @@ swift_leecher_worker_sbs(void *data)
     if (p->sm_leecher == SM_SYNC_REQUEST) {
       /* we are connected to some seeder - so go to sleep and wait for awakening
        * by some other task */
-      swift_leecher_cond_sleep(p);
+      leecher_cond_sleep(p);
 
       _assert((p->cmd == CMD_FETCH) || (p->cmd == CMD_FINISH),
               "Command for leecher state machine should be FETCH or FINISH but "
@@ -1224,12 +1224,12 @@ swift_leecher_worker_sbs(void *data)
 
       if (p->fetch_schedule == 1) {
 	/* lock "download_schedule" array and "download_schedule_idx" index */
-	swift_mutex_lock(&local_peer->download_schedule_mutex);
+	mutex_lock(&local_peer->download_schedule_mutex);
 	/* take begin/end from schedule array */
 	begin = local_peer->download_schedule[local_peer->download_schedule_idx].begin;
 	end = local_peer->download_schedule[local_peer->download_schedule_idx].end;
 	local_peer->download_schedule_idx++;
-	swift_mutex_unlock(&local_peer->download_schedule_mutex);
+	mutex_unlock(&local_peer->download_schedule_mutex);
       }
 
       d_printf("begin: %lu   end: %lu\n", begin, end);
@@ -1401,10 +1401,10 @@ swift_leecher_worker_sbs(void *data)
       /* is this transferring data via file descriptor? */
       if (local_peer->transfer_method == M_FD) {
 	d_printf("writing chunk to file: nr: %d  offset: %lu\n", nr, cc * local_peer->chunk_size);
-	swift_mutex_lock(&local_peer->fd_mutex);
+	mutex_lock(&local_peer->fd_mutex);
 	lseek(local_peer->fd, cc * local_peer->chunk_size, SEEK_SET);
 	write(local_peer->fd, data_buffer + 1 + 4 + 4 + 8 + 4, nr - (1 + 4 + 4 + 8 + 4));
-	swift_mutex_unlock(&local_peer->fd_mutex);
+	mutex_unlock(&local_peer->fd_mutex);
       } else if (local_peer->transfer_method == M_BUF) {
 	first_chunk = local_peer->download_schedule[0].begin;
 	offset = cc * local_peer->chunk_size - first_chunk * local_peer->chunk_size;
@@ -1432,7 +1432,7 @@ swift_leecher_worker_sbs(void *data)
       /* copy just calculated SHA-1 for just received DATA into proper node */
       memcpy(cn->sha, digest, 20);
 
-      cmp = swift_verify_chunk(local_peer, cn);
+      cmp = verify_chunk(local_peer, cn);
 
       if (cmp != 0) {
 	printf("error - hashes are different for node %lu\n", cc * 2);
@@ -1486,13 +1486,13 @@ swift_leecher_worker_sbs(void *data)
     /* given serie of chunks have been fetched - now wait for new command */
     if (p->sm_leecher == SM_WAIT_FOR_NEXT_CMD) {
       d_printf("%s", "wakening main leecher process\n");
-      swift_semaph_post(p->local_leecher->sem);
+      semaphore_post(p->local_leecher->sem);
       d_printf("%s", "main leecher process awakened\n");
 
       p->cmd = 0;
 
       d_printf("%s", "waiting for next command from main leecher process\n");
-      swift_leecher_cond_set_and_sleep(p);
+      leecher_cond_set_and_sleep(p);
       d_printf("%s", "next command arrived from main leecher process\n");
       if (p->cmd == CMD_FETCH) {
 	p->sm_leecher = SM_SYNC_REQUEST;
@@ -1512,7 +1512,7 @@ swift_leecher_worker_sbs(void *data)
       p->to_remove = 1; /* mark peer to be removed by garbage collector */
 
       p->finishing = 1;
-      swift_semaph_post(p->local_leecher->sem); /* wake the main process */
+      semaphore_post(p->local_leecher->sem); /* wake the main process */
       continue;
     }
 
@@ -1653,7 +1653,7 @@ net_preliminary_connection_sbs(struct peer *leecher)
   leecher->finishing = 0;
   leecher->download_schedule_idx = 0;
   leecher->pex_required = 1; /* mark flag that we want list of other seeders form primary seeder */
-  swift_mutex_init(&leecher->download_schedule_mutex);
+  mutex_init(&leecher->download_schedule_mutex);
 
   /* leecher's state machine */
   while (leecher->finishing == 0) {
@@ -1778,8 +1778,8 @@ net_leecher_sbs(struct peer *leecher)
   pthread_t thread;
 
   /* swift_preliminary_connection_sbs(local_peer); */
-  leecher->sem = swift_semaph_init(leecher);
-  swift_mutex_init(&leecher->fd_mutex);
+  leecher->sem = semaphore_init(leecher);
+  mutex_init(&leecher->fd_mutex);
 
   xx = 0;
   /* create as many threads as many seeder peers are in the peer_list_head */
@@ -1795,9 +1795,9 @@ net_leecher_sbs(struct peer *leecher)
   p->thread_num = xx + 1;
   p->current_seeder = p; /* set current_seeder to myself */
   p->local_leecher = leecher;
-  swift_leecher_cond_lock_init(p);
+  leecher_cond_lock_init(p);
 
-  (void)pthread_create(&thread, NULL, swift_leecher_worker_sbs, p);
+  (void)pthread_create(&thread, NULL, leecher_worker_sbs, p);
   p->thread = thread;
 
   p->to_remove = 1; /* mark flag that every thread created in this loop should
@@ -1825,10 +1825,10 @@ net_leecher_fetch_chunk(struct peer *leecher)
 
   /* wake up the step-by-step state machine - she is waiting in
    * SM_PREPARE_REQUEST state */
-  swift_leecher_cond_wake(p);
+  leecher_cond_wake(p);
 
   d_printf("%s", "command FETCH sent\n");
-  swift_semaph_wait(leecher->sem);
+  semaphore_wait(leecher->sem);
 }
 
 INTERNAL_LINKAGE
@@ -1845,10 +1845,10 @@ net_leecher_close(struct peer *leecher)
   d_printf("%s", "sending FINISH command\n");
   p->cmd = leecher->cmd;
   /* wake up the step-by-step state machine */
-  swift_leecher_cond_wake(p);
+  leecher_cond_wake(p);
 
   d_printf("%s", "command FINISH sent\n");
-  swift_semaph_wait(leecher->sem);
+  semaphore_wait(leecher->sem);
 
   /* wait for end of all of the threads and free the allocated memory for them
    */

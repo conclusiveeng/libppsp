@@ -259,7 +259,6 @@ void cleanup_peer(struct peer * /*p*/);
 void cleanup_all_dead_peers(struct slist_peers * /*list_head*/);
 void create_download_schedule(struct peer * /*p*/);
 int32_t create_download_schedule_sbs(struct peer * /*p*/, uint32_t /*start_chunk*/, uint32_t /*end_chunk*/);
-int32_t swift_create_download_schedule_sbs(struct peer * /*p*/, uint32_t /*start_chunk*/, uint32_t /*end_chunk*/);
 int all_chunks_downloaded(struct peer * /*p*/);
 void create_file_list(struct peer * /*peer*/, char * /*dname*/);
 void process_file(struct file_list_entry * /*file_entry*/, struct peer * /*peer*/);

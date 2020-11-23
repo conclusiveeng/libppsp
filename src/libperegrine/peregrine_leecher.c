@@ -129,7 +129,7 @@ peregrine_leecher_get_metadata(peregrine_handle_t handle, peregrine_metadata_t *
  *
  * @return Return size of buffer needed for fetching given chunk range
  * User should allocate that number of bytes for buffer and pass it to
- * swift_leecher_fetch_chunk_to_buf() procedure if he/she choosen
+ * peregrine_leecher_fetch_chunk_to_buf() procedure if he/she choosen
  * transferring buffer method instead of transferring vie file descriptor
  */
 uint32_t
@@ -148,7 +148,7 @@ peregrine_prepare_chunk_range(peregrine_handle_t handle, uint32_t start_chunk, u
 
   local_leecher->download_schedule = malloc(local_leecher->nl * sizeof(struct schedule_entry));
   memset(local_leecher->download_schedule, 0, local_leecher->nl * sizeof(struct schedule_entry));
-  buf_size = swift_create_download_schedule_sbs(local_leecher, start_chunk, end_chunk);
+  buf_size = create_download_schedule_sbs(local_leecher, start_chunk, end_chunk);
   local_leecher->download_schedule_idx = 0;
 
   return buf_size;
