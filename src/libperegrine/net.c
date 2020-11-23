@@ -810,12 +810,9 @@ verify_chunk(struct peer *local_peer, struct node *cn)
 
   /* print sum of concatenated hashes */
   if (debug) {
-    s = 0;
-    for (y = 0; y < 40; y++) {
-      s += sprintf((char *)(bufs + s), "%02x", buf[y] & 0xff);
-    }
-    bufs[80] = '\0';
-    printf("siblings: %s\n", bufs);
+    printf("siblings: ");
+    print_sha1(buf, 40);
+    printf("\n");
   }
 
   /* calculate SHA hash of sum of both siblings */
@@ -830,12 +827,9 @@ verify_chunk(struct peer *local_peer, struct node *cn)
    * if the parent is not in ACTIVE state
    */
   if (debug) {
-    s = 0;
-    for (y = 0; y < 20; y++) {
-      s += sprintf((char *)(sha_buf + s), "%02x", digest_sib[y] & 0xff);
-    }
-    sha_buf[40] = '\0';
-    d_printf("siblings digest: %s\n", sha_buf);
+    printf("siblings digest: ");
+    print_sha1((char *)sha_buf, 20);
+    printf("\n");
   }
 
   _assert(cn->parent != NULL, "parent for node %d doesn't exist\n", cn->number);
