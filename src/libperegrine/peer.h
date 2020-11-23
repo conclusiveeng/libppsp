@@ -247,13 +247,11 @@ struct peer {
   struct peer *current_seeder; /* leecher side: points to one element of the
                                   list seeders in ->snext */
 
-  pthread_mutex_t peers_list_head_mutex;        /* mutex for protecting peers_list_head */
-  struct slist_peers peers_list_head;           /* seeder: list of connected leechers, leecher: ? */
-  struct slist_seeders other_seeders_list_head; /* seeder: list of other (alternative) seeders
-                                                   maintained by primary seeder */
-  struct slisthead file_list_head;              /* seeder: head of list of files shared by seeder */
-  struct file_list_entry *file_list_entry;      /* seeder side: pointer to file choosen by leecher using
-                                                   SHA1 hash */
+  pthread_mutex_t peers_list_head_mutex;   /* mutex for protecting peers_list_head */
+  struct slist_peers peers_list_head;      /* seeder: list of connected leechers, leecher: ? */
+  struct slisthead file_list_head;         /* seeder: head of list of files shared by seeder */
+  struct file_list_entry *file_list_entry; /* seeder side: pointer to file choosen by leecher using
+                                              SHA1 hash */
 
   struct slist_node_cache cache;
   struct wqueue_head hi_wqueue;

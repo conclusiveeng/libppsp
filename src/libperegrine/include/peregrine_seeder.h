@@ -37,8 +37,6 @@ typedef struct {
 } peregrine_seeder_params_t;
 
 peregrine_handle_t peregrine_seeder_create(peregrine_seeder_params_t *params);
-int peregrine_seeder_add_seeder(peregrine_handle_t handle, struct sockaddr_in *sa);
-int peregrine_seeder_remove_seeder(peregrine_handle_t handle, struct sockaddr_in *sa);
 void peregrine_seeder_add_file_or_directory(peregrine_handle_t handle, char *name);
 int peregrine_seeder_remove_file_or_directory(peregrine_handle_t handle, char *name);
 void peregrine_seeder_run(peregrine_handle_t handle);

@@ -24,6 +24,7 @@
  */
 
 #include "config.h" // FIXME: should not be used by main.c after change file should be removed from public include
+#include "libperegrine/debug.h"
 #include "peregrine_leecher.h"
 #include "peregrine_seeder.h"
 #include <arpa/inet.h>
@@ -79,12 +80,6 @@ main(int argc, char *argv[])
   peregrine_metadata_t meta;
   peregrine_handle_t seeder_handle;
   peregrine_handle_t leecher_handle;
-#if MULTIPLE_SEEDERS
-  char *comma, *last_char, *ch;
-  char buf_ip_addr[24];
-  int sia;
-  struct sockaddr_in sa_in;
-#endif
 
   chunk_size = 1024;
   fdname = fname1 = NULL;
@@ -96,7 +91,7 @@ main(int argc, char *argv[])
   sha_demanded = NULL;
   port = 6778;
   sa = NULL;
-  while ((opt = getopt(argc, argv, "a:c:f:hp:s:t:v")) != -1) {
+  while ((opt = getopt(argc, argv, "a:c:f:h:p:s:t:v")) != -1) {
     switch (opt) {
     case 'a': /* remote address of seeder */
       sa = optarg;
@@ -110,11 +105,6 @@ main(int argc, char *argv[])
     case 'h': /* help/usage */
       usage = 1;
       break;
-#if MULTIPLE_SEEDERS
-    case 'l': /* peer IP list separated by ':' */
-      peer_list = optarg;
-      break;
-#endif
     case 'p': /* UDP port number of seeder */
       port = atoi(optarg);
       break;
@@ -147,13 +137,6 @@ main(int argc, char *argv[])
     printf("			example: -f ./filename\n");
     printf("			example: -f /path/to/directory\n");
     printf("-h:			this help\n");
-#if MULTIPLE_SEEDERS
-    printf("-l:			list of pairs of IP address and udp port of "
-           "other seeders, separated by comma ','\n");
-    printf("			valid only for SEEDER\n");
-    printf("			example: -l "
-           "192.168.1.1:6778,192.168.1.2:6778,192.168.1.4:6778\n");
-#endif
     printf("-p port:		UDP listening port number, valid only on "
            "SEEDER side, default 6778\n");
     printf("			example: -p 7777\n");
@@ -220,43 +203,6 @@ main(int argc, char *argv[])
     seeder_params.port = port;
 
     seeder_handle = peregrine_seeder_create(&seeder_params);
-
-#if MULTIPLE_SEEDERS
-    if (peer_list != NULL) {
-      ch = peer_list;
-
-      while (ch < peer_list + strlen(peer_list)) {
-	comma = strchr(ch, ',');
-	if (comma != NULL) { /* if comma found */
-	  last_char = comma - 1;
-	} else if (ch < peer_list + strlen(peer_list)) { /* last IP without ending comma */
-	  last_char = peer_list + strlen(peer_list);
-	}
-
-	/* copy IP:PORT pair to temporary buffer */
-	memset(buf_ip_port, 0, sizeof(buf_ip_port));
-	memcpy(buf_ip_port, ch, last_char - ch + 1);
-
-	/* extract IP address */
-	colon = strchr(buf_ip_port, ':');
-	if (colon != NULL) { /* colon found */
-	  memset(buf_ip_addr, 0, sizeof(buf_ip_addr));
-	  memcpy(buf_ip_addr, buf_ip_port, colon - buf_ip_port);
-	} else {
-	  printf("Error: no colon found at: %s\n", buf_ip_port);
-	  exit(1);
-	}
-
-	sia = inet_aton(buf_ip_addr, &sa_in.sin_addr);
-	sa_in.sin_port = htons(atoi(colon + 1));
-
-	if (sia == 1) { /* if conversion succeeded */
-	  peregrine_seeder_add_seeder(seeder_handle, &sa_in);
-	}
-	ch = last_char + 2;
-      }
-    }
-#endif
 
     if (fdname != NULL) {
       peregrine_seeder_add_file_or_directory(seeder_handle, fdname);

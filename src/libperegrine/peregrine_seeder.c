@@ -57,70 +57,9 @@ peregrine_seeder_create(peregrine_seeder_params_t *params)
     local_seeder->type = SEEDER;
 
     SLIST_INIT(&local_seeder->file_list_head);
-    SLIST_INIT(&local_seeder->other_seeders_list_head);
   }
   handle = (int64_t)local_seeder;
   return handle;
-}
-
-/**
- * @brief Add new seeder to list of alternative seeders
- *
- * @param[in] handle Handle of seeder
- * @param[in] sa Structure with IP address and UDP port number of added seeder
- *
- * @return Return status of adding new seeder
- */
-int
-peregrine_seeder_add_seeder(peregrine_handle_t handle, struct sockaddr_in *sa)
-{
-  int ret;
-  struct other_seeders_entry *ss;
-  struct peer *local_seeder;
-
-  local_seeder = (struct peer *)handle;
-
-  ret = 0;
-
-  ss = malloc(sizeof(struct other_seeders_entry));
-  if (ss != NULL) {
-    memcpy(&ss->sa, sa, sizeof(struct sockaddr_in));
-    SLIST_INSERT_HEAD(&local_seeder->other_seeders_list_head, ss, next);
-  } else {
-    ret = -ENOMEM;
-  }
-
-  return ret;
-}
-
-/**
- * @brief Remove seeder from list of alternative seeders
- *
- * @param[in] handle Handle of seeder
- * @param[in] sa Structure with IP address and UDP port number of added seeder
- *
- * @return Return status of removing seeder
- */
-int
-peregrine_seeder_remove_seeder(peregrine_handle_t handle, struct sockaddr_in *sa)
-{
-  int ret;
-  struct other_seeders_entry *e;
-  struct peer *local_seeder;
-
-  local_seeder = (struct peer *)handle;
-
-  ret = 0;
-  SLIST_FOREACH(e, &local_seeder->other_seeders_list_head, next)
-  {
-    d_printf("%s:%u\n", inet_ntoa(e->sa.sin_addr), ntohs(e->sa.sin_port));
-    if (memcmp(&sa->sin_addr, &e->sa.sin_addr, sizeof(e->sa.sin_addr)) == 0) {
-      d_printf("entry to remove found - removing: %s:%u\n", inet_ntoa(e->sa.sin_addr), ntohs(e->sa.sin_port));
-      SLIST_REMOVE(&local_seeder->other_seeders_list_head, e, other_seeders_entry, next);
-    }
-  }
-
-  return ret;
 }
 
 /**
