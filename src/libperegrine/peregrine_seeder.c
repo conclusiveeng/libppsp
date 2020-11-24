@@ -71,10 +71,7 @@ peregrine_seeder_create(peregrine_seeder_params_t *params)
 void
 peregrine_seeder_add_file_or_directory(peregrine_handle_t handle, char *name)
 {
-  char sha[40 + 1];
   int st;
-  int s;
-  int y;
   struct stat stat;
   struct file_list_entry *f;
   struct peer *local_seeder;
@@ -89,7 +86,7 @@ peregrine_seeder_add_file_or_directory(peregrine_handle_t handle, char *name)
   /* is "name" directory name or filename? */
   if (stat.st_mode & S_IFDIR) { /* directory */
     d_printf("adding files from directory: %s\n", name);
-    create_file_list(local_seeder, name);
+    peer_create_file_list(local_seeder, name);
   } else if (stat.st_mode & S_IFREG) { /* filename */
     d_printf("adding file: %s\n", name);
     f = malloc(sizeof(struct file_list_entry));
@@ -97,25 +94,9 @@ peregrine_seeder_add_file_or_directory(peregrine_handle_t handle, char *name)
     strcpy(f->path, name);
     lstat(f->path, &stat);
     f->file_size = stat.st_size;
-    SLIST_INSERT_HEAD(&local_seeder->file_list_head, f, next);
+    peer_add_file(local_seeder, f);
   }
-
-  SLIST_FOREACH(f, &local_seeder->file_list_head, next)
-  {
-    /* does the tree already exist for given file? */
-    if (f->tree_root == NULL) { /* no - so create tree for it */
-      printf("processing: %s \n", f->path);
-      fflush(stdout);
-      process_file(f, local_seeder);
-
-      memset(sha, 0, sizeof(sha));
-      s = 0;
-      for (y = 0; y < 20; y++) {
-	s += sprintf(sha + s, "%02x", f->tree_root->sha[y] & 0xff);
-      }
-      printf("sha1: %s\n", sha);
-    }
-  }
+  peer_generate_sha1s(local_seeder);
 }
 
 /*
