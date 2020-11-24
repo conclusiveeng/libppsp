@@ -1099,6 +1099,7 @@ leecher_worker_sbs(void *data)
   /* for leecher */
   opts_len = make_proto_config_to_opts(opts, &pos);
   dump_options(opts, p);
+  clock_gettime(CLOCK_REALTIME, &local_peer->ts_start_time);
   d_printf("%s", "\n\ninitial handshake:\n");
 
   /* make initial HANDSHAKE request - serialize dest chan id, src chan id and
@@ -1399,6 +1400,8 @@ leecher_worker_sbs(void *data)
 	lseek(local_peer->fd, cc * local_peer->chunk_size, SEEK_SET);
 	write(local_peer->fd, data_buffer + 1 + 4 + 4 + 8 + 4, nr - (1 + 4 + 4 + 8 + 4));
 	mutex_unlock(&local_peer->fd_mutex);
+	// Account transmitted bytes also for FD transfers
+	local_peer->tx_bytes += nr - (1 + 4 + 4 + 8 + 4);
       } else if (local_peer->transfer_method == M_BUF) {
 	first_chunk = local_peer->download_schedule[0].begin;
 	offset = cc * local_peer->chunk_size - first_chunk * local_peer->chunk_size;
@@ -1506,6 +1509,7 @@ leecher_worker_sbs(void *data)
       p->to_remove = 1; /* mark peer to be removed by garbage collector */
 
       p->finishing = 1;
+      clock_gettime(CLOCK_REALTIME, &local_peer->ts_end_time);
       semaphore_post(p->local_leecher->sem); /* wake the main process */
       continue;
     }

@@ -177,6 +177,7 @@ struct peer {
 
   /* timestamp of last received and sent message */
   struct timespec ts_last_recv, ts_last_send;
+  struct timespec ts_start_time, ts_end_time;
 
   /* network things */
   uint16_t port;                   /* seeder: udp port number to bind to */

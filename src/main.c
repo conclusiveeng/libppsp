@@ -240,6 +240,8 @@ main(int argc, char *argv[])
       peregrine_leecher_fetch_chunk_to_fd(leecher_handle, fd);
 
       peregrine_leecher_close(leecher_handle);
+      peregrine_leecher_print_stats(leecher_handle);
+
 #endif
 #if BUFFER_TRANSFER
       /* transfering with buffer transfer method */

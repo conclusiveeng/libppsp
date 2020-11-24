@@ -213,3 +213,25 @@ peregrine_leecher_close(peregrine_handle_t handle)
   local_leecher->cmd = CMD_FINISH;
   net_leecher_close(local_leecher);
 }
+
+static inline void
+timespec_diff(struct timespec *a, struct timespec *b, struct timespec *result)
+{
+  result->tv_sec = a->tv_sec - b->tv_sec;
+  result->tv_nsec = a->tv_nsec - b->tv_nsec;
+  if (result->tv_nsec < 0) {
+    --result->tv_sec;
+    result->tv_nsec += 1000000000L;
+  }
+}
+
+void
+peregrine_leecher_print_stats(peregrine_handle_t handle)
+{
+  struct peer *leecher = (struct peer *)handle;
+  struct timespec timming;
+  printf("KBytes send: %u \n", leecher->tx_bytes / 1024);
+  timespec_diff(&leecher->ts_end_time, &leecher->ts_start_time, &timming);
+  printf("Time taken: %lld.%.9ld \n", (long long)timming.tv_sec, timming.tv_nsec);
+  printf("Speed test: %f KB/s", (double)(leecher->tx_bytes / 1024 / timming.tv_sec));
+}
