@@ -28,8 +28,6 @@
 
 #define BUFFER_TRANSFER          0
 #define FILE_DESCRIPTOR_TRANSFER 1
-#define MULTIPLE_SEEDERS         0
-#define MQ_SYNC                  0
 #define LIB_SWIFT_PPSPP_EXT      0 /* Incompatible Extenstions to libswift */
 
 #if BUFFER_TRANSFER && FILE_DESCRIPTOR_TRANSFER

@@ -327,7 +327,7 @@ make_handshake_have(char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, uint
  */
 INTERNAL_LINKAGE
 int
-make_handshake_finish(char *ptr, struct peer *peer)
+make_handshake_finish(char *ptr, __attribute__((unused)) struct peer *peer)
 {
   unsigned char *d;
   int ret;
@@ -388,47 +388,54 @@ make_request(char *ptr, uint32_t dest_chan_id, uint32_t start_chunk, uint32_t en
  */
 INTERNAL_LINKAGE
 int
-make_pex_resp(char *ptr, struct peer *peer, struct peer *we)
+make_pex_resp(__attribute__((unused)) char *ptr, __attribute__((unused)) struct peer *peer,
+              __attribute__((unused)) struct peer *we)
 {
-  int addr_size;
-  uint16_t space;
-  uint16_t max_pex;
-  uint16_t pex;
-  struct other_seeders_entry *e;
-  size_t pos = 0;
 
-  /* first - check if there are any entries in alternative seeders list */
-  /* if list is empty then return 0 and don't send any response for PEX_REQ */
-  if (SLIST_EMPTY(&we->other_seeders_list_head)) {
-    return 0;
-  }
+  return 0;
 
-  pos += pack_dest_chan(ptr + pos, peer->dest_chan_id);
+  //   PEX messages are not required in the swift protocol, so let's keep old cod
+  //       but don't use it for now. The code can be used as reference for future use.
 
-  /* calculate amount of available space in UDP payload */
-  /* 1500 - 20(ip) - 8(udp) - 4(chanid) */
-  space = 1500 - 20 - 8 - 4;
-  addr_size = 4 + 2; /* 4 - ip, 2- port */
-  max_pex = space / addr_size;
+  //   int addr_size;
+  //   uint16_t space;
+  //   uint16_t max_pex;
+  //   uint16_t pex;
+  //   struct other_seeders_entry *e;
+  //   size_t pos = 0;
 
-  d_printf("we're sending PEX_RESP to: %s\n", inet_ntoa(peer->leecher_addr.sin_addr));
+  //   /* first - check if there are any entries in alternative seeders list */
+  //   /* if list is empty then return 0 and don't send any response for PEX_REQ */
+  //   if (SLIST_EMPTY(&we->other_seeders_list_head)) {
+  //     return 0;
+  //   }
 
-  /* IP addresses taken from "-l" commandline option: -l
-   * ip1:port1,ip2:port2,ip3:port3 ...etc */
-  pex = 0;
-  SLIST_FOREACH(e, &we->other_seeders_list_head, next)
-  {
-    pos += pack_pex_resv4(ptr + pos, e->sa.sin_addr.s_addr, e->sa.sin_port);
+  //   pos += pack_dest_chan(ptr + pos, peer->dest_chan_id);
 
-    pex++;
-    if (pex >= max_pex) {
-      break;
-    }
-  }
+  //   /* calculate amount of available space in UDP payload */
+  //   /* 1500 - 20(ip) - 8(udp) - 4(chanid) */
+  //   space = 1500 - 20 - 8 - 4;
+  //   addr_size = 4 + 2; /* 4 - ip, 2- port */
+  //   max_pex = space / addr_size;
 
-  d_printf("returning %zu bytes\n", pos);
+  //   d_printf("we're sending PEX_RESP to: %s\n", inet_ntoa(peer->leecher_addr.sin_addr));
 
-  return pos;
+  //   /* IP addresses taken from "-l" commandline option: -l
+  //    * ip1:port1,ip2:port2,ip3:port3 ...etc */
+  //   pex = 0;
+  //   SLIST_FOREACH(e, &we->other_seeders_list_head, next)
+  //   {
+  //     pos += pack_pex_resv4(ptr + pos, e->sa.sin_addr.s_addr, e->sa.sin_port);
+
+  //     pex++;
+  //     if (pex >= max_pex) {
+  //       break;
+  //     }
+  //   }
+
+  //   d_printf("returning %zu bytes\n", pos);
+
+  //   return pos;
 }
 
 /*
@@ -437,7 +444,7 @@ make_pex_resp(char *ptr, struct peer *peer, struct peer *we)
  */
 INTERNAL_LINKAGE
 int
-make_integrity_reverse(char *ptr, struct peer *peer, struct peer *we)
+make_integrity_reverse(char *ptr, struct peer *peer, __attribute__((unused)) struct peer *we)
 {
   char *d;
   int ret;
@@ -1174,7 +1181,7 @@ swift_dump_options(uint8_t *ptr, struct peer *peer)
  */
 INTERNAL_LINKAGE
 int
-dump_handshake_request(char *ptr, int req_len, struct peer *peer)
+dump_handshake_request(char *ptr, __attribute__((unused)) int req_len, struct peer *peer)
 {
   char *d;
   uint32_t dest_chan_id;
@@ -1215,7 +1222,7 @@ dump_handshake_request(char *ptr, int req_len, struct peer *peer)
 
 INTERNAL_LINKAGE
 int
-swift_dump_handshake_request(char *ptr, int req_len, struct peer *peer)
+swift_dump_handshake_request(char *ptr, __attribute__((unused)) int req_len, struct peer *peer)
 {
   char *d;
   uint32_t src_chan_id;
@@ -1503,7 +1510,7 @@ dump_integrity(char *ptr, int req_len, struct peer *peer)
 
 INTERNAL_LINKAGE
 int
-dump_have_ack(char *ptr, int ack_len, struct peer *peer)
+dump_have_ack(char *ptr, int ack_len, __attribute__((unused)) struct peer *peer)
 {
   char *d;
   int ret;
@@ -1631,7 +1638,7 @@ handshake_type(char *ptr)
 
 INTERNAL_LINKAGE
 uint16_t
-count_handshake(char *ptr, uint16_t n, uint8_t skip_hdr)
+count_handshake(char *ptr, __attribute__((unused)) uint16_t n, uint8_t skip_hdr)
 {
   char *d;
   int swarm_len;

@@ -30,7 +30,6 @@
 
 #define BUFSIZE 1500
 
-int net_seeder(struct peer *seeder);
 int net_seeder_mq(struct peer *seeder);
 int net_leecher_continuous(struct peer *leecher);
 int net_preliminary_connection_sbs(struct peer *leecher);

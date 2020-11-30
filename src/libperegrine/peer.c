@@ -40,6 +40,9 @@
 #include <time.h>
 #include <unistd.h>
 
+void list_dir(struct peer *peer, char *dname);
+void process_file(struct file_list_entry *file_entry, struct peer *peer);
+
 /*
  * add element to the end of the list
  */
@@ -265,66 +268,9 @@ create_download_schedule(struct peer *p)
   }
 }
 
-/*
- * basing on chunk array - create download schedule (array)
- */
 INTERNAL_LINKAGE
 int32_t
 create_download_schedule_sbs(struct peer *p, uint32_t start_chunk, uint32_t end_chunk)
-{
-  int32_t ret;
-  uint32_t last_chunk;
-  uint64_t o;
-  uint64_t old_o;
-
-  d_printf("creating schedule for %u chunks\n", p->nc);
-  p->download_schedule_len = 0;
-  o = start_chunk;
-  last_chunk = start_chunk;
-
-  if (start_chunk > p->end_chunk) {
-    d_printf("error: range: %u-%u is outside of the allowed range (%u-%u)\n", start_chunk, end_chunk, p->start_chunk,
-             p->end_chunk);
-    return -1;
-  }
-
-  p->hashes_per_mtu = 256;
-
-  while ((o < p->nc) && (o <= end_chunk)) {
-    /* find first/closest not yet downloaded chunk */
-    while ((p->chunk[o].downloaded == CH_YES) && (o < p->nc)) {
-      o++;
-    }
-    if (o >= p->nc) {
-      break;
-    }
-
-    old_o = o;
-    uint64_t y = 0;
-    while ((y < p->hashes_per_mtu) && (o < p->nc) && (o <= end_chunk)) {
-      if (p->chunk[o].downloaded == CH_NO) {
-	o++;
-      } else {
-	break;
-      }
-      y++;
-    }
-    d_printf("range of chunks: %lu-%lu   %lu\n", old_o, o - 1, o - old_o);
-
-    last_chunk = o - 1;
-    p->download_schedule[p->download_schedule_len].begin = old_o;
-    p->download_schedule[p->download_schedule_len].end = o - 1;
-    p->download_schedule_len++;
-  }
-
-  ret = (last_chunk - start_chunk + 1) * p->chunk_size;
-
-  return ret;
-}
-
-INTERNAL_LINKAGE
-int32_t
-swift_create_download_schedule_sbs(struct peer *p, uint32_t start_chunk, uint32_t end_chunk)
 {
   int32_t ret;
   int32_t hci;
@@ -409,6 +355,47 @@ all_chunks_downloaded(struct peer *p)
 
 INTERNAL_LINKAGE
 void
+peer_add_file(struct peer *peer, struct file_list_entry *f)
+{
+  SLIST_INSERT_HEAD(&peer->file_list_head, f, next);
+}
+
+INTERNAL_LINKAGE
+void
+peer_create_file_list(struct peer *peer, char *dname)
+{
+  list_dir(peer, dname);
+}
+
+INTERNAL_LINKAGE
+void
+peer_generate_sha1s(struct peer *peer)
+{
+  int s;
+  int y;
+  char sha[40 + 1];
+  struct file_list_entry *f;
+
+  SLIST_FOREACH(f, &peer->file_list_head, next)
+  {
+    /* does the tree already exist for given file? */
+    if (f->tree_root == NULL) { /* no - so create tree for it */
+      printf("processing: %s \n", f->path);
+      fflush(stdout);
+      process_file(f, peer);
+
+      memset(sha, 0, sizeof(sha));
+      s = 0;
+      for (y = 0; y < 20; y++) {
+	s += sprintf(sha + s, "%02x", f->tree_root->sha[y] & 0xff);
+      }
+      printf("sha1: %s\n", sha);
+    }
+  }
+}
+
+INTERNAL_LINKAGE
+void
 list_dir(struct peer *peer, char *dname)
 {
   DIR *dir;
@@ -433,7 +420,7 @@ list_dir(struct peer *peer, char *dname)
       sprintf(f->path, "%s/%s", dname, dirent->d_name);
       lstat(f->path, &stat);
       f->file_size = stat.st_size;
-      SLIST_INSERT_HEAD(&peer->file_list_head, f, next);
+      peer_add_file(peer, f);
     }
 
     if ((dirent->d_type == DT_DIR) && (strcmp(dirent->d_name, ".") != 0) && (strcmp(dirent->d_name, "..") != 0)) {
@@ -442,13 +429,6 @@ list_dir(struct peer *peer, char *dname)
     }
   }
   closedir(dir);
-}
-
-INTERNAL_LINKAGE
-void
-create_file_list(struct peer *peer, char *dname)
-{
-  list_dir(peer, dname);
 }
 
 INTERNAL_LINKAGE

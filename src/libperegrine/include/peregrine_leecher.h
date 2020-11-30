@@ -51,5 +51,5 @@ void peregrine_leecher_fetch_chunk_to_fd(peregrine_handle_t handle, int fd);
 int32_t peregrine_leecher_fetch_chunk_to_buf(peregrine_handle_t handle, uint8_t *transfer_buf);
 void peregrine_leecher_close(peregrine_handle_t handle);
 void peregrine_leecher_run(peregrine_handle_t handle);
-
+void peregrine_leecher_print_stats(peregrine_handle_t handle);
 #endif
