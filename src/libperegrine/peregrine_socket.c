@@ -1,6 +1,5 @@
 #include "peregrine_socket.h"
 #include "log.h"
-#include "seeder.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
