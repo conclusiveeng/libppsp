@@ -32,26 +32,17 @@
 
 #define BUFSIZE       1500
 #define PEER_STR_ADDR 32
-
-struct peregrine_server {
-  int server_sock_fd;
-  struct sockaddr_in server_addr;
-};
-
 struct peregrine_peer {
-  int peer_sock_fd;
+  int sock_fd;
   char str_addr[PEER_STR_ADDR];
   struct sockaddr_in peer_addr;
 };
 
-struct peregrine_client {
-  struct peregrine_peer local_peer;  // it's local leecher peer (running in current process)
-  struct peregrine_peer remote_peer; // it's remote server/seeder peer (external process)
-};
-
-int peregrine_socket_setup_server(unsigned long local_port, struct peregrine_server *server);
-int peregrine_socket_setup_client(unsigned long port, const char *host, struct peregrine_client *client);
-void peregrine_socket_loop(struct peregrine_server *server, struct peregrine_client *client);
-void peregrine_socket_finish(struct peregrine_server *server, struct peregrine_client *client);
+int peregrine_socket_setup(unsigned long local_port, struct peregrine_peer *peer);
+void peregrine_socket_loop(struct peregrine_peer *peer, struct peregrine_peer *initial_peer);
+int peregrine_socket_add_peer(unsigned long port, const char *host, struct peregrine_peer *peer);
+int peregrine_socket_add_peer_from_cli(char *in_buffer, struct peregrine_peer *peer);
+int peregrine_socket_add_peer_from_connection(const struct sockaddr_in *peer_sockaddr, struct peregrine_peer *peer);
+void peregrine_socket_finish(struct peregrine_peer *peer);
 
 #endif

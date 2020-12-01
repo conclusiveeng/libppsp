@@ -1,5 +1,6 @@
 #include "peregrine_socket.h"
 #include "log.h"
+#include "seeder.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
@@ -31,12 +32,12 @@ str_to_hex(char *in, size_t in_size, char *out, size_t out_size)
 }
 
 int
-peregrine_socket_setup_server(unsigned long local_port, struct peregrine_server *server)
+peregrine_socket_setup(unsigned long local_port, struct peregrine_peer *peer)
 {
   // Crete server socket
-  server->server_sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
-  if (server->server_sock_fd < 0) {
-    PEREGRINE_ERROR("Failed to open socket: %s\n", strerror(errno));
+  peer->sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (peer->sock_fd < 0) {
+    PEREGRINE_ERROR("Failed to open socket: %s", strerror(errno));
     return 1;
   }
 
@@ -45,68 +46,90 @@ peregrine_socket_setup_server(unsigned long local_port, struct peregrine_server 
   //   setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &opt_val, sizeof(opt_val));
 
   // Bind server socket
-  server->server_addr.sin_family = AF_INET;
-  server->server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-  server->server_addr.sin_port = htons(local_port);
-  if (bind(server->server_sock_fd, (struct sockaddr *)(&server->server_addr), sizeof(server->server_addr)) < 0) {
-    PEREGRINE_ERROR("Failed to bind socket: %s\n", strerror(errno));
+  peer->peer_addr.sin_family = AF_INET;
+  peer->peer_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  peer->peer_addr.sin_port = htons(local_port);
+  if (bind(peer->sock_fd, (struct sockaddr *)(&peer->peer_addr), sizeof(peer->peer_addr)) < 0) {
+    PEREGRINE_ERROR("Failed to bind socket: %s", strerror(errno));
     return 1;
   }
 
-  PEREGRINE_INFO("Setup seeder server at: %s:%d", inet_ntoa(server->server_addr.sin_addr),
-                 ntohs(server->server_addr.sin_port));
+  snprintf(peer->str_addr, PEER_STR_ADDR, "%s:%d", inet_ntoa(peer->peer_addr.sin_addr),
+           ntohs(peer->peer_addr.sin_port));
+  PEREGRINE_INFO("Setup socket at: %s", peer->str_addr);
 
   return 0;
 }
 
 int
-peregrine_socket_setup_client(const unsigned long port, const char *host, struct peregrine_client *client)
+peregrine_socket_add_peer(const unsigned long port, const char *host, struct peregrine_peer *peer)
 {
-  // Setup connection details to seeder (remote server)
-  client->remote_peer.peer_addr.sin_family = AF_INET;
-  client->remote_peer.peer_addr.sin_port = htons(port);
-  if (inet_aton(host, &client->remote_peer.peer_addr.sin_addr) == 0) {
-    PEREGRINE_ERROR("Invalid remote address '%s'\n", host);
+  peer->peer_addr.sin_family = AF_INET;
+  peer->peer_addr.sin_port = htons(port);
+  if (inet_aton(host, &peer->peer_addr.sin_addr) == 0) {
+    PEREGRINE_ERROR("Invalid remote address '%s'", host);
     return 1;
   }
-  snprintf(client->remote_peer.str_addr, PEER_STR_ADDR, "%s:%lu", host, port);
+  snprintf(peer->str_addr, PEER_STR_ADDR, "%s:%lu", host, port);
+  peer->sock_fd = -1;
 
-  // Setup leecher connection details - use random port (internal peregrine client)
-  client->local_peer.peer_addr.sin_family = AF_INET;
-  client->local_peer.peer_addr.sin_addr.s_addr = INADDR_ANY;
-  client->local_peer.peer_addr.sin_port = 0; // Get first free random port number.
+  PEREGRINE_INFO("Setup new peer at: %s", peer->str_addr);
 
-  // Create leecher socket (internal peregrine client)
-  client->local_peer.peer_sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
-  if (client->local_peer.peer_sock_fd < 0) {
-    PEREGRINE_ERROR("Failed to open socket: %s\n", strerror(errno));
-    return 1;
+  return 0;
+}
+
+int
+peregrine_socket_add_peer_from_connection(const struct sockaddr_in *peer_sockaddr, struct peregrine_peer *peer)
+{
+  memcpy((void *)&peer->peer_addr, (void *)peer_sockaddr, sizeof(struct sockaddr_in));
+  snprintf(peer->str_addr, PEER_STR_ADDR, "%s:%d", inet_ntoa(peer->peer_addr.sin_addr),
+           ntohs(peer->peer_addr.sin_port));
+
+  PEREGRINE_INFO("Added new peer at: %s", peer->str_addr);
+
+  return 0;
+}
+
+int
+peregrine_socket_add_peer_from_cli(char *in_buffer, struct peregrine_peer *peer)
+{
+  if (strncmp("add", in_buffer, strlen("add")) == 0) {
+    strtok(in_buffer, ",");
+    char *host = strtok(NULL, ",");
+    char *port = strtok(NULL, ",");
+
+    peer->peer_addr.sin_family = AF_INET;
+
+    if ((host == NULL) || (port == NULL)) {
+      PEREGRINE_ERROR("Host or port input it incorrect. Format is 'add,host,port'");
+    }
+
+    if (host != NULL) {
+      if (inet_aton(host, &peer->peer_addr.sin_addr) == 0) {
+	PEREGRINE_ERROR("Invalid remote address '%s'", host);
+	return 1;
+      }
+    }
+
+    if (port != NULL) {
+      unsigned long peer_port = strtoul(port, NULL, 0);
+      if (peer_port < 1 || peer_port > 65535) {
+	PEREGRINE_ERROR("Invalid remote port '%s'", port);
+	return 1;
+      }
+      peer->peer_addr.sin_port = htons(peer_port);
+    }
+
+    snprintf(peer->str_addr, PEER_STR_ADDR, "%s:%d", inet_ntoa(peer->peer_addr.sin_addr),
+             ntohs(peer->peer_addr.sin_port));
+    PEREGRINE_INFO("Added new peer from CLI at: %s", peer->str_addr);
   }
-
-  if (bind(client->local_peer.peer_sock_fd, (struct sockaddr *)&client->local_peer.peer_addr,
-           sizeof(client->local_peer.peer_addr))
-      < 0) {
-    PEREGRINE_ERROR("Failed to bind socket: %s\n", strerror(errno));
-    return 1;
-  }
-
-  // Get assigned port number
-  socklen_t len = sizeof(client->local_peer.peer_addr);
-  if (getsockname(client->local_peer.peer_sock_fd, (struct sockaddr *)&client->local_peer.peer_addr, &len) == -1) {
-    PEREGRINE_ERROR("Error while getsockname: %s\n", strerror(errno));
-    return 1;
-  }
-
-  snprintf(client->local_peer.str_addr, PEER_STR_ADDR, "%s:%d", inet_ntoa(client->local_peer.peer_addr.sin_addr),
-           ntohs(client->local_peer.peer_addr.sin_port));
-
-  PEREGRINE_INFO("Setup internal client at: %s", client->local_peer.str_addr);
 
   return 0;
 }
 
 void
-peregrine_socket_loop(struct peregrine_server *server, struct peregrine_client *client)
+peregrine_socket_loop(struct peregrine_peer *peer, struct peregrine_peer *initial_peer)
 {
   ssize_t bytes;
   char input_buffer[BUFSIZE];
@@ -115,19 +138,28 @@ peregrine_socket_loop(struct peregrine_server *server, struct peregrine_client *
   struct pollfd fds[3];
   struct sockaddr_in client_addr;
   socklen_t client_addr_len;
-  char client_str_addr[PEER_STR_ADDR];
-  int received_from_client = 0;
 
   /* Descriptor zero is stdin */
   fds[0].fd = 0;
-  fds[1].fd = server->server_sock_fd;
-  fds[2].fd = client->local_peer.peer_sock_fd;
+  fds[1].fd = peer->sock_fd;
   fds[0].events = POLLIN | POLLPRI;
   fds[1].events = POLLIN | POLLPRI;
-  fds[2].events = POLLIN | POLLPRI;
 
   while (1) {
-    int ret = poll(fds, 3, -1);
+    //     if (initial_peer != NULL) {
+    //       PEREGRINE_INFO("[SRV] Will send to: %s", initial_peer->str_addr);
+
+    //       strcpy(output_buffer, "HELLO!");
+    //       bytes = 8;
+
+    //       bytes = sendto(peer->sock_fd, output_buffer, bytes, 0, (struct sockaddr *)&initial_peer->peer_addr,
+    //                      sizeof(initial_peer->peer_addr));
+    //       if (bytes < 0) {
+    // 	PEREGRINE_ERROR("Error - sendto error: %s", strerror(errno));
+    // 	break;
+    //       }
+    //     }
+    int ret = poll(fds, 2, -1);
 
     if (ret < 0) {
       PEREGRINE_ERROR("Poll returned error: %s", strerror(errno));
@@ -152,78 +184,40 @@ peregrine_socket_loop(struct peregrine_server *server, struct peregrine_client *
 	  PEREGRINE_ERROR("stdin error: %s", strerror(errno));
 	  break;
 	}
-	// Don't send newline characters when on CLI operation
-	output_buffer[strcspn(output_buffer, "\n")] = 0;
-	PEREGRINE_INFO("[CLI] Sending: '%.*s'", (int)bytes, output_buffer);
+	PEREGRINE_INFO("[CLI] GOT: '%.*s'", (int)bytes, output_buffer);
+	struct peregrine_peer new_peer;
+	peregrine_socket_add_peer_from_cli(output_buffer, &new_peer);
+      }
 
-	// This is for test purposes :
-	//     At the beggining of the application running the stdio stream should be directed to remote server socket
-	//     - seeder, this way we initiate connection(from perspective of 2nd application)
-	//     After the connetion is initialized - remote server has our address, we change the communication,
-	//     to point to remote client(from perspective of 1st application)
-	//     After those operation we will be able to cross communicate between 2nd application (as client) to
-	//     1st application (as server).
+      // Check if there is any data on ours socket
+      if (fds[1].revents & (POLLIN | POLLPRI)) {
+	struct peregrine_peer new_peer;
 
-	if (received_from_client == 1) {
-	  PEREGRINE_INFO("[CLI] Will send to: %s", client_str_addr);
-	  bytes = sendto(server->server_sock_fd, output_buffer, bytes, 0, (struct sockaddr *)&client_addr,
-	                 sizeof(client_addr));
-	} else {
-	  PEREGRINE_INFO("[CLI] Will send to: %s", client->remote_peer.str_addr);
-	  bytes = sendto(client->local_peer.peer_sock_fd, output_buffer, bytes, 0,
-	                 (struct sockaddr *)&client->remote_peer.peer_addr, sizeof(client->remote_peer.peer_addr));
+	bzero(&client_addr, sizeof(client_addr));
+	client_addr_len = sizeof(client_addr);
+	bytes = recvfrom(peer->sock_fd, input_buffer, sizeof(input_buffer) - 1, 0, (struct sockaddr *)&client_addr,
+	                 &client_addr_len);
+	if (bytes < 0) {
+	  PEREGRINE_ERROR("Error - recvfrom error: %s", strerror(errno));
+	  break;
 	}
 
+	// Potentially, new client just connected to us.
+	peregrine_socket_add_peer_from_connection(&client_addr, &new_peer);
+	PEREGRINE_DEBUG("[SRV] Received from peer %s", new_peer.str_addr);
+	if (bytes > 0) {
+	  input_buffer[strcspn(input_buffer, "\n")] = 0;
+	  str_to_hex(input_buffer, bytes, input_buffer_hex, bytes);
+	  PEREGRINE_DEBUG("[SRV] %s Received 0x:'%.*s'", new_peer.str_addr, (int)bytes, input_buffer_hex);
+	  PEREGRINE_DEBUG("[SRV] %s Received   :'%.*s'", new_peer.str_addr, (int)bytes, input_buffer);
+	}
+
+	PEREGRINE_INFO("[SRV] Will send to: %s", new_peer.str_addr);
+	bytes = sendto(peer->sock_fd, input_buffer, bytes, 0, (struct sockaddr *)&new_peer.peer_addr,
+	               sizeof(new_peer.peer_addr));
 	if (bytes < 0) {
 	  PEREGRINE_ERROR("Error - sendto error: %s", strerror(errno));
 	  break;
-	}
-      }
-
-      // Check if there is any data on the server (seeder) socket
-      if (fds[1].revents & (POLLIN | POLLPRI)) {
-	// Potentially, new client just connected to us.
-	bzero(&client_addr, sizeof(client_addr));
-	client_addr_len = sizeof(client_addr);
-	bytes = recvfrom(server->server_sock_fd, input_buffer, sizeof(input_buffer) - 1, 0,
-	                 (struct sockaddr *)&client_addr, &client_addr_len);
-	if (bytes < 0) {
-	  PEREGRINE_ERROR("Error - recvfrom error: %s", strerror(errno));
-	  break;
-	}
-
-	snprintf(client_str_addr, PEER_STR_ADDR, "%s:%d", inet_ntoa(client_addr.sin_addr),
-	         ntohs(client_addr.sin_port));
-	PEREGRINE_DEBUG("[SRV] Received from peer %s", client_str_addr);
-
-	if (bytes > 0) {
-	  str_to_hex(input_buffer, bytes, input_buffer_hex, bytes);
-	  PEREGRINE_DEBUG("[SRV] %s Received 0x:'%.*s'", client_str_addr, (int)bytes, input_buffer_hex);
-	  PEREGRINE_DEBUG("[SRV] %s Received   :'%.*s'", client_str_addr, (int)bytes, input_buffer);
-	}
-
-	received_from_client = 1;
-      }
-
-      // Check if there is any data on the client (leecher) socket
-      if (fds[2].revents & (POLLIN | POLLPRI)) {
-	bzero(&client_addr, sizeof(client_addr));
-	client_addr_len = sizeof(client_addr);
-	bytes = recvfrom(client->local_peer.peer_sock_fd, input_buffer, sizeof(input_buffer) - 1, 0,
-	                 (struct sockaddr *)&client_addr, &client_addr_len);
-	if (bytes < 0) {
-	  PEREGRINE_ERROR("Error - recvfrom error: %s", strerror(errno));
-	  break;
-	}
-
-	snprintf(client_str_addr, PEER_STR_ADDR, "%s:%d", inet_ntoa(client_addr.sin_addr),
-	         ntohs(client_addr.sin_port));
-	PEREGRINE_DEBUG("[CLT] Received from peer %s", client_str_addr);
-
-	if (bytes > 0) {
-	  str_to_hex(input_buffer, bytes, input_buffer_hex, bytes);
-	  PEREGRINE_INFO("[CLT] %s Received 0x:'%.*s'", client_str_addr, (int)bytes, input_buffer_hex);
-	  PEREGRINE_INFO("[CLT] %s Received   :'%.*s'", client_str_addr, (int)bytes, input_buffer);
 	}
       }
     }
@@ -231,8 +225,9 @@ peregrine_socket_loop(struct peregrine_server *server, struct peregrine_client *
 }
 
 void
-peregrine_socket_finish(struct peregrine_server *server, struct peregrine_client *client)
+peregrine_socket_finish(struct peregrine_peer *peer)
 {
-  close(client->local_peer.peer_sock_fd);
-  close(server->server_sock_fd);
+  if (peer->sock_fd != -1) {
+    close(peer->sock_fd);
+  }
 }
