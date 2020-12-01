@@ -28,21 +28,60 @@
 
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <sys/queue.h>
 #include <sys/socket.h>
 
 #define BUFSIZE       1500
 #define PEER_STR_ADDR 32
+
+/* shared file */
+struct peregrine_file {
+  struct peregrine_context *context;
+  const char *name;
+  int fd;
+  char hash[256];
+  /* other file state, maybe mmap() handle, etc */
+  LIST_ENTRY(peregrine_file) ptrs;
+};
+/* known peer */
 struct peregrine_peer {
+  struct peregrine_context *context;
+
   int sock_fd;
   char str_addr[PEER_STR_ADDR];
   struct sockaddr_in peer_addr;
+  /* other peer state: known files cache, etc */
+  LIST_ENTRY(peregrine_peer) ptrs;
 };
 
-int peregrine_socket_setup(unsigned long local_port, struct peregrine_peer *peer);
-void peregrine_socket_loop(struct peregrine_peer *peer, struct peregrine_peer *initial_peer);
-int peregrine_socket_add_peer(unsigned long port, const char *host, struct peregrine_peer *peer);
-int peregrine_socket_add_peer_from_cli(char *in_buffer, struct peregrine_peer *peer);
-int peregrine_socket_add_peer_from_connection(const struct sockaddr_in *peer_sockaddr, struct peregrine_peer *peer);
-void peregrine_socket_finish(struct peregrine_peer *peer);
+/* file being downloaded */
+struct peregrine_download {
+  struct peregrine_context *context;
+  char hash[256];
+  int out_fd;
+  LIST_HEAD(peregrine_download_peers, peregrine_peer) peers; /* peers we download from */
+  /* other download state: downloaded chunks, known chunks, etc */
+  LIST_ENTRY(peregrine_download) ptrs;
+};
+
+/* instance */
+struct peregrine_context {
+  int sock_fd;
+  uint32_t swarm_id;
+  struct peregrine_peer ctx_peer;
+  LIST_HEAD(peregrine_peers, peregrine_peer) peers;
+  LIST_HEAD(peregrine_files, peregrine_file) files;
+  LIST_HEAD(peregrine_downloads, peregrine_download) downloads;
+  /* other instance state */
+};
+
+int peregrine_socket_setup(unsigned long local_port, struct peregrine_context *ctx);
+void peregrine_socket_loop(struct peregrine_context *ctx, struct peregrine_peer *initial_peer);
+int peregrine_socket_add_peer(struct peregrine_context *ctx, const unsigned long port, const char *host,
+                              struct peregrine_peer **peer);
+int peregrine_socket_add_peer_from_cli(struct peregrine_context *ctx, char *in_buffer, struct peregrine_peer **peer);
+int peregrine_socket_add_peer_from_connection(struct peregrine_context *ctx, const struct sockaddr_in *peer_sockaddr,
+                                              struct peregrine_peer **peer);
+void peregrine_socket_finish(struct peregrine_context *ctx);
 
 #endif

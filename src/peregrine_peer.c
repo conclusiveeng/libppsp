@@ -9,7 +9,7 @@ int debug;
 int
 main(int argc, char const *argv[])
 {
-  struct peregrine_peer our_peer;
+  struct peregrine_context context;
   struct peregrine_peer *other_peer = NULL;
   unsigned long local_port;
 
@@ -36,18 +36,18 @@ main(int argc, char const *argv[])
   //     PEREGRINE_INFO("Added initial peer!");
   //   }
 
-  if (peregrine_socket_setup(local_port, &our_peer) < 0) {
+  if (peregrine_socket_setup(local_port, &context) < 0) {
     PEREGRINE_ERROR("Error while seting up server!");
     return 1;
   }
 
-  peregrine_socket_loop(&our_peer, other_peer);
+  peregrine_socket_loop(&context, other_peer);
 
   if (other_peer) {
     free(other_peer);
   }
 
-  peregrine_socket_finish(&our_peer);
+  peregrine_socket_finish(&context);
 
   return 0;
 }
