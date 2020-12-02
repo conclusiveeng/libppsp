@@ -1,5 +1,6 @@
 #include "peregrine_socket.h"
 #include "log.h"
+#include "peer_handler.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
@@ -156,13 +157,8 @@ void
 peregrine_socket_loop(struct peregrine_context *ctx)
 {
   ssize_t bytes;
-  char input_buffer[BUFSIZE];
-  char input_buffer_hex[BUFSIZE];
-  char output_buffer[BUFSIZE];
   struct pollfd fds[3];
-  struct sockaddr_in client_addr;
-  socklen_t client_addr_len;
-  struct peregrine_peer *new_peer = NULL;
+  struct peregrine_peer *peer = NULL;
 
   /* Descriptor zero is stdin */
   fds[0].fd = 0;
@@ -189,52 +185,73 @@ peregrine_socket_loop(struct peregrine_context *ctx)
 
       /* Check if there is any input on stdin */
       if (fds[0].revents & (POLLIN | POLLPRI)) {
-	bytes = read(0, output_buffer, sizeof(output_buffer));
+	char cli_buffer[BUFSIZE];
+	bytes = read(0, cli_buffer, sizeof(cli_buffer));
 	if (bytes < 0) {
 	  PEREGRINE_ERROR("stdin error: %s", strerror(errno));
 	  break;
 	}
-	new_peer = NULL;
-	output_buffer[strcspn(output_buffer, "\n")] = 0;
-	PEREGRINE_INFO("[CLI] GOT: '%.*s'", (int)bytes, output_buffer);
+	peer = NULL;
+	cli_buffer[strcspn(cli_buffer, "\n")] = 0;
+	PEREGRINE_INFO("[CLI] GOT: '%.*s'", (int)bytes, cli_buffer);
 
 	// Each peer will be added only once, if it was added before it will just skip it.
 
-	if (peregrine_socket_add_peer_from_cli(ctx, output_buffer, &new_peer) < 0) {
+	if (peregrine_socket_add_peer_from_cli(ctx, cli_buffer, &peer) < 0) {
 	  PEREGRINE_ERROR("[CLI] There was an error while adding new peer from CLI.");
 	}
       }
 
       /* Check if there is any data on ours socket */
       if (fds[1].revents & (POLLIN | POLLPRI)) {
-	new_peer = NULL;
+	char input_buffer[BUFSIZE];
+	char dbg_buffer_hex[3 * BUFSIZE];
+	char output_buffer[BUFSIZE];
+	struct sockaddr_in client_addr;
+	socklen_t client_addr_len = sizeof(client_addr);
+	ssize_t output_bytes = 0;
+	peer = NULL;
 	bzero(&client_addr, sizeof(client_addr));
-	client_addr_len = sizeof(client_addr);
+
+	// Server socket got new data from the peer, read the data into input buffer
 	bytes = recvfrom(ctx->sock_fd, input_buffer, sizeof(input_buffer) - 1, 0, (struct sockaddr *)&client_addr,
 	                 &client_addr_len);
+	// If there was read error, stop the application (cancel main loop)
 	if (bytes < 0) {
 	  PEREGRINE_ERROR("Error - recvfrom error: %s", strerror(errno));
 	  break;
 	}
-
-	// Each peer will be added only once, if it was added before it will just skip it.
-	if (peregrine_socket_add_peer_from_connection(ctx, &client_addr, &new_peer) < 0) {
+	// Try to find the peer by host:port in the list of existing or add new one, on error stop application.
+	if (peregrine_socket_add_peer_from_connection(ctx, &client_addr, &peer) < 0) {
 	  PEREGRINE_ERROR("[SRV] There was an error while adding new peer from connection!");
 	  break;
 	}
+	// Pass read data to request handling routine - get response and its length
+	output_bytes = peer_handle_request(ctx, peer, input_buffer, output_buffer, sizeof(output_buffer));
 
-	PEREGRINE_DEBUG("[SRV] Received from peer %s", new_peer->str_addr);
-	if (bytes > 0) {
-	  input_buffer[strcspn(input_buffer, "\n")] = 0;
-	  str_to_hex(input_buffer, bytes, input_buffer_hex, bytes);
-	  PEREGRINE_DEBUG("[SRV] %s Received 0x:'%.*s'", new_peer->str_addr, (int)bytes, input_buffer_hex);
-	  PEREGRINE_DEBUG("[SRV] %s Received   :'%.*s'", new_peer->str_addr, (int)bytes, input_buffer);
+	/* Only for debug purposes START */
+	input_buffer[strcspn(input_buffer, "\n")] = 0;
+	str_to_hex(input_buffer, bytes, dbg_buffer_hex, sizeof(dbg_buffer_hex));
+	PEREGRINE_DEBUG("[SRV] %s Received 0x:'%.*s'", peer->str_addr, (int)sizeof(dbg_buffer_hex), dbg_buffer_hex);
+	PEREGRINE_DEBUG("[SRV] %s Received   :'%.*s'", peer->str_addr, (int)bytes, input_buffer);
+	/* Only for debug purposes END */
+
+	// If request handling routine got error, stop the application
+	if (output_bytes < 0) {
+	  PEREGRINE_ERROR("[SRV] Error while handling peer message: %d", output_bytes);
+	  break;
 	}
 
-	// FIXME: Handle the input data instead of just sending back
-	PEREGRINE_INFO("[SRV] Will send to: %s", new_peer->str_addr);
-	bytes = sendto(ctx->sock_fd, input_buffer, bytes, 0, (struct sockaddr *)&new_peer->peer_addr,
-	               sizeof(new_peer->peer_addr));
+	/* Only for debug purposes START */
+	str_to_hex(output_buffer, output_bytes, dbg_buffer_hex, sizeof(dbg_buffer_hex));
+	PEREGRINE_DEBUG("[SRV] %s Send 0x:'%.*s'", peer->str_addr, (int)sizeof(dbg_buffer_hex), dbg_buffer_hex);
+	PEREGRINE_DEBUG("[SRV] %s Send   :'%.*s'", peer->str_addr, (int)bytes, output_buffer);
+	/* Only for debug purposes END */
+
+	// Send response for handled request
+	bytes = sendto(ctx->sock_fd, output_buffer, output_bytes, 0, (struct sockaddr *)&peer->peer_addr,
+	               sizeof(peer->peer_addr));
+	// If there was write error, stop the application (cancel main loop)
 	if (bytes < 0) {
 	  PEREGRINE_ERROR("Error - sendto error: %s", strerror(errno));
 	  break;
