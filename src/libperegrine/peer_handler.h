@@ -30,6 +30,6 @@
 #include <stddef.h>
 
 int peer_handle_request(struct peregrine_context *ctx, struct peregrine_peer *peer, char *input_data,
-                        char *response_buffer, size_t response_size);
+                        size_t input_size, char *response_buffer, size_t response_size);
 
 #endif

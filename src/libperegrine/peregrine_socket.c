@@ -32,6 +32,20 @@ str_to_hex(char *in, size_t in_size, char *out, size_t out_size)
   out[ptr_out - out - 1] = 0;
 }
 
+struct peregrine_peer *
+find_existing_peer_or_null(struct peregrine_context *ctx, struct peregrine_peer *searched_peer)
+{
+  struct peregrine_peer *peer_ptr;
+  peer_ptr = LIST_FIRST(&ctx->peers);
+  while (peer_ptr != NULL) {
+    if (memcmp(&searched_peer->peer_addr, &peer_ptr->peer_addr, sizeof(peer_ptr->peer_addr)) == 0) {
+      return peer_ptr;
+    }
+    peer_ptr = LIST_NEXT(peer_ptr, ptrs);
+  }
+  return NULL;
+}
+
 int
 peregrine_socket_setup(unsigned long local_port, struct peregrine_context *ctx)
 {
@@ -65,20 +79,6 @@ peregrine_socket_setup(unsigned long local_port, struct peregrine_context *ctx)
   LIST_INIT(&ctx->downloads);
 
   return 0;
-}
-
-struct peregrine_peer *
-find_existing_peer_or_null(struct peregrine_context *ctx, struct peregrine_peer *searched_peer)
-{
-  struct peregrine_peer *peer_ptr;
-  peer_ptr = LIST_FIRST(&ctx->peers);
-  while (peer_ptr != NULL) {
-    if (memcmp(&searched_peer->peer_addr, &peer_ptr->peer_addr, sizeof(peer_ptr->peer_addr)) == 0) {
-      return peer_ptr;
-    }
-    peer_ptr = LIST_NEXT(peer_ptr, ptrs);
-  }
-  return NULL;
 }
 
 int
@@ -227,13 +227,13 @@ peregrine_socket_loop(struct peregrine_context *ctx)
 	  break;
 	}
 	// Pass read data to request handling routine - get response and its length
-	output_bytes = peer_handle_request(ctx, peer, input_buffer, output_buffer, sizeof(output_buffer));
+	output_bytes = peer_handle_request(ctx, peer, input_buffer, bytes, output_buffer, sizeof(output_buffer));
 
 	/* Only for debug purposes START */
 	input_buffer[strcspn(input_buffer, "\n")] = 0;
 	str_to_hex(input_buffer, bytes, dbg_buffer_hex, sizeof(dbg_buffer_hex));
 	PEREGRINE_DEBUG("[SRV] %s Received 0x:'%.*s'", peer->str_addr, (int)sizeof(dbg_buffer_hex), dbg_buffer_hex);
-	PEREGRINE_DEBUG("[SRV] %s Received   :'%.*s'", peer->str_addr, (int)bytes, input_buffer);
+	// PEREGRINE_DEBUG("[SRV] %s Received   :'%.*s'", peer->str_addr, (int)bytes, input_buffer);
 	/* Only for debug purposes END */
 
 	// If request handling routine got error, stop the application
@@ -242,10 +242,22 @@ peregrine_socket_loop(struct peregrine_context *ctx)
 	  break;
 	}
 
+	if (output_bytes == 0) {
+	  PEREGRINE_DEBUG("[SRV] %s Ignore sending response.", peer->str_addr);
+	  if (peer->to_remove == 1) {
+	    // Handle the situation when peer want's to close connection.
+	    PEREGRINE_INFO("[PEER] Removing %s", peer->str_addr);
+	    LIST_REMOVE(peer, ptrs);
+	    free(peer);
+	    peer = NULL;
+	  }
+	  continue;
+	}
+
 	/* Only for debug purposes START */
 	str_to_hex(output_buffer, output_bytes, dbg_buffer_hex, sizeof(dbg_buffer_hex));
 	PEREGRINE_DEBUG("[SRV] %s Send 0x:'%.*s'", peer->str_addr, (int)sizeof(dbg_buffer_hex), dbg_buffer_hex);
-	PEREGRINE_DEBUG("[SRV] %s Send   :'%.*s'", peer->str_addr, (int)bytes, output_buffer);
+	// PEREGRINE_DEBUG("[SRV] %s Send   :'%.*s'", peer->str_addr, (int)bytes, output_buffer);
 	/* Only for debug purposes END */
 
 	// Send response for handled request

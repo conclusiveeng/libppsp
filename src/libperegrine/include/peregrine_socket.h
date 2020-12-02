@@ -52,6 +52,7 @@ struct peregrine_peer {
   struct sockaddr_in peer_addr;
   /* other peer state: known files cache, etc */
   LIST_ENTRY(peregrine_peer) ptrs;
+  uint8_t to_remove;
 };
 
 /* file being downloaded */
