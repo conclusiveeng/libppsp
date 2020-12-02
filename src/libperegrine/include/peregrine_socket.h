@@ -76,9 +76,7 @@ struct peregrine_context {
 };
 
 int peregrine_socket_setup(unsigned long local_port, struct peregrine_context *ctx);
-void peregrine_socket_loop(struct peregrine_context *ctx, struct peregrine_peer *initial_peer);
-int peregrine_socket_add_peer(struct peregrine_context *ctx, const unsigned long port, const char *host,
-                              struct peregrine_peer **peer);
+void peregrine_socket_loop(struct peregrine_context *ctx);
 int peregrine_socket_add_peer_from_cli(struct peregrine_context *ctx, char *in_buffer, struct peregrine_peer **peer);
 int peregrine_socket_add_peer_from_connection(struct peregrine_context *ctx, const struct sockaddr_in *peer_sockaddr,
                                               struct peregrine_peer **peer);

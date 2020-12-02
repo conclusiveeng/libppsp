@@ -66,28 +66,18 @@ peregrine_socket_setup(unsigned long local_port, struct peregrine_context *ctx)
   return 0;
 }
 
-int
-peregrine_socket_add_peer(struct peregrine_context *ctx, const unsigned long port, const char *host,
-                          struct peregrine_peer **peer)
+struct peregrine_peer *
+find_existing_peer_or_null(struct peregrine_context *ctx, struct peregrine_peer *searched_peer)
 {
-  struct peregrine_peer *new_peer = malloc(sizeof(struct peregrine_peer));
-
-  new_peer->peer_addr.sin_family = AF_INET;
-  new_peer->peer_addr.sin_port = htons(port);
-  if (inet_aton(host, &new_peer->peer_addr.sin_addr) == 0) {
-    PEREGRINE_ERROR("Invalid remote address '%s'", host);
-    free(new_peer);
-    return 1;
+  struct peregrine_peer *peer_ptr;
+  peer_ptr = LIST_FIRST(&ctx->peers);
+  while (peer_ptr != NULL) {
+    if (memcmp(&searched_peer->peer_addr, &peer_ptr->peer_addr, sizeof(peer_ptr->peer_addr)) == 0) {
+      return peer_ptr;
+    }
+    peer_ptr = LIST_NEXT(peer_ptr, ptrs);
   }
-  snprintf(new_peer->str_addr, PEER_STR_ADDR, "%s:%lu", host, port);
-  new_peer->sock_fd = -1;
-
-  PEREGRINE_INFO("Setup new peer at: %s", new_peer->str_addr);
-  new_peer->context = ctx;
-  LIST_INSERT_HEAD(&ctx->peers, new_peer, ptrs);
-  *peer = new_peer;
-
-  return 0;
+  return NULL;
 }
 
 int
@@ -98,11 +88,17 @@ peregrine_socket_add_peer_from_connection(struct peregrine_context *ctx, const s
 
   new_peer->peer_addr.sin_family = AF_INET;
   memcpy((void *)&new_peer->peer_addr, (void *)peer_sockaddr, sizeof(struct sockaddr_in));
+
+  struct peregrine_peer *existing_peer = find_existing_peer_or_null(ctx, new_peer);
+  if (existing_peer) {
+    *peer = existing_peer;
+    PEREGRINE_DEBUG("Peer %s already known.", existing_peer->str_addr);
+    return 0;
+  }
   snprintf(new_peer->str_addr, PEER_STR_ADDR, "%s:%d", inet_ntoa(new_peer->peer_addr.sin_addr),
            ntohs(new_peer->peer_addr.sin_port));
-
-  PEREGRINE_INFO("Added new peer at: %s", new_peer->str_addr);
   new_peer->context = ctx;
+  PEREGRINE_DEBUG("Added new peer at: %s", new_peer->str_addr);
   LIST_INSERT_HEAD(&ctx->peers, new_peer, ptrs);
   *peer = new_peer;
 
@@ -112,42 +108,43 @@ peregrine_socket_add_peer_from_connection(struct peregrine_context *ctx, const s
 int
 peregrine_socket_add_peer_from_cli(struct peregrine_context *ctx, char *in_buffer, struct peregrine_peer **peer)
 {
-  struct peregrine_peer *new_peer = malloc(sizeof(struct peregrine_peer));
-
   if (strncmp("add", in_buffer, strlen("add")) == 0) {
     strtok(in_buffer, ",");
     char *host = strtok(NULL, ",");
     char *port = strtok(NULL, ",");
 
-    new_peer->peer_addr.sin_family = AF_INET;
-
     if ((host == NULL) || (port == NULL)) {
       PEREGRINE_ERROR("Host or port input it incorrect. Format is 'add,host,port'");
+      return 1;
     }
 
-    if (host != NULL) {
-      if (inet_aton(host, &new_peer->peer_addr.sin_addr) == 0) {
-	PEREGRINE_ERROR("Invalid remote address '%s'", host);
-	free(new_peer);
-	return 1;
-      }
+    struct peregrine_peer *new_peer = malloc(sizeof(struct peregrine_peer));
+    new_peer->peer_addr.sin_family = AF_INET;
+
+    if (inet_aton(host, &new_peer->peer_addr.sin_addr) == 0) {
+      PEREGRINE_ERROR("Invalid remote address '%s'", host);
+      free(new_peer);
+      return 1;
     }
 
-    if (port != NULL) {
-      unsigned long peer_port = strtoul(port, NULL, 0);
-      if (peer_port < 1 || peer_port > 65535) {
-	PEREGRINE_ERROR("Invalid remote port '%s'", port);
-	free(new_peer);
-	return 1;
-      }
-      new_peer->peer_addr.sin_port = htons(peer_port);
+    unsigned long peer_port = strtoul(port, NULL, 0);
+    if (peer_port < 1 || peer_port > 65535) {
+      PEREGRINE_ERROR("Invalid remote port '%s'", port);
+      free(new_peer);
+      return 1;
     }
+    new_peer->peer_addr.sin_port = htons(peer_port);
 
+    struct peregrine_peer *existing_peer = find_existing_peer_or_null(ctx, new_peer);
+    if (existing_peer) {
+      *peer = existing_peer;
+      PEREGRINE_DEBUG("Peer %s already known.", existing_peer->str_addr);
+      return 0;
+    }
     snprintf(new_peer->str_addr, PEER_STR_ADDR, "%s:%d", inet_ntoa(new_peer->peer_addr.sin_addr),
              ntohs(new_peer->peer_addr.sin_port));
-    PEREGRINE_INFO("Added new peer from CLI at: %s", new_peer->str_addr);
-
     new_peer->context = ctx;
+    PEREGRINE_DEBUG("Added new peer from CLI at: %s", new_peer->str_addr);
     LIST_INSERT_HEAD(&ctx->peers, new_peer, ptrs);
     *peer = new_peer;
   }
@@ -156,7 +153,7 @@ peregrine_socket_add_peer_from_cli(struct peregrine_context *ctx, char *in_buffe
 }
 
 void
-peregrine_socket_loop(struct peregrine_context *ctx, struct peregrine_peer *initial_peer)
+peregrine_socket_loop(struct peregrine_context *ctx)
 {
   ssize_t bytes;
   char input_buffer[BUFSIZE];
@@ -174,19 +171,6 @@ peregrine_socket_loop(struct peregrine_context *ctx, struct peregrine_peer *init
   fds[1].events = POLLIN | POLLPRI;
 
   while (1) {
-    //     if (initial_peer != NULL) {
-    //       PEREGRINE_INFO("[SRV] Will send to: %s", initial_peer->str_addr);
-
-    //       strcpy(output_buffer, "HELLO!");
-    //       bytes = 8;
-
-    //       bytes = sendto(peer->sock_fd, output_buffer, bytes, 0, (struct sockaddr *)&initial_peer->peer_addr,
-    //                      sizeof(initial_peer->peer_addr));
-    //       if (bytes < 0) {
-    // 	PEREGRINE_ERROR("Error - sendto error: %s", strerror(errno));
-    // 	break;
-    //       }
-    //     }
     int ret = poll(fds, 2, -1);
 
     if (ret < 0) {
@@ -194,8 +178,6 @@ peregrine_socket_loop(struct peregrine_context *ctx, struct peregrine_peer *init
       break;
     }
     if (ret > 0) {
-
-      /* Regardless of requested events, poll() can always return these */
       if (fds[0].revents & (POLLERR | POLLHUP | POLLNVAL)) {
 	PEREGRINE_ERROR("Poll indicated stdin error");
 	break;
@@ -205,20 +187,25 @@ peregrine_socket_loop(struct peregrine_context *ctx, struct peregrine_peer *init
 	break;
       }
 
-      // Check if there is any input on stdin
+      /* Check if there is any input on stdin */
       if (fds[0].revents & (POLLIN | POLLPRI)) {
 	bytes = read(0, output_buffer, sizeof(output_buffer));
 	if (bytes < 0) {
 	  PEREGRINE_ERROR("stdin error: %s", strerror(errno));
 	  break;
 	}
-	PEREGRINE_INFO("[CLI] GOT: '%.*s'", (int)bytes, output_buffer);
-	output_buffer[strcspn(output_buffer, "\n")] = 0;
 	new_peer = NULL;
-	peregrine_socket_add_peer_from_cli(ctx, output_buffer, &new_peer);
+	output_buffer[strcspn(output_buffer, "\n")] = 0;
+	PEREGRINE_INFO("[CLI] GOT: '%.*s'", (int)bytes, output_buffer);
+
+	// Each peer will be added only once, if it was added before it will just skip it.
+
+	if (peregrine_socket_add_peer_from_cli(ctx, output_buffer, &new_peer) < 0) {
+	  PEREGRINE_ERROR("[CLI] There was an error while adding new peer from CLI.");
+	}
       }
 
-      // Check if there is any data on ours socket
+      /* Check if there is any data on ours socket */
       if (fds[1].revents & (POLLIN | POLLPRI)) {
 	new_peer = NULL;
 	bzero(&client_addr, sizeof(client_addr));
@@ -230,8 +217,11 @@ peregrine_socket_loop(struct peregrine_context *ctx, struct peregrine_peer *init
 	  break;
 	}
 
-	// FIXME: Here we should check if peer was already in list or if we need to add it
-	peregrine_socket_add_peer_from_connection(ctx, &client_addr, &new_peer);
+	// Each peer will be added only once, if it was added before it will just skip it.
+	if (peregrine_socket_add_peer_from_connection(ctx, &client_addr, &new_peer) < 0) {
+	  PEREGRINE_ERROR("[SRV] There was an error while adding new peer from connection!");
+	  break;
+	}
 
 	PEREGRINE_DEBUG("[SRV] Received from peer %s", new_peer->str_addr);
 	if (bytes > 0) {
@@ -252,6 +242,7 @@ peregrine_socket_loop(struct peregrine_context *ctx, struct peregrine_peer *init
       }
     }
   }
+  PEREGRINE_ERROR("Something bad happend. We shouldn't exit the program loop.");
 }
 
 void
