@@ -38,20 +38,15 @@ struct ppspp_protocol_options {
   uint8_t version;
   uint8_t minimum_version;
   uint16_t swarm_id_len;
-  uint32_t swarm_id;
+  uint8_t swarm_id[20];
   uint8_t content_prot_method;
   uint8_t merkle_hash_func;
   uint8_t live_signature_alg;
   uint8_t chunk_addr_method;
   uint64_t live_disc_wind;
   uint8_t supported_msgs_len;
-  // uint8_t supported_msgs[256]; - for now we ignore this field
+  uint32_t supported_msgs; // for now we ignore this field
   uint32_t chunk_size;
-  uint64_t file_size;
-  uint8_t file_name[256];
-  uint8_t file_name_len;
-  uint8_t sha_demanded[20];
-  uint32_t opt_map; /* bitmap - which of the fields above have any data */
 };
 
 /* shared file */
@@ -74,6 +69,8 @@ struct peregrine_peer {
   LIST_ENTRY(peregrine_peer) ptrs;
   uint8_t to_remove;
   struct ppspp_protocol_options protocol_options;
+  uint32_t src_channel_id;
+  uint32_t dst_channel_id;
 };
 
 /* file being downloaded */
@@ -81,7 +78,7 @@ struct peregrine_download {
   struct peregrine_context *context;
   char hash[256];
   int out_fd;
-  LIST_HEAD(peregrine_download_peers, peregrine_peer) peers; /* peers we download from */
+  LIST_HEAD(peregrine_download_peers, peregrine_peer) peers; // peers we download from
   /* other download state: downloaded chunks, known chunks, etc */
   LIST_ENTRY(peregrine_download) ptrs;
 };

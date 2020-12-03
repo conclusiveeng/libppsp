@@ -13,25 +13,6 @@
 #include <sys/queue.h>
 #include <sys/socket.h>
 #include <unistd.h>
-
-void
-str_to_hex(char *in, size_t in_size, char *out, size_t out_size)
-{
-  char *ptr_in = in;
-  const char *hex = "0123456789ABCDEF";
-  char *ptr_out = out;
-  for (; ptr_in < in + in_size; ptr_out += 3, ptr_in++) {
-    ptr_out[0] = hex[(*ptr_in >> 4) & 0xF];
-    ptr_out[1] = hex[*ptr_in & 0xF];
-    ptr_out[2] = ':';
-    if (ptr_out + 3 - out > (long)out_size) {
-      // Truncate instead of overflow...
-      break;
-    }
-  }
-  out[ptr_out - out - 1] = 0;
-}
-
 struct peregrine_peer *
 find_existing_peer_or_null(struct peregrine_context *ctx, struct peregrine_peer *searched_peer)
 {
@@ -233,7 +214,7 @@ peregrine_socket_loop(struct peregrine_context *ctx)
 
 	/* Only for debug purposes START */
 	input_buffer[strcspn(input_buffer, "\n")] = 0;
-	str_to_hex(input_buffer, bytes, dbg_buffer_hex, sizeof(dbg_buffer_hex));
+	dbgutil_str2hex(input_buffer, bytes, dbg_buffer_hex, sizeof(dbg_buffer_hex));
 	PEREGRINE_DEBUG("[SRV] %s Received 0x:'%.*s'", peer->str_addr, (int)sizeof(dbg_buffer_hex), dbg_buffer_hex);
 	// PEREGRINE_DEBUG("[SRV] %s Received   :'%.*s'", peer->str_addr, (int)bytes, input_buffer);
 	/* Only for debug purposes END */
@@ -257,7 +238,7 @@ peregrine_socket_loop(struct peregrine_context *ctx)
 	}
 
 	/* Only for debug purposes START */
-	str_to_hex(output_buffer, output_bytes, dbg_buffer_hex, sizeof(dbg_buffer_hex));
+	dbgutil_str2hex(output_buffer, output_bytes, dbg_buffer_hex, sizeof(dbg_buffer_hex));
 	PEREGRINE_DEBUG("[SRV] %s Send 0x:'%.*s'", peer->str_addr, (int)sizeof(dbg_buffer_hex), dbg_buffer_hex);
 	// PEREGRINE_DEBUG("[SRV] %s Send   :'%.*s'", peer->str_addr, (int)bytes, output_buffer);
 	/* Only for debug purposes END */

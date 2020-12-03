@@ -29,6 +29,9 @@
 #ifndef LIBPEREGRINE_LOG_H
 #define LIBPEREGRINE_LOG_H
 
+#include <stddef.h>
+#include <stdint.h>
+
 enum libperegrine_log_level { LIBPEREGRINE_DEBUG, LIBPEREGRINE_INFO, LIBPEREGRINE_WARNING, LIBPEREGRINE_ERROR };
 
 void libperegrine_logf(enum libperegrine_log_level level, const char *func, const char *fmt, ...);
@@ -46,5 +49,7 @@ void libperegrine_logf(enum libperegrine_log_level level, const char *func, cons
 #define PEREGRINE_WARN(fmt, ...)
 #define PEREGRINE_ERROR(fmt, ...)
 #endif
+
+void dbgutil_str2hex(char *in, size_t in_size, char *out, size_t out_size);
 
 #endif /* LIBPEREGRINE_LOG_H */

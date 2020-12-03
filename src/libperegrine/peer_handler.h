@@ -28,6 +28,7 @@
 
 #include "peregrine_socket.h"
 #include <stddef.h>
+#include <stdint.h>
 
 enum ppspp_protocol_options_headers {
   F_VERSION = 0,
@@ -88,8 +89,31 @@ enum ppspp_handshake_type { HANDSHAKE_INIT = 0, HANDSHAKE_CLOSE, HANDSHAKE_ERROR
 
 struct msg_handshake {
   uint32_t dst_channel_id;
+  uint8_t f_handshake_type;
   uint32_t src_channel_id;
-  uint8_t protocol_options[];
+  uint8_t f_version;
+  uint8_t version;
+  uint8_t f_min_version;
+  uint8_t min_version;
+  uint8_t f_swarm_id;
+  uint16_t swarm_id_len; // Hash has always 20 bytes
+  uint8_t swarm_id[20];  //
+  uint8_t f_content_prot_method;
+  uint8_t content_prot_method;
+  uint8_t f_merkle_hash_func;
+  uint8_t merkle_hash_func;
+  uint8_t f_live_signature_alg;
+  uint8_t live_signature_alg;
+  uint8_t f_chunk_addr_method;
+  uint8_t chunk_addr_method;
+  //   uint8_t f_live_disc_wind; // Live discard window is not used currently
+  //   uint32_t live_disc_wind;
+  //   uint8_t f_supported_msg;
+  //   uint8_t supported_msg_len;
+  //   uint8_t supported_msg;
+  uint8_t f_chunk_size;
+  uint32_t chunk_size;
+  uint8_t end_opt;
 } __attribute__((packed));
 
 struct msg_have {

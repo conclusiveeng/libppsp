@@ -59,3 +59,21 @@ libperegrine_logf(enum libperegrine_log_level level, const char *func, const cha
   fflush(stream);
   va_end(ap);
 }
+
+void
+dbgutil_str2hex(char *in, size_t in_size, char *out, size_t out_size)
+{
+  char *ptr_in = in;
+  const char *hex = "0123456789ABCDEF";
+  char *ptr_out = out;
+  for (; ptr_in < in + in_size; ptr_out += 3, ptr_in++) {
+    ptr_out[0] = hex[(*ptr_in >> 4) & 0xF];
+    ptr_out[1] = hex[*ptr_in & 0xF];
+    ptr_out[2] = ':';
+    if (ptr_out + 3 - out > (long)out_size) {
+      // Truncate instead of overflow...
+      break;
+    }
+  }
+  out[ptr_out - out - 1] = 0;
+}
