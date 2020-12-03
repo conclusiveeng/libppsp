@@ -212,6 +212,8 @@ peregrine_socket_loop(struct peregrine_context *ctx)
 	ssize_t output_bytes = 0;
 	peer = NULL;
 	bzero(&client_addr, sizeof(client_addr));
+	bzero(input_buffer, sizeof(input_buffer));
+	bzero(output_buffer, sizeof(output_buffer));
 
 	// Server socket got new data from the peer, read the data into input buffer
 	bytes = recvfrom(ctx->sock_fd, input_buffer, sizeof(input_buffer) - 1, 0, (struct sockaddr *)&client_addr,

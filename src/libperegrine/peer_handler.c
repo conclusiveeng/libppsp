@@ -13,7 +13,8 @@ parse_message_type(const char *ptr)
 }
 
 enum ppspp_handshake_type
-parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id, struct ppspp_protocol_options *proto_options)
+parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id, struct ppspp_protocol_options *proto_options,
+                uint8_t *bytes_parsed)
 {
   //  Descritpion can be found at section 8.4 of https://tools.ietf.org/rfc/rfc7574.txt
   uint8_t *msg_ptr = (uint8_t *)ptr;
@@ -23,6 +24,7 @@ parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id, struct
   msg_ptr += sizeof(uint32_t);
   if (*msg_ptr != MSG_HANDSHAKE) {
     PEREGRINE_ERROR("[PEER] Wrong HANDSHAKE message format. Should be %u, actual value: %u", 0, *msg_ptr);
+    *bytes_parsed = (char *)msg_ptr - ptr;
     return HANDSHAKE_ERROR;
   }
   msg_ptr += sizeof(uint8_t);
@@ -36,6 +38,7 @@ parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id, struct
   // Peer wants to close connection
   if ((*dest_chan_id != 0x0) && (*src_chan_id == 0x0)) {
     // Don't parse handshake if it's close request!
+    *bytes_parsed = (char *)msg_ptr - ptr;
     return HANDSHAKE_CLOSE;
   }
 
@@ -99,6 +102,7 @@ parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id, struct
       msg_ptr += sizeof(uint64_t);
       break;
     default:
+      *bytes_parsed = (char *)msg_ptr - ptr;
       return HANDSHAKE_ERROR;
     }
   }
@@ -125,7 +129,8 @@ parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id, struct
     return HANDSHAKE_ERROR;
   }
 
-  PEREGRINE_DEBUG("[PEER] parsed %td bytes", (char *)msg_ptr - ptr);
+  *bytes_parsed = (char *)msg_ptr - ptr;
+  PEREGRINE_DEBUG("[PEER] parsed %td bytes", bytes_parsed);
   return ret;
 }
 
@@ -153,6 +158,7 @@ peer_handle_request(struct peregrine_context *ctx, struct peregrine_peer *peer, 
   PEREGRINE_DEBUG("PEER: %s", peer->str_addr);
   uint32_t src_channel_id = 0;
   uint32_t dst_channel_id = 0;
+  uint8_t bytes_done;
 
   if (input_size == 4) {
     // KEEPALIVE message it's safe to ignore
@@ -165,20 +171,25 @@ peer_handle_request(struct peregrine_context *ctx, struct peregrine_peer *peer, 
   if (parse_message_type(input_data) == MSG_HANDSHAKE) {
     PEREGRINE_DEBUG("[PEER] Got HANDSHAKE message");
 
-    if (parse_handshake(input_data, &dst_channel_id, &src_channel_id, &peer->protocol_options) == HANDSHAKE_INIT) {
-      PEREGRINE_DEBUG("[PEER] Got HANDSHAKE_INIT message");
-      PEREGRINE_DEBUG("SRC_CHAN: %u, DST_CHAN: %u", src_channel_id, dst_channel_id);
-      print_handshake(&peer->protocol_options);
-      peer->to_remove = 0;
-      return 0;
-    }
-
-    if (parse_handshake(input_data, &dst_channel_id, &src_channel_id, &peer->protocol_options) == HANDSHAKE_CLOSE) {
+    if (parse_handshake(input_data, &dst_channel_id, &src_channel_id, &peer->protocol_options, &bytes_done)
+        == HANDSHAKE_CLOSE) {
       PEREGRINE_DEBUG("[PEER] Got HANDSHAKE_FINISH message");
       // peer wants to close the connection
       peer->to_remove = 1;
       return 0;
     }
+
+    if (parse_handshake(input_data, &dst_channel_id, &src_channel_id, &peer->protocol_options, &bytes_done)
+        == HANDSHAKE_INIT) {
+      PEREGRINE_DEBUG("[PEER] Got HANDSHAKE_INIT message");
+      PEREGRINE_DEBUG("SRC_CHAN: %u, DST_CHAN: %u", src_channel_id, dst_channel_id);
+      print_handshake(&peer->protocol_options);
+      peer->to_remove = 0;
+    }
+  }
+  PEREGRINE_DEBUG("READ %d, PARSED: %d", input_size, bytes_done);
+  if (input_size == bytes_done) {
+    return 0;
   }
 
   memcpy(response_buffer, input_data, response_size);
