@@ -27,6 +27,7 @@
 #include "net.h"
 #include "peer.h"
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 

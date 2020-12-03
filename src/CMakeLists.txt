@@ -9,3 +9,8 @@ add_executable(peregrine_demo ${SOURCE_FILES})
 set_target_properties(peregrine_demo PROPERTIES OUTPUT_NAME peregrine)
 target_link_libraries(peregrine_demo peregrine pthread rt)
 install(TARGETS peregrine_demo DESTINATION ${PEREGRINE_INSTALL_BIN_DIR})
+
+
+add_executable(peregrine_peer peregrine_peer.c)
+target_link_libraries(peregrine_peer peregrine pthread)
+install(TARGETS peregrine_peer DESTINATION ${PEREGRINE_INSTALL_BIN_DIR})

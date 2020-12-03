@@ -11,7 +11,7 @@ project(peregrine
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11")
-add_compile_options(-O0 -Wall -Wextra -g -D_DEFAULT_SOURCE)
+add_compile_options(-O0 -Wall -Wextra -g -D_DEFAULT_SOURCE -DLIBPEREGRINE_DEBUG_ENABLED)
 # -ggdb3
 
 message(STATUS "CMake version   : " "${CMAKE_SYSTEM_VERSION}")
