@@ -241,6 +241,59 @@ peer_handle_request(struct peregrine_context *ctx, struct peregrine_peer *peer, 
       return resp;
     }
   }
+  if (parse_message_type(input_data) == MSG_DATA) {
+    PEREGRINE_DEBUG("GOT MSG_DATA");
+    return 0;
+  }
+  if (parse_message_type(input_data) == MSG_ACK) {
+    PEREGRINE_DEBUG("GOT MSG_ACK");
+    return 0;
+  }
+  if (parse_message_type(input_data) == MSG_HAVE) {
+    PEREGRINE_DEBUG("GOT MSG_HAVE");
+    return 0;
+  }
+  if (parse_message_type(input_data) == MSG_INTEGRITY) {
+    PEREGRINE_DEBUG("GOT MSG_INTEGRITY");
+    return 0;
+  }
+  if (parse_message_type(input_data) == MSG_PEX_RESV4) {
+    PEREGRINE_DEBUG("GOT MSG_PEX_RESV4");
+    return 0;
+  }
+  if (parse_message_type(input_data) == MSG_PEX_REQ) {
+    PEREGRINE_DEBUG("GOT MSG_PEX_REQ");
+    return 0;
+  }
+  if (parse_message_type(input_data) == MSG_SIGNED_INTEGRITY) {
+    PEREGRINE_DEBUG("GOT MSG_SIGNED_INTEGRITY");
+    return 0;
+  }
+  if (parse_message_type(input_data) == MSG_REQUEST) {
+    PEREGRINE_DEBUG("GOT MSG_REQUEST");
+    return 0;
+  }
+  if (parse_message_type(input_data) == MSG_CANCEL) {
+    PEREGRINE_DEBUG("GOT MSG_CANCEL");
+    return 0;
+  }
+  if (parse_message_type(input_data) == MSG_CHOKE) {
+    PEREGRINE_DEBUG("GOT MSG_CHOKE");
+    return 0;
+  }
+  if (parse_message_type(input_data) == MSG_UNCHOKE) {
+    PEREGRINE_DEBUG("GOT MSG_UNCHOKE");
+    return 0;
+  }
+  if (parse_message_type(input_data) == MSG_PEX_RESV6) {
+    PEREGRINE_DEBUG("GOT MSG_PEX_RESV6");
+    return 0;
+  }
+  if (parse_message_type(input_data) == MSG_PEX_RESCERT) {
+    PEREGRINE_DEBUG("GOT MSG_PEX_RESCERT");
+    return 0;
+  }
+
   PEREGRINE_DEBUG("READ %d, PARSED: %d", input_size, bytes_done);
   if (input_size == bytes_done) {
     return 0;
