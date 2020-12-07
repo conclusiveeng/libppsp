@@ -1,6 +1,6 @@
 #include "peer_handler.h"
-#include "include/peregrine_socket.h"
 #include "log.h"
+#include "peregrine_socket.h"
 #include <stdlib.h>
 #include <string.h>
 #include <sys/queue.h>
@@ -154,7 +154,7 @@ parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id, struct
 }
 
 int
-response_handshake(struct peregrine_peer *peer, size_t response_buffer_size, char *response)
+prepare_handshake(struct peregrine_peer *peer, size_t response_buffer_size, char *response)
 {
   size_t response_size;
   struct msg_handshake proto_handshake;
@@ -235,7 +235,7 @@ peer_handle_request(struct peregrine_context *ctx, struct peregrine_peer *peer, 
       print_dbg_protocol_options(&peer->protocol_options);
       peer->to_remove = 0;
 
-      size_t resp = response_handshake(peer, max_response_size, response_buffer);
+      size_t resp = prepare_handshake(peer, max_response_size, response_buffer);
       PEREGRINE_DEBUG("Resp size: %d", resp);
 
       return resp;
@@ -302,3 +302,66 @@ peer_handle_request(struct peregrine_context *ctx, struct peregrine_peer *peer, 
   // memcpy(response_buffer, input_data, response_size);
   return 100;
 }
+
+// /*
+//  * generate set of HAVE messages basing on that if given bit in number of chunks
+//  * is set or not if set - make proper HAVE subrange in other words - make HAVE
+//  * cache
+//  */
+// int
+// prepare_handshake_have(struct peregrine_peer *peer, size_t response_buffer_size, char *response)
+// {
+//   /* char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, uint8_t *opts, int opt_len,
+//                        struct peer *peer */
+//   char *d;
+//   int ret;
+//   int len;
+//   uint32_t b;
+//   uint32_t i;
+//   uint32_t v;
+//   uint32_t nc;
+
+//   /* serialize HANDSHAKE header and options */
+//   // len = make_handshake_request(ptr, dest_chan_id, src_chan_id, opts, opt_len);
+//   len = prepare_handshake(peer, response_buffer_size, response);
+
+//   /* alloc memory for HAVE cache */
+//   peer->have_cache = malloc(1024 * sizeof(struct have_cache));
+//   peer->num_have_cache = 0;
+
+//   d = ptr + len;
+//   nc = peer->file_list_entry->end_chunk - peer->file_list_entry->start_chunk + 1;
+
+//   b = 31; /* starting bit for scanning of bits */
+//   i = 0;  /* iterator */
+//   v = 0;
+//   while (i < 32) {
+//     if (nc & (1 << b)) { /* if the bit on position "b" is set? */
+//       d_printf("HAVE: %u..%u\n", v, v + (1 << b) - 1);
+
+//       /* add HAVE header + data */
+//       *d = HAVE;
+//       d++;
+
+//       *(uint32_t *)d = htobe32(v);
+//       d += sizeof(uint32_t);
+//       peer->have_cache[peer->num_have_cache].start_chunk = v;
+
+//       *(uint32_t *)d = htobe32(v + (1 << b) - 1);
+//       d += sizeof(uint32_t);
+//       peer->have_cache[peer->num_have_cache].end_chunk = v + (1 << b) - 1;
+
+//       v = v + (1 << b);
+//       peer->num_have_cache++;
+//     }
+//     i++;
+//     b--;
+//   }
+
+//   d_printf("num_have_cache: %d\n", peer->num_have_cache);
+
+//   ret = d - ptr;
+//   d_printf("%s: returning %d bytes\n", __func__, ret);
+
+//   return ret;
+// }

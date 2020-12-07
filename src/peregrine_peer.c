@@ -1,4 +1,4 @@
-#include "libperegrine/log.h"
+#include "libperegrine/v2/log.h"
 #include "peregrine_socket.h"
 #include <stdio.h>
 #include <stdlib.h>

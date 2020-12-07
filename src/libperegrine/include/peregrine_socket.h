@@ -49,15 +49,34 @@ struct ppspp_protocol_options {
   uint32_t chunk_size;
 };
 
+// /* shared file */
+// struct peregrine_file {
+//   struct peregrine_context *context;
+//   const char *name;
+//   int fd;
+//   char hash[256];
+//   /* other file state, maybe mmap() handle, etc */
+//   LIST_ENTRY(peregrine_file) ptrs;
+// };
+
 /* shared file */
 struct peregrine_file {
   struct peregrine_context *context;
-  const char *name;
+  char path[1024]; /* full path to file: directory name + file name */
+  char sha[20];    /* do we need this? */
+  uint64_t file_size;
+  uint32_t nl;             /* number of leaves */
+  uint32_t nc;             /* number of chunks */
+  struct chunk *tab_chunk; /* array of chunks for this file */
+  struct node *tree;       /* tree of the file */
+  struct node *tree_root;  /* pointer to root node of the tree */
   int fd;
-  char hash[256];
-  /* other file state, maybe mmap() handle, etc */
-  LIST_ENTRY(peregrine_file) ptrs;
+  uint32_t start_chunk;
+  uint32_t end_chunk;
+
+  SLIST_ENTRY(peregrine_file) ptrs;
 };
+
 /* known peer */
 struct peregrine_peer {
   struct peregrine_context *context;
