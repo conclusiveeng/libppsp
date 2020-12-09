@@ -12,8 +12,8 @@ main(int argc, char const *argv[])
   struct peregrine_context context;
   unsigned long local_port;
 
-  if (argc < 2) {
-    printf("Usage: %s <local port> \n", argv[0]);
+  if (argc < 3) {
+    printf("Usage: %s <local port> <work directory> \n", argv[0]);
     return 1;
   }
   local_port = strtoul(argv[1], NULL, 0);
@@ -22,7 +22,7 @@ main(int argc, char const *argv[])
     return 1;
   }
 
-  if (peregrine_socket_setup(local_port, &context) < 0) {
+  if (peregrine_socket_setup(local_port, (char *)argv[2], &context) < 0) {
     PEREGRINE_ERROR("Error while seting up server!");
     return 1;
   }

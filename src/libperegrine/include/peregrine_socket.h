@@ -33,6 +33,7 @@
 
 #define BUFSIZE       1500
 #define PEER_STR_ADDR 32
+#define CHUNK_SIZE    1024
 /* protocol options for peer send with HANDSHAKE */
 struct ppspp_protocol_options {
   uint8_t version;
@@ -63,7 +64,7 @@ struct ppspp_protocol_options {
 struct peregrine_file {
   struct peregrine_context *context;
   char path[1024]; /* full path to file: directory name + file name */
-  char sha[20];    /* do we need this? */
+  char sha[41];    /* textual representation of sha1 for a file */
   uint64_t file_size;
   uint32_t nl;             /* number of leaves */
   uint32_t nc;             /* number of chunks */
@@ -90,6 +91,7 @@ struct peregrine_peer {
   struct ppspp_protocol_options protocol_options;
   uint32_t src_channel_id;
   uint32_t dst_channel_id;
+  struct peregrine_file *file;
 };
 
 /* file being downloaded */
@@ -107,13 +109,14 @@ struct peregrine_context {
   int sock_fd;
   uint32_t swarm_id;
   struct peregrine_peer ctx_peer;
+  char *work_dir;
   LIST_HEAD(peregrine_peers, peregrine_peer) peers;
-  LIST_HEAD(peregrine_files, peregrine_file) files;
+  SLIST_HEAD(peregrine_files, peregrine_file) files;
   LIST_HEAD(peregrine_downloads, peregrine_download) downloads;
   /* other instance state */
 };
 
-int peregrine_socket_setup(unsigned long local_port, struct peregrine_context *ctx);
+int peregrine_socket_setup(unsigned long local_port, char *work_dir, struct peregrine_context *ctx);
 void peregrine_socket_loop(struct peregrine_context *ctx);
 int peregrine_socket_add_peer_from_cli(struct peregrine_context *ctx, char *in_buffer, struct peregrine_peer **peer);
 int peregrine_socket_add_peer_from_connection(struct peregrine_context *ctx, const struct sockaddr_in *peer_sockaddr,

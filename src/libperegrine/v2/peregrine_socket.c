@@ -1,4 +1,5 @@
 #include "peregrine_socket.h"
+#include "file.h"
 #include "log.h"
 #include "peer_handler.h"
 #include <arpa/inet.h>
@@ -28,7 +29,7 @@ find_existing_peer_or_null(struct peregrine_context *ctx, struct peregrine_peer 
 }
 
 int
-peregrine_socket_setup(unsigned long local_port, struct peregrine_context *ctx)
+peregrine_socket_setup(unsigned long local_port, char *work_dir, struct peregrine_context *ctx)
 {
   // Crete server socket
   ctx->sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -56,8 +57,14 @@ peregrine_socket_setup(unsigned long local_port, struct peregrine_context *ctx)
   ctx->ctx_peer.context = ctx;
 
   LIST_INIT(&ctx->peers);
-  LIST_INIT(&ctx->files);
+  SLIST_INIT(&ctx->files);
   LIST_INIT(&ctx->downloads);
+
+  strncpy(ctx->work_dir, work_dir, BUFSIZE);
+
+  peregrine_file_add_directory(ctx, ctx->work_dir);
+  peregrine_file_generate_sha1(ctx);
+  peregrine_file_list_sha1(ctx);
 
   return 0;
 }
