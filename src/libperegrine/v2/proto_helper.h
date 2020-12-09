@@ -117,6 +117,27 @@ struct msg_handshake {
   uint8_t end_opt;
 } __attribute__((packed));
 
+/**
+ * @brief Additional handshake structure used for replying to others peer handshake.
+ *
+ */
+struct msg_handshake_reply {
+  uint32_t dst_channel_id;
+  uint8_t f_handshake_type;
+  uint32_t src_channel_id;
+  uint8_t f_version;
+  uint8_t version;
+  uint8_t f_min_version;
+  uint8_t min_version;
+  uint8_t f_content_prot_method;
+  uint8_t content_prot_method;
+  uint8_t f_merkle_hash_func;
+  uint8_t merkle_hash_func;
+  uint8_t f_chunk_addr_method;
+  uint8_t chunk_addr_method;
+  uint8_t end_opt;
+} __attribute__((packed));
+
 struct msg_have {
   uint32_t start_chunk;
   uint32_t end_chunk;
@@ -180,6 +201,7 @@ struct msg {
 void proto_print_protocol_options(struct ppspp_protocol_options *proto_options);
 enum ppspp_handshake_type proto_parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id,
                                                 struct ppspp_protocol_options *proto_options, uint32_t *bytes_parsed);
+int proto_prepare_handshake_replay(struct peregrine_peer *peer, size_t response_buffer_size, char *response);
 int proto_prepare_handshake(struct peregrine_peer *peer, size_t response_buffer_size, char *response);
 int proto_prepare_have(struct peregrine_peer *peer, size_t response_buffer_size, char *response);
 

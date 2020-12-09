@@ -18,36 +18,48 @@ int
 peer_handle_handshake(struct peregrine_context *ctx, struct peregrine_peer *peer, char *input,
                       size_t max_response_size, char *response_buffer, uint32_t *bytes_parsed)
 {
-  uint32_t src_channel_id = 0;
-  uint32_t dst_channel_id = 0;
+  uint32_t remote_channel_id = 0;
+  uint32_t local_channel_id = 0;
   uint32_t bytes_done = 0;
   size_t resp = 0;
   PEREGRINE_DEBUG("[PEER] Got HANDSHAKE message");
 
   enum ppspp_handshake_type handshake_type
-      = proto_parse_handshake(input, &dst_channel_id, &src_channel_id, &peer->protocol_options, &bytes_done);
+      = proto_parse_handshake(input, &local_channel_id, &remote_channel_id, &peer->protocol_options, &bytes_done);
 
   if (handshake_type == HANDSHAKE_CLOSE) {
     PEREGRINE_DEBUG("[PEER] Got HANDSHAKE_FINISH message");
     // peer wants to close the connection
     peer->to_remove = 1;
-  } else if (handshake_type == HANDSHAKE_INIT) {
-    PEREGRINE_DEBUG("[PEER] Got HANDSHAKE_INIT message");
-    peer->src_channel_id = src_channel_id;
-    peer->dst_channel_id = 8; // Choosen by hand
-    peer->to_remove = 0;
-    proto_print_protocol_options(&peer->protocol_options);
-
-    resp = proto_prepare_handshake(peer, max_response_size, response_buffer);
-    PEREGRINE_DEBUG("HANDSHAKE: %d bytes", resp);
-    peer->file = peregrine_file_find(ctx, peer->protocol_options.swarm_id);
-    if (peer->file) {
-      PEREGRINE_DEBUG("Remote peer selected file: %s", peer->file->path);
-      resp += proto_prepare_have(peer, max_response_size - resp, response_buffer + resp);
-      PEREGRINE_DEBUG("Sending HANDSHAKE + HAVE %d bytes", resp);
-    } else {
-      PEREGRINE_ERROR("Remote peer asked for not existing file!");
-      // Skip sending HAVE message
+    // FIXME: Should we send something here?
+    resp = 0;
+  } else {
+    if (peer->handshake_send == 0) {
+      // A new leecher want's to cooperate
+      peer->to_remove = 0;
+      peer->handshake_send = 1;
+      peer->dst_channel_id = remote_channel_id;
+      peer->src_channel_id = rand() % 65535 + 1;
+      PEREGRINE_DEBUG("PEER %s SRC:%d DEST:%d", peer->str_addr, peer->src_channel_id, peer->dst_channel_id);
+      resp = proto_prepare_handshake(peer, max_response_size, response_buffer);
+      peer->file = peregrine_file_find(ctx, peer->protocol_options.swarm_id);
+      if (peer->file) {
+	PEREGRINE_DEBUG("Remote peer selected file: %s", peer->file->path);
+	resp += proto_prepare_have(peer, max_response_size - resp, response_buffer + resp);
+	PEREGRINE_DEBUG("Sending HANDSHAKE + HAVE %d bytes", resp);
+      }
+    }
+    if (peer->handshake_send == 1) {
+      // We've got replay to our handshake
+      PEREGRINE_INFO("Got replay to handshake");
+      PEREGRINE_INFO("PEER %s SRC:%d DEST:%d", peer->str_addr, peer->src_channel_id, peer->dst_channel_id);
+      resp = proto_prepare_handshake_replay(peer, max_response_size, response_buffer);
+      peer->file = peregrine_file_find(ctx, peer->protocol_options.swarm_id);
+      if (peer->file) {
+	PEREGRINE_DEBUG("Remote peer selected file: %s", peer->file->path);
+	resp += proto_prepare_have(peer, max_response_size - resp, response_buffer + resp);
+	PEREGRINE_DEBUG("Sending HANDSHAKE + HAVE %d bytes", resp);
+      }
     }
   }
   *bytes_parsed = bytes_done;

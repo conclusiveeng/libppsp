@@ -87,6 +87,7 @@ peregrine_socket_add_peer_from_connection(struct peregrine_context *ctx, const s
   snprintf(new_peer->str_addr, PEER_STR_ADDR, "%s:%d", inet_ntoa(new_peer->peer_addr.sin_addr),
            ntohs(new_peer->peer_addr.sin_port));
   new_peer->context = ctx;
+  new_peer->handshake_send = 0;
   PEREGRINE_DEBUG("Added new peer at: %s", new_peer->str_addr);
   LIST_INSERT_HEAD(&ctx->peers, new_peer, ptrs);
   *peer = new_peer;
@@ -200,8 +201,6 @@ peregrine_socket_loop(struct peregrine_context *ctx)
 	ssize_t output_bytes = 0;
 	peer = NULL;
 	bzero(&client_addr, sizeof(client_addr));
-	bzero(input_buffer, sizeof(input_buffer));
-	bzero(output_buffer, sizeof(output_buffer));
 
 	// Server socket got new data from the peer, read the data into input buffer
 	bytes = recvfrom(ctx->sock_fd, input_buffer, sizeof(input_buffer) - 1, 0, (struct sockaddr *)&client_addr,
@@ -225,6 +224,7 @@ peregrine_socket_loop(struct peregrine_context *ctx)
 
 	// Pass read data to request handling routine - get response and its length
 	output_bytes = peer_handle_request(ctx, peer, input_buffer, bytes, output_buffer, sizeof(output_buffer));
+	bzero(input_buffer, sizeof(input_buffer));
 
 	// If request handling routine got error, stop the application
 	if (output_bytes < 0) {
@@ -254,6 +254,7 @@ peregrine_socket_loop(struct peregrine_context *ctx)
 	// Send response for handled request
 	bytes = sendto(ctx->sock_fd, output_buffer, output_bytes, 0, (struct sockaddr *)&peer->peer_addr,
 	               sizeof(peer->peer_addr));
+	bzero(output_buffer, sizeof(output_buffer));
 	// If there was write error, stop the application (cancel main loop)
 	if (bytes < 0) {
 	  PEREGRINE_ERROR("Error - sendto error: %s", strerror(errno));

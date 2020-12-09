@@ -89,6 +89,7 @@ struct peregrine_peer {
   /* other peer state: known files cache, etc */
   LIST_ENTRY(peregrine_peer) ptrs;
   uint8_t to_remove;
+  uint8_t handshake_send;
   struct ppspp_protocol_options protocol_options;
   uint32_t src_channel_id;
   uint32_t dst_channel_id;

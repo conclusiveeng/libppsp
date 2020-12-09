@@ -149,9 +149,9 @@ proto_prepare_handshake(struct peregrine_peer *peer, size_t response_buffer_size
 {
   size_t response_size;
   struct msg_handshake proto_handshake;
-  proto_handshake.dst_channel_id = htobe32(peer->src_channel_id); // peer->src_channel_id; // Cross channel
-  proto_handshake.src_channel_id = htobe32(peer->dst_channel_id); // peer->dst_channel_id;
+  proto_handshake.dst_channel_id = htobe32(peer->dst_channel_id);
   proto_handshake.f_handshake_type = MSG_HANDSHAKE;
+  proto_handshake.src_channel_id = htobe32(peer->src_channel_id);
   proto_handshake.f_version = F_VERSION;
   proto_handshake.version = 1;
   proto_handshake.f_min_version = F_MINIMUM_VERSION;
@@ -162,6 +162,7 @@ proto_prepare_handshake(struct peregrine_peer *peer, size_t response_buffer_size
   proto_handshake.f_content_prot_method = F_CONTENT_PROT_METHOD;
   proto_handshake.content_prot_method = 1;
   proto_handshake.f_merkle_hash_func = F_MERKLE_HASH_FUNC;
+  proto_handshake.merkle_hash_func = 0;
   proto_handshake.f_live_signature_alg = F_LIVE_SIGNATURE_ALG;
   proto_handshake.live_signature_alg = peer->protocol_options.live_signature_alg;
   proto_handshake.f_chunk_addr_method = F_CHUNK_ADDR_METHOD;
@@ -185,7 +186,35 @@ proto_prepare_handshake(struct peregrine_peer *peer, size_t response_buffer_size
     return response_size;
   }
 
-  // Should we send also HAVE message, with what we've got?
+  return 0;
+}
+
+int
+proto_prepare_handshake_replay(struct peregrine_peer *peer, size_t response_buffer_size, char *response)
+{
+  size_t response_size;
+  struct msg_handshake_reply proto_handshake;
+  proto_handshake.dst_channel_id = htobe32(peer->dst_channel_id);
+  proto_handshake.f_handshake_type = MSG_HANDSHAKE;
+  proto_handshake.src_channel_id = htobe32(peer->src_channel_id);
+  proto_handshake.f_version = F_VERSION;
+  proto_handshake.version = 1;
+  proto_handshake.f_min_version = F_MINIMUM_VERSION;
+  proto_handshake.min_version = 1;
+  proto_handshake.f_content_prot_method = F_CONTENT_PROT_METHOD;
+  proto_handshake.content_prot_method = 1;
+  proto_handshake.f_merkle_hash_func = F_MERKLE_HASH_FUNC;
+  proto_handshake.merkle_hash_func = 0;
+  proto_handshake.f_chunk_addr_method = F_CHUNK_ADDR_METHOD;
+  proto_handshake.chunk_addr_method = 2;
+  proto_handshake.end_opt = F_END_OPTION;
+
+  response_size = sizeof(struct msg_handshake_reply);
+  if (response_size <= response_buffer_size) {
+    memcpy(response, &proto_handshake, response_size);
+    return response_size;
+  }
+
   return 0;
 }
 
