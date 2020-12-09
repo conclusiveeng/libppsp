@@ -216,15 +216,15 @@ peregrine_socket_loop(struct peregrine_context *ctx)
 	  PEREGRINE_ERROR("[SRV] There was an error while adding new peer from connection!");
 	  break;
 	}
-	// Pass read data to request handling routine - get response and its length
-	output_bytes = peer_handle_request(ctx, peer, input_buffer, bytes, output_buffer, sizeof(output_buffer));
-
 	/* Only for debug purposes START */
-	input_buffer[strcspn(input_buffer, "\n")] = 0;
+	// input_buffer[strcspn(input_buffer, "\n")] = 0;
 	dbgutil_str2hex(input_buffer, bytes, dbg_buffer_hex, sizeof(dbg_buffer_hex));
 	PEREGRINE_DEBUG("[SRV] %s Received 0x:'%.*s'", peer->str_addr, (int)sizeof(dbg_buffer_hex), dbg_buffer_hex);
 	// PEREGRINE_DEBUG("[SRV] %s Received   :'%.*s'", peer->str_addr, (int)bytes, input_buffer);
 	/* Only for debug purposes END */
+
+	// Pass read data to request handling routine - get response and its length
+	output_bytes = peer_handle_request(ctx, peer, input_buffer, bytes, output_buffer, sizeof(output_buffer));
 
 	// If request handling routine got error, stop the application
 	if (output_bytes < 0) {
@@ -241,6 +241,7 @@ peregrine_socket_loop(struct peregrine_context *ctx)
 	    free(peer);
 	    peer = NULL;
 	  }
+	  PEREGRINE_DEBUG("[SRV] %s 0-output bytes", peer->str_addr);
 	  continue;
 	}
 

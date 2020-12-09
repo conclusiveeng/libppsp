@@ -179,7 +179,7 @@ struct msg {
 
 void proto_print_protocol_options(struct ppspp_protocol_options *proto_options);
 enum ppspp_handshake_type proto_parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id,
-                                                struct ppspp_protocol_options *proto_options, uint8_t *bytes_parsed);
+                                                struct ppspp_protocol_options *proto_options, uint32_t *bytes_parsed);
 int proto_prepare_handshake(struct peregrine_peer *peer, size_t response_buffer_size, char *response);
 int proto_prepare_have(struct peregrine_peer *peer, size_t response_buffer_size, char *response);
 

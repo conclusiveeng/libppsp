@@ -23,7 +23,7 @@ proto_print_protocol_options(struct ppspp_protocol_options *proto_options)
 
 enum ppspp_handshake_type
 proto_parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id,
-                      struct ppspp_protocol_options *proto_options, uint8_t *bytes_parsed)
+                      struct ppspp_protocol_options *proto_options, uint32_t *bytes_parsed)
 {
   // FIXME: Maybe 'struct msg_handshake' could be use for parsing
   //  Descritpion can be found at section 8.4 of https://tools.ietf.org/rfc/rfc7574.txt
