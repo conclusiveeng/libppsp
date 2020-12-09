@@ -28,6 +28,7 @@
 
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <stdio.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
 
@@ -109,7 +110,7 @@ struct peregrine_context {
   int sock_fd;
   uint32_t swarm_id;
   struct peregrine_peer ctx_peer;
-  char *work_dir;
+  char work_dir[BUFSIZ];
   LIST_HEAD(peregrine_peers, peregrine_peer) peers;
   SLIST_HEAD(peregrine_files, peregrine_file) files;
   LIST_HEAD(peregrine_downloads, peregrine_download) downloads;

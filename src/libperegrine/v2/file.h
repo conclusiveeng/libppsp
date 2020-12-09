@@ -27,9 +27,43 @@
 #define _PEER_H_
 #include "peregrine_socket.h"
 
+/**
+ * @brief Genrate sha1 for all files added to peregrine context
+ *
+ * @param context peregrine_context
+ */
 void peregrine_file_generate_sha1(struct peregrine_context *context);
+
+/**
+ * @brief Adds single file to peregrine context
+ *
+ * @param context peregrine_contex
+ * @param name path/name to file to be added
+ */
 void peregrine_file_add_file(struct peregrine_context *context, char *name);
+
+/**
+ * @brief Adds recursively all files from provided directory to peregrine contex
+ *
+ * @param context peregrine_contex
+ * @param dname path to directory where the files are (should be without tailing '/')
+ */
 void peregrine_file_add_directory(struct peregrine_context *context, char *dname);
+
+/**
+ * @brief Prints to INFO log all files with calculated SHA1
+ *
+ * @param context  peregrine_context
+ */
 void peregrine_file_list_sha1(struct peregrine_context *context);
+
+/**
+ * @brief Finds file handle of selected file by it's SHA1
+ *
+ * @param context peregrine_context
+ * @param sha1 sha1 of the file to look for
+ * @return struct peregrine_file* handle to first file with corresponging SHA1 or NULL
+ */
+struct peregrine_file *peregrine_file_find(struct peregrine_context *context, uint8_t sha1[20]);
 
 #endif /* _PEER_H_ */

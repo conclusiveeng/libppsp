@@ -4,7 +4,7 @@ project(libperegrine_v2 C)
 get_filename_component(PARENT_DIR .. REALPATH DIRECTORY)
 
 include_directories(../include)
-set(SOURCE_FILES log.c peregrine_socket.c peer_handler.c file.c sha1.c mt.c)
+set(SOURCE_FILES log.c peregrine_socket.c peer_handler.c file.c sha1.c mt.c proto_helper.c)
 
 add_library(peregrine_v2 SHARED ${SOURCE_FILES})
 

@@ -46,6 +46,7 @@ include(CPack)
 find_package(Doxygen OPTIONAL_COMPONENTS dot)
 if (DOXYGEN_FOUND)
 #set(DOXYGEN_USE_MDFILE_AS_MAINPAGE "${CMAKE_SOURCE_DIR}/README.md")
+set(DOXYGEN_EXTRACT_ALL YES)
 doxygen_add_docs(docs ALL ${CMAKE_SOURCE_DIR})
 endif(DOXYGEN_FOUND)
 

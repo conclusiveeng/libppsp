@@ -180,6 +180,7 @@ peregrine_file_add_file(struct peregrine_context *context, char *name)
     SLIST_INSERT_HEAD(&context->files, f, ptrs);
   }
 }
+
 void
 peregrine_file_add_directory(struct peregrine_context *context, char *dname)
 {
@@ -216,4 +217,18 @@ peregrine_file_list_sha1(struct peregrine_context *context)
 {
   struct peregrine_file *f;
   SLIST_FOREACH(f, &context->files, ptrs) { PEREGRINE_INFO("File: %s, NC:%d, SHA1: %s", f->path, f->nc, f->sha); }
+}
+
+struct peregrine_file *
+peregrine_file_find(struct peregrine_context *context, uint8_t sha1[20])
+{
+  struct peregrine_file *f;
+  SLIST_FOREACH(f, &context->files, ptrs)
+  {
+    // Find first file that have corresponding SHA1 of root tree.
+    if (memcmp(f->tree_root->sha, sha1, sizeof(uint8_t[20])) == 0) {
+      return f;
+    }
+  }
+  return NULL;
 }
