@@ -1,4 +1,5 @@
 #include "proto_helper.h"
+#include "log.h"
 #include "peer_handler.h"
 #include "peregrine_socket.h"
 #include "log.h"
