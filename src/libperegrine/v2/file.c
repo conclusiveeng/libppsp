@@ -144,7 +144,7 @@ peregrine_file_generate_sha1(struct peregrine_context *context)
   int y;
   struct peregrine_file *f;
 
-  SLIST_FOREACH(f, &context->files, ptrs)
+  SLIST_FOREACH(f, &context->files, entry)
   {
     /* does the tree already exist for given file? */
     if (f->tree_root == NULL) { /* no - so create tree for it */
@@ -177,7 +177,7 @@ peregrine_file_add_file(struct peregrine_context *context, char *name)
     strcpy(f->path, name);
     lstat(f->path, &stat);
     f->file_size = stat.st_size;
-    SLIST_INSERT_HEAD(&context->files, f, ptrs);
+    SLIST_INSERT_HEAD(&context->files, f, entry);
   }
 }
 void
@@ -214,7 +214,5 @@ void
 peregrine_file_list_sha1(struct peregrine_context *context)
 {
   struct peregrine_file *f;
-  SLIST_FOREACH(f, &context->files, ptrs) {
-  	INFO("File: %s, NC:%d, SHA1: %s", f->path, f->nc, f->sha);
-  }
+  SLIST_FOREACH(f, &context->files, entry) { INFO("File: %s, NC:%d, SHA1: %s", f->path, f->nc, f->sha); }
 }

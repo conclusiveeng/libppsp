@@ -1,6 +1,7 @@
 #include "peer_handler.h"
 #include "log.h"
 #include "peregrine_socket.h"
+#include "proto_helper.h"
 #include <stdlib.h>
 #include <string.h>
 #include <sys/queue.h>
@@ -19,27 +20,24 @@ ssize_t pg_handle_cancel(struct peregrine_peer *peer, struct msg *msg);
 ssize_t pg_handle_choke(struct peregrine_peer *peer, struct msg *msg);
 ssize_t pg_handle_unchoke(struct peregrine_peer *peer, struct msg *msg);
 
-struct peregrine_frame_handler
-{
-        enum peregrine_message_type type;
-        ssize_t (*handler)(struct peregrine_peer *, struct msg *);
+struct peregrine_frame_handler {
+  enum peregrine_message_type type;
+  ssize_t (*handler)(struct peregrine_peer *, struct msg *);
 };
 
-static const struct peregrine_frame_handler frame_handlers[] = {
-	{ MSG_HANDSHAKE, pg_handle_handshake },
-	{ MSG_DATA, pg_handle_data },
-	{ MSG_ACK, pg_handle_ack },
-	{ MSG_HAVE, pg_handle_have },
-	{ MSG_INTEGRITY, pg_handle_integrity },
-	{ MSG_PEX_RESV4, pg_handle_pex_resv4 },
-	{ MSG_PEX_REQ, pg_handle_pex_req },
-	{ MSG_SIGNED_INTEGRITY, pg_handle_signed_integrity },
-	{ MSG_REQUEST, pg_handle_request },
-	{ MSG_CANCEL, pg_handle_cancel },
-	{ MSG_CHOKE, pg_handle_choke },
-	{ MSG_UNCHOKE, pg_handle_unchoke },
-	{ MSG_RESERVED, NULL }
-};
+static const struct peregrine_frame_handler frame_handlers[] = { { MSG_HANDSHAKE, pg_handle_handshake },
+                                                                 { MSG_DATA, pg_handle_data },
+                                                                 { MSG_ACK, pg_handle_ack },
+                                                                 { MSG_HAVE, pg_handle_have },
+                                                                 { MSG_INTEGRITY, pg_handle_integrity },
+                                                                 { MSG_PEX_RESV4, pg_handle_pex_resv4 },
+                                                                 { MSG_PEX_REQ, pg_handle_pex_req },
+                                                                 { MSG_SIGNED_INTEGRITY, pg_handle_signed_integrity },
+                                                                 { MSG_REQUEST, pg_handle_request },
+                                                                 { MSG_CANCEL, pg_handle_cancel },
+                                                                 { MSG_CHOKE, pg_handle_choke },
+                                                                 { MSG_UNCHOKE, pg_handle_unchoke },
+                                                                 { MSG_RESERVED, NULL } };
 
 void
 print_dbg_protocol_options(struct ppspp_protocol_options *proto_options)
@@ -62,141 +60,151 @@ print_dbg_protocol_options(struct ppspp_protocol_options *proto_options)
 ssize_t
 pg_handle_message(struct peregrine_peer *peer, struct msg *msg)
 {
-    const struct peregrine_frame_handler *handler;
+  const struct peregrine_frame_handler *handler;
 
-    for (handler = &frame_handlers[0]; handler->handler != NULL; handler++) {
-        if (handler->type == msg->message_type) {
-		return (handler->handler(peer, msg));
-	}
+  for (handler = &frame_handlers[0]; handler->handler != NULL; handler++) {
+    if (handler->type == msg->message_type) {
+      return (handler->handler(peer, msg));
     }
+  }
 
-    return (-1);
+  return (-1);
 }
 
 ssize_t
 pg_handle_handshake(struct peregrine_peer *peer, struct msg *msg)
 {
-	struct msg_handshake_opt *opt;
-	struct ppspp_protocol_options options;
-	int pos = 0;
+  struct msg_handshake_opt *opt;
+  struct ppspp_protocol_options options;
+  int pos = 0;
 
-	DEBUG("handshake: peer=%p", peer);
+  DEBUG("handshake: peer=%p", peer);
 
-	for (;;) {
-		opt = (struct msg_handshake_opt *)&msg->handshake.protocol_options[pos];
+  for (;;) {
+    opt = (struct msg_handshake_opt *)&msg->handshake.protocol_options[pos];
 
-		switch (opt->code) {
-		case HANDSHAKE_OPT_VERSION:
-			options.version = opt->value[0];
-			pos += sizeof(opt) + sizeof(uint8_t);
-			DEBUG("handshake: version = %d\n", options.version);
-			break;
+    switch (opt->code) {
+    case HANDSHAKE_OPT_VERSION:
+      options.version = opt->value[0];
+      pos += sizeof(opt) + sizeof(uint8_t);
+      DEBUG("handshake: version = %d\n", options.version);
+      break;
 
-		case HANDSHAKE_OPT_MIN_VERSION:
-			options.minimum_version = opt->value[0];
-			pos += sizeof(opt) + sizeof(uint8_t);
-			DEBUG("handshake: minimum_version = %d\n", options.version);
-			break;
+    case HANDSHAKE_OPT_MIN_VERSION:
+      options.minimum_version = opt->value[0];
+      pos += sizeof(opt) + sizeof(uint8_t);
+      DEBUG("handshake: minimum_version = %d\n", options.version);
+      break;
 
-		case HANDSHAKE_OPT_SWARM_ID:
-			options.swarm_id_len = be16toh(*(uint16_t *) opt->value);
-			memcpy(&options.swarm_id, &opt->value[sizeof(uint16_t)],
-			    options.swarm_id_len);
-			pos += sizeof(opt) + options.swarm_id_len;
-			DEBUG("handshake: minimum_version = %d\n", options.minimum_version);
-			break;
+    case HANDSHAKE_OPT_SWARM_ID:
+      options.swarm_id_len = be16toh(*(uint16_t *)opt->value);
+      memcpy(&options.swarm_id, &opt->value[sizeof(uint16_t)], options.swarm_id_len);
+      pos += sizeof(opt) + options.swarm_id_len;
+      DEBUG("handshake: minimum_version = %d\n", options.minimum_version);
+      break;
 
-		case HANDSHAKE_OPT_MERKLE_HASH_FUNC:
-			options.merkle_hash_func = opt->value[0];
-			pos += sizeof(opt) + sizeof(uint8_t);
-			DEBUG("handshake: merkle_hash_func = %d\n", options.merkle_hash_func);
-			break;
+    case HANDSHAKE_OPT_MERKLE_HASH_FUNC:
+      options.merkle_hash_func = opt->value[0];
+      pos += sizeof(opt) + sizeof(uint8_t);
+      DEBUG("handshake: merkle_hash_func = %d\n", options.merkle_hash_func);
+      break;
 
-		case HANDSHAKE_OPT_LIVE_SIGNATURE_ALGO:
-			options.live_signature_alg = opt->value[0];
-			pos += sizeof(opt) + sizeof(uint8_t);
-			DEBUG("handshake: live_signature_alg = %d\n", options.live_signature_alg);
-			break;
+    case HANDSHAKE_OPT_LIVE_SIGNATURE_ALGO:
+      options.live_signature_alg = opt->value[0];
+      pos += sizeof(opt) + sizeof(uint8_t);
+      DEBUG("handshake: live_signature_alg = %d\n", options.live_signature_alg);
+      break;
 
-		case HANDSHAKE_OPT_CHUNK_SIZE:
-			options.chunk_size = be32toh(*(uint32_t *)opt->value);
-			pos += sizeof(opt) + sizeof(uint32_t);
-			DEBUG("handshake: chunk_size = %d\n", options.chunk_size);
-			break;
+    case HANDSHAKE_OPT_CHUNK_SIZE:
+      options.chunk_size = be32toh(*(uint32_t *)opt->value);
+      pos += sizeof(opt) + sizeof(uint32_t);
+      DEBUG("handshake: chunk_size = %d\n", options.chunk_size);
+      break;
 
-		case HANDSHAKE_OPT_END:
-			goto done;
-		}
-	}
+    case HANDSHAKE_OPT_END:
+      goto done;
+    }
+  }
 
 done:
-	return -1;
+  return -1;
 }
 
 ssize_t
 pg_handle_data(struct peregrine_peer *peer, struct msg *msg)
 {
-
 }
 
 ssize_t
 pg_handle_ack(struct peregrine_peer *peer, struct msg *msg)
 {
-
 }
 
 ssize_t
 pg_handle_have(struct peregrine_peer *peer, struct msg *msg)
 {
-
 }
 
 ssize_t
 pg_handle_integrity(struct peregrine_peer *peer, struct msg *msg)
 {
-
 }
 
 ssize_t
 pg_handle_pex_resv4(struct peregrine_peer *peer, struct msg *msg)
 {
-
 }
 
 ssize_t
 pg_handle_pex_req(struct peregrine_peer *peer, struct msg *msg)
 {
+  uint32_t bytes_done = 0;
+  uint32_t remote_channel_id = 0;
+  size_t resp = 0;
+  DEBUG("[PEER] Got REQUEST message");
+  if (msg->message_type == MSG_REQUEST) {
+    bytes_done += sizeof(msg->message_type);
+    DEBUG("[PEER] REQUEST start chunk: %d, end chunk: %d", msg->request.start_chunk, msg->request.end_chunk);
+    bytes_done += sizeof(struct msg_request);
+    peer->seeder_request_start_chunk = msg->request.start_chunk;
+    peer->seeder_request_end_chunk = msg->request.end_chunk;
+  }
 
+  //   // It's possible that PEX_REQ is attached to the message
+  //   if ((input_size - bytes_done) == sizeof(msg->message_type)) {
+  //     msg = (const struct msg *)&input[bytes_done];
+  //     if (msg->message_type == MSG_PEX_REQ) {
+  //       peer->seeder_pex_request = 1;
+  //       bytes_done += sizeof(msg->message_type);
+  //     }
+  //   }
+
+  return 0;
 }
 
 ssize_t
 pg_handle_signed_integrity(struct peregrine_peer *peer, struct msg *msg)
 {
-
 }
 
 ssize_t
 pg_handle_request(struct peregrine_peer *peer, struct msg *msg)
 {
-
 }
 
 ssize_t
 pg_handle_cancel(struct peregrine_peer *peer, struct msg *msg)
 {
-
 }
 
 ssize_t
 pg_handle_choke(struct peregrine_peer *peer, struct msg *msg)
 {
-
 }
 
 ssize_t
 pg_handle_unchoke(struct peregrine_peer *peer, struct msg *msg)
 {
-
 }
 
 enum ppspp_handshake_type
@@ -325,11 +333,38 @@ parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id, struct
 int
 prepare_handshake(struct peregrine_peer *peer, size_t response_buffer_size, char *response)
 {
+
+  size_t response_size;
+  struct msg_handshake_reply proto_handshake;
+  proto_handshake.dst_channel_id = htobe32(peer->dst_channel_id);
+  proto_handshake.f_handshake_type = MSG_HANDSHAKE;
+  proto_handshake.src_channel_id = htobe32(peer->src_channel_id);
+  proto_handshake.f_version = F_VERSION;
+  proto_handshake.version = 1;
+  proto_handshake.f_min_version = F_MINIMUM_VERSION;
+  proto_handshake.min_version = 1;
+  proto_handshake.f_content_prot_method = F_CONTENT_PROT_METHOD;
+  proto_handshake.content_prot_method = 1;
+  proto_handshake.f_merkle_hash_func = F_MERKLE_HASH_FUNC;
+  proto_handshake.merkle_hash_func = 0;
+  proto_handshake.f_chunk_addr_method = F_CHUNK_ADDR_METHOD;
+  proto_handshake.chunk_addr_method = 2;
+  proto_handshake.end_opt = F_END_OPTION;
+
+  response_size = sizeof(struct msg_handshake_reply);
+  if (response_size <= response_buffer_size) {
+    memcpy(response, &proto_handshake, response_size);
+    return response_size;
+  }
+
+  return 0;
+
+#if 0
   size_t response_size;
   struct msg_handshake proto_handshake;
-  proto_handshake.dst_channel_id = htobe32(peer->src_channel_id); // peer->src_channel_id; // Cross channel
-  proto_handshake.src_channel_id = htobe32(peer->dst_channel_id); // peer->dst_channel_id;
+  proto_handshake.dst_channel_id = htobe32(peer->dst_channel_id);
   proto_handshake.f_handshake_type = MSG_HANDSHAKE;
+  proto_handshake.src_channel_id = htobe32(peer->src_channel_id);
   proto_handshake.f_version = F_VERSION;
   proto_handshake.version = 1;
   proto_handshake.f_min_version = F_MINIMUM_VERSION;
@@ -340,6 +375,7 @@ prepare_handshake(struct peregrine_peer *peer, size_t response_buffer_size, char
   proto_handshake.f_content_prot_method = F_CONTENT_PROT_METHOD;
   proto_handshake.content_prot_method = 1;
   proto_handshake.f_merkle_hash_func = F_MERKLE_HASH_FUNC;
+  proto_handshake.merkle_hash_func = 0;
   proto_handshake.f_live_signature_alg = F_LIVE_SIGNATURE_ALG;
   proto_handshake.live_signature_alg = peer->protocol_options.live_signature_alg;
   proto_handshake.f_chunk_addr_method = F_CHUNK_ADDR_METHOD;
@@ -357,14 +393,58 @@ prepare_handshake(struct peregrine_peer *peer, size_t response_buffer_size, char
   proto_handshake.chunk_size = htobe32(1024);
   proto_handshake.end_opt = F_END_OPTION;
 
+  // FIXME: Here we should have sendto
   response_size = sizeof(struct msg_handshake);
   if (response_size <= response_buffer_size) {
     memcpy(response, &proto_handshake, response_size);
     return response_size;
   }
 
-  // Should we send also HAVE message, with what we've got?
+#endif
+
   return 0;
+}
+
+int
+prepare_have(struct peregrine_peer *peer, size_t response_buffer_size, char *response)
+{
+
+  uint32_t bit = 31; /* starting bit for scanning of bits */
+  uint32_t it = 0;   /* iterator */
+  uint32_t val = 0;
+  uint32_t offset = 0;
+
+  //     /* alloc memory for HAVE cache */
+  //   peer->have_cache = malloc(1024 * sizeof(struct have_cache));
+  //   peer->num_have_cache = 0;
+
+  while (it < 32) {
+    if (peer->file->nc & (1 << bit)) { /* if the bit on position "b" is set? */
+      INFO("HAVE: %u..%u", val, val + (1 << bit) - 1);
+
+      offset += pack_have(response + offset, val, val + (1 << bit) - 1);
+      INFO("OFFSET: %d", offset);
+      INFO("VALUE: %d", val);
+
+      //       /* add HAVE header + data */
+      //       *d = HAVE;
+      //       d++;
+
+      //       *(uint32_t *)d = htobe32(v);
+      //       d += sizeof(uint32_t);
+      //       peer->have_cache[peer->num_have_cache].start_chunk = val;
+
+      //       *(uint32_t *)d = htobe32(v + (1 << b) - 1);
+      //       d += sizeof(uint32_t);
+      //       peer->have_cache[peer->num_have_cache].end_chunk = val + (1 << bit) - 1;
+
+      val = val + (1 << bit);
+      //       peer->num_have_cache++;
+    }
+    it++;
+    bit--;
+  }
+  return offset;
 }
 
 int
@@ -386,91 +466,31 @@ peer_handle_request(struct peregrine_context *ctx, struct peregrine_peer *peer, 
     return 0;
   }
 
-  if (parse_message_type(input_data) == MSG_HANDSHAKE) {
-    DEBUG("[PEER] Got HANDSHAKE message");
+  //    MESSAGE_HANDSHAKE
+  DEBUG("[PEER] Got HANDSHAKE message");
 
-    if (parse_handshake(input_data, &dst_channel_id, &src_channel_id, &peer->protocol_options, &bytes_done)
-        == HANDSHAKE_CLOSE) {
-      DEBUG("[PEER] Got HANDSHAKE_FINISH message");
-      // peer wants to close the connection
-      peer->to_remove = 1;
-      return 0;
-    }
-
-    if (parse_handshake(input_data, &dst_channel_id, &src_channel_id, &peer->protocol_options, &bytes_done)
-        == HANDSHAKE_INIT) {
-      DEBUG("[PEER] Got HANDSHAKE_INIT message");
-      peer->src_channel_id = src_channel_id;
-      peer->dst_channel_id = 8; // Choosen by hand
-      print_dbg_protocol_options(&peer->protocol_options);
-      peer->to_remove = 0;
-
-      size_t resp = prepare_handshake(peer, max_response_size, response_buffer);
-      DEBUG("Resp size: %d", resp);
-
-      return resp;
-    }
-  }
-  if (parse_message_type(input_data) == MSG_DATA) {
-    DEBUG("GOT MSG_DATA");
-    return 0;
-  }
-  if (parse_message_type(input_data) == MSG_ACK) {
-    DEBUG("GOT MSG_ACK");
-    return 0;
-  }
-  if (parse_message_type(input_data) == MSG_HAVE) {
-    DEBUG("GOT MSG_HAVE");
-    return 0;
-  }
-  if (parse_message_type(input_data) == MSG_INTEGRITY) {
-    DEBUG("GOT MSG_INTEGRITY");
-    return 0;
-  }
-  if (parse_message_type(input_data) == MSG_PEX_RESV4) {
-    DEBUG("GOT MSG_PEX_RESV4");
-    return 0;
-  }
-  if (parse_message_type(input_data) == MSG_PEX_REQ) {
-    DEBUG("GOT MSG_PEX_REQ");
-    return 0;
-  }
-  if (parse_message_type(input_data) == MSG_SIGNED_INTEGRITY) {
-    DEBUG("GOT MSG_SIGNED_INTEGRITY");
-    return 0;
-  }
-  if (parse_message_type(input_data) == MSG_REQUEST) {
-    DEBUG("GOT MSG_REQUEST");
-    return 0;
-  }
-  if (parse_message_type(input_data) == MSG_CANCEL) {
-    DEBUG("GOT MSG_CANCEL");
-    return 0;
-  }
-  if (parse_message_type(input_data) == MSG_CHOKE) {
-    DEBUG("GOT MSG_CHOKE");
-    return 0;
-  }
-  if (parse_message_type(input_data) == MSG_UNCHOKE) {
-    DEBUG("GOT MSG_UNCHOKE");
-    return 0;
-  }
-  if (parse_message_type(input_data) == MSG_PEX_RESV6) {
-    DEBUG("GOT MSG_PEX_RESV6");
-    return 0;
-  }
-  if (parse_message_type(input_data) == MSG_PEX_RESCERT) {
-    DEBUG("GOT MSG_PEX_RESCERT");
+  if (parse_handshake(input_data, &dst_channel_id, &src_channel_id, &peer->protocol_options, &bytes_done)
+      == HANDSHAKE_CLOSE) {
+    DEBUG("[PEER] Got HANDSHAKE_FINISH message");
+    // peer wants to close the connection
+    peer->to_remove = 1;
     return 0;
   }
 
-  DEBUG("READ %d, PARSED: %d", input_size, bytes_done);
-  if (input_size == bytes_done) {
-    return 0;
-  }
+  if (parse_handshake(input_data, &dst_channel_id, &src_channel_id, &peer->protocol_options, &bytes_done)
+      == HANDSHAKE_INIT) {
+    DEBUG("[PEER] Got HANDSHAKE_INIT message");
+    peer->src_channel_id = src_channel_id;
+    peer->dst_channel_id = 8; // Choosen by hand
+    print_dbg_protocol_options(&peer->protocol_options);
+    peer->to_remove = 0;
 
-  // memcpy(response_buffer, input_data, response_size);
-  return 100;
+    size_t resp = prepare_handshake(peer, max_response_size, response_buffer);
+    DEBUG("Resp size: %d", resp);
+
+    return resp;
+  }
+  return 0;
 }
 
 // /*

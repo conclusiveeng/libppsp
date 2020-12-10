@@ -22,14 +22,14 @@ main(int argc, char const *argv[])
     return 1;
   }
 
-  if (peregrine_socket_setup(local_port, (char *)argv[2], &context) < 0) {
-    ERROR("Error while seting up server!");
-    return 1;
-  }
+  //   if (peregrine_socket_setup(local_port, (char *)argv[2], &context) < 0) {
+  //     ERROR("Error while seting up server!");
+  //     return 1;
+  //   }
 
-  peregrine_socket_loop(&context);
+  //   peregrine_socket_loop(&context);
 
-  peregrine_socket_finish(&context);
+  //   peregrine_socket_finish(&context);
 
   return 0;
 }
