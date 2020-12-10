@@ -82,8 +82,34 @@ pg_context_add_directory(struct peregrine_context *ctx, const char *directory)
 }
 
 int
-pg_context_destroy(struct peregrine_context *ctx)
-{
+pg_context_destroy(struct peregrine_context *ctx) {
+	struct peregrine_peer *peer;
+	struct peregrine_download *download;
+	struct peregrine_file *file;
+	struct peregrine_block *block;
+
+	LIST_FOREACH(peer, &ctx->peers, ptrs) {
+		LIST_REMOVE(peer, ptrs);
+		free(peer);
+	}
+
+	LIST_FOREACH(download, &ctx->downloads, entry) {
+		LIST_REMOVE(download, entry);
+		free(download);
+	}
+
+	while (!SLIST_EMPTY(&ctx->files)) {
+		file = SLIST_FIRST(&ctx->files);
+		SLIST_REMOVE_HEAD(&ctx->files, entry);
+		free(file);
+	}
+
+	TAILQ_FOREACH(block, &ctx->io, entry) {
+		TAILQ_REMOVE(&ctx->io, block, entry);
+		free(block);
+	}
+
+	return (0);
 }
 
 int
