@@ -2,6 +2,7 @@
 #include "log.h"
 #include "peregrine_socket.h"
 #include "proto_helper.h"
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/queue.h>
@@ -200,29 +201,12 @@ pg_handle_pex_resv4(struct peregrine_peer *peer, struct msg *msg)
 ssize_t
 pg_handle_pex_req(struct peregrine_peer *peer, struct msg *msg)
 {
-	uint32_t bytes_done = 0;
-	uint32_t remote_channel_id = 0;
-	size_t resp = 0;
-	DEBUG("[PEER] Got REQUEST message");
-	if (msg->message_type == MSG_REQUEST) {
-		bytes_done += sizeof(msg->message_type);
-		DEBUG("[PEER] REQUEST start chunk: %d, end chunk: %d", msg->request.start_chunk,
-		      msg->request.end_chunk);
-		bytes_done += sizeof(struct msg_request);
-		peer->seeder_request_start_chunk = msg->request.start_chunk;
-		peer->seeder_request_end_chunk = msg->request.end_chunk;
+	// PEX_REQUEST is just field name without any value
+	DEBUG("[PEER] Handle PEX_REQ");
+	if (msg->message_type == MSG_PEX_REQ) {
+		peer->seeder_pex_request = 1;
 	}
-
-	//   // It's possible that PEX_REQ is attached to the message
-	//   if ((input_size - bytes_done) == sizeof(msg->message_type)) {
-	//     msg = (const struct msg *)&input[bytes_done];
-	//     if (msg->message_type == MSG_PEX_REQ) {
-	//       peer->seeder_pex_request = 1;
-	//       bytes_done += sizeof(msg->message_type);
-	//     }
-	//   }
-
-	return 0;
+	return sizeof(msg->message_type);
 }
 
 ssize_t
@@ -233,6 +217,15 @@ pg_handle_signed_integrity(struct peregrine_peer *peer, struct msg *msg)
 ssize_t
 pg_handle_request(struct peregrine_peer *peer, struct msg *msg)
 {
+
+	DEBUG("[PEER] Handle REQUEST message");
+	if (msg->message_type == MSG_REQUEST) {
+		DEBUG("[PEER] REQUEST start chunk: %d, end chunk: %d", msg->request.start_chunk,
+		      msg->request.end_chunk);
+		peer->seeder_request_start_chunk = msg->request.start_chunk;
+		peer->seeder_request_end_chunk = msg->request.end_chunk;
+	}
+	return (sizeof(msg->message_type) + sizeof(msg->request));
 }
 
 ssize_t
@@ -447,49 +440,6 @@ prepare_handshake(struct peregrine_peer *peer, size_t response_buffer_size, char
 #endif
 
 	return 0;
-}
-
-int
-prepare_have(struct peregrine_peer *peer, size_t response_buffer_size, char *response)
-{
-
-	uint32_t bit = 31; /* starting bit for scanning of bits */
-	uint32_t it = 0;   /* iterator */
-	uint32_t val = 0;
-	uint32_t offset = 0;
-
-	//     /* alloc memory for HAVE cache */
-	//   peer->have_cache = malloc(1024 * sizeof(struct have_cache));
-	//   peer->num_have_cache = 0;
-
-	while (it < 32) {
-		if (peer->file->nc & (1 << bit)) { /* if the bit on position "b" is set? */
-			INFO("HAVE: %u..%u", val, val + (1 << bit) - 1);
-
-			offset += pack_have(response + offset, val, val + (1 << bit) - 1);
-			INFO("OFFSET: %d", offset);
-			INFO("VALUE: %d", val);
-
-			//       /* add HAVE header + data */
-			//       *d = HAVE;
-			//       d++;
-
-			//       *(uint32_t *)d = htobe32(v);
-			//       d += sizeof(uint32_t);
-			//       peer->have_cache[peer->num_have_cache].start_chunk = val;
-
-			//       *(uint32_t *)d = htobe32(v + (1 << b) - 1);
-			//       d += sizeof(uint32_t);
-			//       peer->have_cache[peer->num_have_cache].end_chunk = val + (1 << bit)
-			//       - 1;
-
-			val = val + (1 << bit);
-			//       peer->num_have_cache++;
-		}
-		it++;
-		bit--;
-	}
-	return offset;
 }
 
 int

@@ -26,9 +26,19 @@
 #ifndef _PROTO_HELPER_H_
 #define _PROTO_HELPER_H_
 
+#include "peregrine_socket.h"
 #include <netinet/in.h>
 #include <stddef.h>
 #include <stdint.h>
+
+/**
+ * @brief Prepare HAVE message (seeder) that informs about what chunks we have
+ *
+ * @param peer peer handle
+ * @param response_buffer output buffer to store the message
+ * @return size_t amount of data stored in the buffer
+ */
+size_t prepare_have_msg(struct peregrine_peer *peer, char *response_buffer);
 
 size_t pack_handshake(void *dptr, uint32_t src_channel_id, uint8_t *options, size_t optlen);
 size_t pack_have(void *dptr, uint32_t start_chunk, uint32_t end_chunk);
