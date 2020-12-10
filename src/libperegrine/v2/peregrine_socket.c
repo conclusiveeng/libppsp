@@ -91,18 +91,18 @@ peregrine_handle_frame(struct peregrine_context *ctx, const struct sockaddr *cli
 	struct peregrine_peer *peer;
 	struct msg *msg;
 	uint32_t channel_id;
-	size_t pos = 0;
+	size_t pos;
 	ssize_t ret;
 
 	channel_id = ((uint32_t *)frame)[0];
 	peer = pg_find_or_add_peer(ctx, client);
 
 	if (len == 4) {
-		DEBUG("KEEP-ALIVE!");
+		DEBUG("keep-alive received");
 		return 0;
 	}
 
-	for (;;) {
+	for (pos = 4; pos < len;) {
 		msg = (struct msg *)&frame[pos];
 		ret = pg_handle_message(peer, msg);
 		if (ret < 0)
@@ -110,6 +110,8 @@ peregrine_handle_frame(struct peregrine_context *ctx, const struct sockaddr *cli
 
 		pos += ret;
 	}
+
+	return (0);
 }
 
 int

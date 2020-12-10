@@ -132,6 +132,7 @@ struct msg_handshake_reply {
 	uint8_t chunk_addr_method;
 	uint8_t end_opt;
 } __attribute__((packed));
+
 struct msg_have {
 	uint32_t start_chunk;
 	uint32_t end_chunk;
@@ -151,8 +152,9 @@ struct msg_ack {
 };
 
 struct msg_integrity {
+	uint32_t start_chunk;
 	uint32_t end_chunk;
-	uint8_t hash[256];
+	uint8_t hash[20];
 } __attribute__((packed));
 
 struct msg_signed_integrity {
@@ -197,7 +199,6 @@ struct msg_frame {
 	struct msg msg;
 };
 
-int peer_handle_request(struct peregrine_context *ctx, struct peregrine_peer *peer, char *input_data,
-                        size_t input_size, char *response_buffer, size_t response_size);
+ssize_t pg_handle_message(struct peregrine_peer *peer, struct msg *msg);
 
 #endif
