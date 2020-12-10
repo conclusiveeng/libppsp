@@ -8,22 +8,22 @@
 #include <sys/queue.h>
 
 
-static ssize_t pg_handle_handshake(struct peregrine_peer *peer, struct msg *msg);
-static ssize_t pg_handle_data(struct peregrine_peer *peer, struct msg *msg);
-static ssize_t pg_handle_ack(struct peregrine_peer *peer, struct msg *msg);
-static ssize_t pg_handle_have(struct peregrine_peer *peer, struct msg *msg);
-static ssize_t pg_handle_integrity(struct peregrine_peer *peer, struct msg *msg);
-static ssize_t pg_handle_pex_resv4(struct peregrine_peer *peer, struct msg *msg);
-static ssize_t pg_handle_pex_req(struct peregrine_peer *peer, struct msg *msg);
-static ssize_t pg_handle_signed_integrity(struct peregrine_peer *peer, struct msg *msg);
-static ssize_t pg_handle_request(struct peregrine_peer *peer, struct msg *msg);
-static ssize_t pg_handle_cancel(struct peregrine_peer *peer, struct msg *msg);
-static ssize_t pg_handle_choke(struct peregrine_peer *peer, struct msg *msg);
-static ssize_t pg_handle_unchoke(struct peregrine_peer *peer, struct msg *msg);
+static ssize_t pg_handle_handshake(struct pg_peer *peer, struct msg *msg);
+static ssize_t pg_handle_data(struct pg_peer *peer, struct msg *msg);
+static ssize_t pg_handle_ack(struct pg_peer *peer, struct msg *msg);
+static ssize_t pg_handle_have(struct pg_peer *peer, struct msg *msg);
+static ssize_t pg_handle_integrity(struct pg_peer *peer, struct msg *msg);
+static ssize_t pg_handle_pex_resv4(struct pg_peer *peer, struct msg *msg);
+static ssize_t pg_handle_pex_req(struct pg_peer *peer, struct msg *msg);
+static ssize_t pg_handle_signed_integrity(struct pg_peer *peer, struct msg *msg);
+static ssize_t pg_handle_request(struct pg_peer *peer, struct msg *msg);
+static ssize_t pg_handle_cancel(struct pg_peer *peer, struct msg *msg);
+static ssize_t pg_handle_choke(struct pg_peer *peer, struct msg *msg);
+static ssize_t pg_handle_unchoke(struct pg_peer *peer, struct msg *msg);
 
 struct peregrine_frame_handler {
 	enum peregrine_message_type type;
-	ssize_t (*handler)(struct peregrine_peer *, struct msg *);
+	ssize_t (*handler)(struct pg_peer *, struct msg *);
 };
 
 static const struct peregrine_frame_handler frame_handlers[] = {
@@ -43,7 +43,7 @@ static const struct peregrine_frame_handler frame_handlers[] = {
 };
 
 void
-print_dbg_protocol_options(struct ppspp_protocol_options *proto_options)
+print_dbg_protocol_options(struct pg_protocol_options *proto_options)
 {
 	char buffer[256];
 	DEBUG("VERSION IS: %d", proto_options->version);
@@ -61,7 +61,7 @@ print_dbg_protocol_options(struct ppspp_protocol_options *proto_options)
 }
 
 ssize_t
-pg_handle_message(struct peregrine_peer *peer, struct msg *msg)
+pg_handle_message(struct pg_peer *peer, struct msg *msg)
 {
 	const struct peregrine_frame_handler *handler;
 
@@ -75,10 +75,10 @@ pg_handle_message(struct peregrine_peer *peer, struct msg *msg)
 }
 
 static ssize_t
-pg_handle_handshake(struct peregrine_peer *peer, struct msg *msg)
+pg_handle_handshake(struct pg_peer *peer, struct msg *msg)
 {
 	struct msg_handshake_opt *opt;
-	struct ppspp_protocol_options options;
+	struct pg_protocol_options options;
 	int pos = 0;
 
 	DEBUG("handshake: peer=%p", peer);
@@ -178,7 +178,7 @@ done:
 }
 
 static ssize_t
-pg_handle_data(struct peregrine_peer *peer, struct msg *msg)
+pg_handle_data(struct pg_peer *peer, struct msg *msg)
 {
 	DEBUG("data: peer=%p", peer);
 
@@ -186,19 +186,19 @@ pg_handle_data(struct peregrine_peer *peer, struct msg *msg)
 }
 
 static ssize_t
-pg_handle_ack(struct peregrine_peer *peer, struct msg *msg)
+pg_handle_ack(struct pg_peer *peer, struct msg *msg)
 {
 	DEBUG("ack: peer=%p", peer);
 }
 
 static ssize_t
-pg_handle_have(struct peregrine_peer *peer, struct msg *msg)
+pg_handle_have(struct pg_peer *peer, struct msg *msg)
 {
 	DEBUG("have: peer=%p", peer);
 }
 
 static ssize_t
-pg_handle_integrity(struct peregrine_peer *peer, struct msg *msg)
+pg_handle_integrity(struct pg_peer *peer, struct msg *msg)
 {
 	DEBUG("integrity: peer=%p", peer);
 
@@ -206,13 +206,13 @@ pg_handle_integrity(struct peregrine_peer *peer, struct msg *msg)
 }
 
 static ssize_t
-pg_handle_pex_resv4(struct peregrine_peer *peer, struct msg *msg)
+pg_handle_pex_resv4(struct pg_peer *peer, struct msg *msg)
 {
 	DEBUG("pex_resv4: peer=%p", peer);
 }
 
 static ssize_t
-pg_handle_pex_req(struct peregrine_peer *peer, struct msg *msg)
+pg_handle_pex_req(struct pg_peer *peer, struct msg *msg)
 {
 	// PEX_REQUEST is just field name without any value
 	DEBUG("[PEER] Handle PEX_REQ");
@@ -224,12 +224,12 @@ pg_handle_pex_req(struct peregrine_peer *peer, struct msg *msg)
 }
 
 static ssize_t
-pg_handle_signed_integrity(struct peregrine_peer *peer, struct msg *msg)
+pg_handle_signed_integrity(struct pg_peer *peer, struct msg *msg)
 {
 }
 
 static ssize_t
-pg_handle_request(struct peregrine_peer *peer, struct msg *msg)
+pg_handle_request(struct pg_peer *peer, struct msg *msg)
 {
 
 	DEBUG("[PEER] Handle REQUEST message");
@@ -243,22 +243,22 @@ pg_handle_request(struct peregrine_peer *peer, struct msg *msg)
 }
 
 static ssize_t
-pg_handle_cancel(struct peregrine_peer *peer, struct msg *msg)
+pg_handle_cancel(struct pg_peer *peer, struct msg *msg)
 {
 }
 
 static ssize_t
-pg_handle_choke(struct peregrine_peer *peer, struct msg *msg)
+pg_handle_choke(struct pg_peer *peer, struct msg *msg)
 {
 }
 
 static ssize_t
-pg_handle_unchoke(struct peregrine_peer *peer, struct msg *msg)
+pg_handle_unchoke(struct pg_peer *peer, struct msg *msg)
 {
 }
 
 enum ppspp_handshake_type
-parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id, struct ppspp_protocol_options *proto_options,
+parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id, struct pg_protocol_options *proto_options,
                 uint8_t *bytes_parsed)
 {
 	// FIXME: Maybe 'struct msg_handshake' could be use for parsing
@@ -382,7 +382,7 @@ parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id, struct
 }
 
 int
-prepare_handshake(struct peregrine_peer *peer, size_t response_buffer_size, char *response)
+prepare_handshake(struct pg_peer *peer, size_t response_buffer_size, char *response)
 {
 
 	size_t response_size;
@@ -457,7 +457,7 @@ prepare_handshake(struct peregrine_peer *peer, size_t response_buffer_size, char
 }
 
 int
-peer_handle_request(struct peregrine_context *ctx, struct peregrine_peer *peer, char *input_data, size_t input_size,
+peer_handle_request(struct pg_context *ctx, struct pg_peer *peer, char *input_data, size_t input_size,
                     char *response_buffer, size_t max_response_size)
 {
 	DEBUG("CTX %d", ctx->sock_fd);

@@ -38,7 +38,7 @@
  * @param response_buffer output buffer to store the message
  * @return size_t amount of data stored in the buffer
  */
-size_t prepare_have_msg(struct peregrine_peer *peer, char *response_buffer);
+size_t prepare_have_msg(struct pg_peer *peer, char *response_buffer);
 
 size_t pack_handshake(void *dptr, uint32_t src_channel_id, uint8_t *options, size_t optlen);
 size_t pack_have(void *dptr, uint32_t start_chunk, uint32_t end_chunk);

@@ -7,7 +7,7 @@
 #include <string.h>
 
 size_t
-prepare_have_msg(struct peregrine_peer *peer, char *response_buffer)
+prepare_have_msg(struct pg_peer *peer, char *response_buffer)
 {
 
 	uint32_t bit = 31; /* starting bit for scanning of bits */

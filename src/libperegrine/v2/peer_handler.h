@@ -199,6 +199,6 @@ struct msg_frame {
 	struct msg msg;
 };
 
-ssize_t pg_handle_message(struct peregrine_peer *peer, struct msg *msg);
+ssize_t pg_handle_message(struct pg_peer *peer, struct msg *msg);
 
 #endif

@@ -35,7 +35,7 @@
 #define PEER_STR_ADDR 32
 #define CHUNK_SIZE    1024
 /* protocol options for peer send with HANDSHAKE */
-struct ppspp_protocol_options {
+struct pg_protocol_options {
 	uint8_t version;
 	uint8_t minimum_version;
 	uint16_t swarm_id_len;
@@ -52,7 +52,7 @@ struct ppspp_protocol_options {
 
 // /* shared file */
 // struct peregrine_file {
-//   struct peregrine_context *context;
+//   struct pg_context *context;
 //   const char *name;
 //   int fd;
 //   char hash[256];
@@ -60,16 +60,16 @@ struct ppspp_protocol_options {
 //   LIST_ENTRY(peregrine_file) ptrs;
 // };
 
-struct peregrine_block {
-	struct peregrine_file *file;
-	struct peregrine_peer *peer;
+struct pg_block {
+	struct pg_file *file;
+	struct pg_peer *peer;
 	uint32_t chunk_num;
-	TAILQ_ENTRY(peregrine_block) entry;
+	TAILQ_ENTRY(pg_block) entry;
 };
 
 /* shared file */
-struct peregrine_file {
-	struct peregrine_context *context;
+struct pg_file {
+	struct pg_context *context;
 	char path[1024]; /* full path to file: directory name + file name */
 	char sha[41];    /* textual representation of sha1 for a file */
 	uint64_t file_size;
@@ -82,7 +82,7 @@ struct peregrine_file {
 	uint32_t start_chunk;
 	uint32_t end_chunk;
 
-	SLIST_ENTRY(peregrine_file) entry;
+	SLIST_ENTRY(pg_file) entry;
 };
 
 /**
@@ -98,8 +98,8 @@ struct have_cache {
  * @brief peregrine peer structure - main communication object
  *
  */
-struct peregrine_peer {
-	struct peregrine_context *context;
+struct pg_peer {
+	struct pg_context *context;
 
 	int sock_fd;
 	char str_addr[PEER_STR_ADDR];
@@ -107,8 +107,8 @@ struct peregrine_peer {
 	// Operation status
 	uint8_t to_remove;                              // Peer makrked to remove (send handshake finish)
 	uint8_t handshake_send;                         // Peer under initialization (wainting for second handshake)
-	struct ppspp_protocol_options protocol_options; // Protocol configuration for peer
-	struct peregrine_file *file;                    // Selected file
+	struct pg_protocol_options protocol_options; // Protocol configuration for peer
+	struct pg_file *file;                    // Selected file
 	// Main peer info
 	uint32_t dst_channel_id;
 	uint32_t src_channel_id;
@@ -123,37 +123,38 @@ struct peregrine_peer {
 	uint16_t have_cache_usage;
 
 	// Make a list of them
-	LIST_ENTRY(peregrine_peer) ptrs;
+	LIST_ENTRY(pg_peer) ptrs;
 };
 
 /* file being downloaded */
-struct peregrine_download {
-	struct peregrine_context *context;
+struct pg_download {
+	struct pg_context *context;
 	char hash[256];
 	int out_fd;
-	LIST_HEAD(peregrine_download_peers, peregrine_peer) peers; // peers we download from
+	LIST_HEAD(pg_download_peers, pg_peer) peers; // peers we download from
 	/* other download state: downloaded chunks, known chunks, etc */
-	LIST_ENTRY(peregrine_download) entry;
+	LIST_ENTRY(pg_download) entry;
 };
 
 /* instance */
-struct peregrine_context {
+struct pg_context {
 	int sock_fd;
 	uint32_t swarm_id;
 	struct sockaddr_storage addr;
-	LIST_HEAD(, peregrine_peer) peers;
-	SLIST_HEAD(, peregrine_file) files;
-	LIST_HEAD(, peregrine_download) downloads;
-	TAILQ_HEAD(, peregrine_block) io;
+	LIST_HEAD(, pg_peer) peers;
+	SLIST_HEAD(, pg_file) files;
+	LIST_HEAD(, pg_download) downloads;
+	TAILQ_HEAD(, pg_block) io;
 	/* other instance state */
 };
 
-int pg_context_create(struct sockaddr *sa, socklen_t salen, struct peregrine_context **ctxp);
-int pg_context_add_directory(struct peregrine_context *ctx, const char *directory);
-int pg_context_destroy(struct peregrine_context *ctx);
-int pg_context_get_fd(struct peregrine_context *ctx);
-int pg_handle_fd_read(struct peregrine_context *ctx);
-int pg_handle_fd_write(struct peregrine_context *ctx);
-int pg_add_peer(struct peregrine_context *ctx, struct sockaddr *sa);
+int pg_context_create(struct sockaddr *sa, socklen_t salen, struct pg_context **ctxp);
+int pg_context_add_directory(struct pg_context *ctx, const char *directory);
+struct pg_file *pg_context_add_file(struct pg_context *ctx, const char *path);
+int pg_context_destroy(struct pg_context *ctx);
+int pg_context_get_fd(struct pg_context *ctx);
+int pg_handle_fd_read(struct pg_context *ctx);
+int pg_handle_fd_write(struct pg_context *ctx);
+int pg_add_peer(struct pg_context *ctx, struct sockaddr *sa);
 
 #endif

@@ -27,9 +27,9 @@
 #define _PEER_H_
 #include "peregrine_socket.h"
 
-void pg_file_generate_sha1(struct peregrine_context *context);
-void pg_file_add_file(struct peregrine_context *context, char *name);
-void pg_file_add_directory(struct peregrine_context *context, char *dname);
-void pg_file_list_sha1(struct peregrine_context *context);
+void pg_file_generate_sha1(struct pg_context *context);
+struct pg_file *pg_file_add_file(struct pg_context *context, const char *name);
+void pg_file_add_directory(struct pg_context *context, const char *dname);
+void pg_file_list_sha1(struct pg_context *context);
 
 #endif /* _PEER_H_ */

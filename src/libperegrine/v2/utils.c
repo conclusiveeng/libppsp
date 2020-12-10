@@ -1,6 +1,7 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <sys/socket.h>
+#include "utils.h"
 
 int
 pg_sockaddr_cmp(const struct sockaddr *s1, const struct sockaddr *s2)
@@ -39,4 +40,23 @@ pg_sockaddr_copy(struct sockaddr_storage *dest, const struct sockaddr *src)
 		memcpy(dest, src, sizeof(struct sockaddr_in));
 		return;
 	}
+}
+
+const char *
+pg_context_sha_by_file(struct pg_file *file)
+{
+
+	return (file->sha);
+}
+
+struct pg_file *
+pg_context_file_by_sha(struct pg_context *ctx, const char *sha)
+{
+	struct pg_file *file;
+	SLIST_FOREACH(file, &ctx->files, entry) {
+		if (strcmp(file->sha, sha) == 0)
+			return (file);
+	}
+
+	return (NULL);
 }

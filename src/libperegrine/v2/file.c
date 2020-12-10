@@ -39,7 +39,7 @@
 #include <unistd.h>
 
 int
-peregrine_file_process_file(struct peregrine_file *file)
+peregrine_file_process_file(struct pg_file *file)
 {
 	char *buf;
 	unsigned char digest[20 + 1];
@@ -138,11 +138,11 @@ peregrine_file_process_file(struct peregrine_file *file)
 }
 
 void
-pg_file_generate_sha1(struct peregrine_context *context)
+pg_file_generate_sha1(struct pg_context *context)
 {
 	int s;
 	int y;
-	struct peregrine_file *f;
+	struct pg_file *f;
 
 	SLIST_FOREACH(f, &context->files, entry)
 	{
@@ -161,8 +161,8 @@ pg_file_generate_sha1(struct peregrine_context *context)
 	}
 }
 
-void
-pg_file_add_file(struct peregrine_context *context, char *name)
+struct pg_file *
+pg_file_add_file(struct pg_context *context, const char *name)
 {
 	struct stat stat;
 	int st;
@@ -172,16 +172,20 @@ pg_file_add_file(struct peregrine_context *context, char *name)
 		ERROR("Error: %s", strerror(errno));
 	}
 	if (stat.st_mode & S_IFREG) { /* filename */
-		struct peregrine_file *f = malloc(sizeof(struct peregrine_file));
+		struct pg_file *f = malloc(sizeof(struct pg_file));
 		memset(f->path, 0, sizeof(f->path));
 		strcpy(f->path, name);
 		lstat(f->path, &stat);
 		f->file_size = stat.st_size;
 		SLIST_INSERT_HEAD(&context->files, f, entry);
+		return (f);
 	}
+
+	return (NULL);
 }
+
 void
-pg_file_add_directory(struct peregrine_context *context, char *dname)
+pg_file_add_directory(struct pg_context *context, const char *dname)
 {
 	DIR *dir;
 	char newdir[BUFSIZ];
@@ -212,8 +216,8 @@ pg_file_add_directory(struct peregrine_context *context, char *dname)
 }
 
 void
-pg_file_list_sha1(struct peregrine_context *context)
+pg_file_list_sha1(struct pg_context *context)
 {
-	struct peregrine_file *f;
+	struct pg_file *f;
 	SLIST_FOREACH(f, &context->files, entry) { INFO("File: %s, NC:%d, SHA1: %s", f->path, f->nc, f->sha); }
 }

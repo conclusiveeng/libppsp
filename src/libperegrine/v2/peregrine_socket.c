@@ -16,10 +16,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-static struct peregrine_peer *
-pg_find_peer(struct peregrine_context *ctx, const struct sockaddr *saddr)
+static struct pg_peer *
+pg_find_peer(struct pg_context *ctx, const struct sockaddr *saddr)
 {
-	struct peregrine_peer *peer;
+	struct pg_peer *peer;
 
 	LIST_FOREACH(peer, &ctx->peers, ptrs)
 	{
@@ -30,10 +30,10 @@ pg_find_peer(struct peregrine_context *ctx, const struct sockaddr *saddr)
 	return (NULL);
 }
 
-static struct peregrine_peer *
-pg_find_or_add_peer(struct peregrine_context *ctx, const struct sockaddr *saddr)
+static struct pg_peer *
+pg_find_or_add_peer(struct pg_context *ctx, const struct sockaddr *saddr)
 {
-	struct peregrine_peer *peer;
+	struct pg_peer *peer;
 
 	peer = pg_find_peer(ctx, saddr);
 	if (peer != NULL)
@@ -47,9 +47,9 @@ pg_find_or_add_peer(struct peregrine_context *ctx, const struct sockaddr *saddr)
 }
 
 int
-pg_context_create(struct sockaddr *sa, socklen_t salen, struct peregrine_context **ctxp)
+pg_context_create(struct sockaddr *sa, socklen_t salen, struct pg_context **ctxp)
 {
-	struct peregrine_context *ctx;
+	struct pg_context *ctx;
 
 	ctx = calloc(1, sizeof(*ctx));
 
@@ -74,19 +74,27 @@ pg_context_create(struct sockaddr *sa, socklen_t salen, struct peregrine_context
 }
 
 int
-pg_context_add_directory(struct peregrine_context *ctx, const char *directory)
+pg_context_add_directory(struct pg_context *ctx, const char *directory)
 {
 	pg_file_add_directory(ctx, directory);
 	pg_file_generate_sha1(ctx);
 	pg_file_list_sha1(ctx);
+
+	return (0);
+}
+
+struct pg_file*
+pg_context_add_file(struct pg_context *ctx, const char *path)
+{
+	return (pg_file_add_file(ctx, path));
 }
 
 int
-pg_context_destroy(struct peregrine_context *ctx) {
-	struct peregrine_peer *peer;
-	struct peregrine_download *download;
-	struct peregrine_file *file;
-	struct peregrine_block *block;
+pg_context_destroy(struct pg_context *ctx) {
+	struct pg_peer *peer;
+	struct pg_download *download;
+	struct pg_file *file;
+	struct pg_block *block;
 
 	LIST_FOREACH(peer, &ctx->peers, ptrs) {
 		LIST_REMOVE(peer, ptrs);
@@ -113,15 +121,15 @@ pg_context_destroy(struct peregrine_context *ctx) {
 }
 
 int
-pg_context_get_fd(struct peregrine_context *ctx)
+pg_context_get_fd(struct pg_context *ctx)
 {
 	return (ctx->sock_fd);
 }
 
 static int
-peregrine_handle_frame(struct peregrine_context *ctx, const struct sockaddr *client, const uint8_t *frame, size_t len)
+peregrine_handle_frame(struct pg_context *ctx, const struct sockaddr *client, const uint8_t *frame, size_t len)
 {
-	struct peregrine_peer *peer;
+	struct pg_peer *peer;
 	struct msg *msg;
 	uint32_t channel_id;
 	size_t pos;
@@ -148,7 +156,7 @@ peregrine_handle_frame(struct peregrine_context *ctx, const struct sockaddr *cli
 }
 
 int
-pg_handle_fd_read(struct peregrine_context *ctx)
+pg_handle_fd_read(struct pg_context *ctx)
 {
 	struct sockaddr_storage client_addr;
 	socklen_t client_addr_len;
@@ -173,9 +181,9 @@ pg_handle_fd_read(struct peregrine_context *ctx)
 }
 
 int
-pg_handle_fd_write(struct peregrine_context *ctx)
+pg_handle_fd_write(struct pg_context *ctx)
 {
-	struct peregrine_block *block;
+	struct pg_block *block;
 	struct msg_frame *msgf;
 	uint8_t frame[sizeof(struct msg_data) + 1500];
 	size_t chunk_size;
@@ -217,7 +225,7 @@ pg_handle_fd_write(struct peregrine_context *ctx)
 }
 
 int
-pg_add_peer(struct peregrine_context *ctx, struct sockaddr *sa)
+pg_add_peer(struct pg_context *ctx, struct sockaddr *sa)
 {
 	if (pg_find_or_add_peer(ctx, sa) == NULL)
 		return (-1);
