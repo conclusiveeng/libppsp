@@ -37,43 +37,43 @@ static const char *libperegrine_log_level_names[] = { "DEBUG", "INFO", "WARN", "
 void
 pg_logf(enum peregrine_log_level level, const char *func, const char *fmt, ...)
 {
-  const char *dest = NULL;
-  static FILE *stream = NULL;
-  va_list ap;
+	const char *dest = NULL;
+	static FILE *stream = NULL;
+	va_list ap;
 
-  if (stream == NULL) {
-    dest = getenv("LIBPEREGRINE_LOGGING");
-    if (dest == NULL) {
-      stream = stdout;
-    } else if (!strcmp(dest, "stderr")) {
-      stream = stderr;
-    } else {
-      stream = fopen(dest, "a");
-    }
-  }
+	if (stream == NULL) {
+		dest = getenv("LIBPEREGRINE_LOGGING");
+		if (dest == NULL) {
+			stream = stdout;
+		} else if (!strcmp(dest, "stderr")) {
+			stream = stderr;
+		} else {
+			stream = fopen(dest, "a");
+		}
+	}
 
-  va_start(ap, fmt);
-  fprintf(stream, "[%s]\t %s: ", libperegrine_log_level_names[level], func);
-  vfprintf(stream, fmt, ap);
-  fprintf(stream, "\n");
-  fflush(stream);
-  va_end(ap);
+	va_start(ap, fmt);
+	fprintf(stream, "[%s]\t %s: ", libperegrine_log_level_names[level], func);
+	vfprintf(stream, fmt, ap);
+	fprintf(stream, "\n");
+	fflush(stream);
+	va_end(ap);
 }
 
 void
 dbgutil_str2hex(char *in, size_t in_size, char *out, size_t out_size)
 {
-  char *ptr_in = in;
-  const char *hex = "0123456789ABCDEF";
-  char *ptr_out = out;
-  for (; ptr_in < in + in_size; ptr_out += 3, ptr_in++) {
-    ptr_out[0] = hex[(*ptr_in >> 4) & 0xF];
-    ptr_out[1] = hex[*ptr_in & 0xF];
-    ptr_out[2] = ':';
-    if (ptr_out + 3 - out > (long)out_size) {
-      // Truncate instead of overflow...
-      break;
-    }
-  }
-  out[ptr_out - out - 1] = 0;
+	char *ptr_in = in;
+	const char *hex = "0123456789ABCDEF";
+	char *ptr_out = out;
+	for (; ptr_in < in + in_size; ptr_out += 3, ptr_in++) {
+		ptr_out[0] = hex[(*ptr_in >> 4) & 0xF];
+		ptr_out[1] = hex[*ptr_in & 0xF];
+		ptr_out[2] = ':';
+		if (ptr_out + 3 - out > (long)out_size) {
+			// Truncate instead of overflow...
+			break;
+		}
+	}
+	out[ptr_out - out - 1] = 0;
 }

@@ -32,13 +32,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-enum peregrine_log_level
-{
-        PEREGRINE_DEBUG,
-        PEREGRINE_INFO,
-        PEREGRINE_WARNING,
-        PEREGRINE_ERROR
-};
+enum peregrine_log_level { PEREGRINE_DEBUG, PEREGRINE_INFO, PEREGRINE_WARNING, PEREGRINE_ERROR };
 
 void pg_logf(enum peregrine_log_level level, const char *func, const char *fmt, ...);
 

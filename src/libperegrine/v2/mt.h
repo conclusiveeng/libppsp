@@ -28,39 +28,31 @@
 
 #include <stdint.h>
 
-enum chunk_state
-{
-	CH_EMPTY = 0,
-	CH_ACTIVE
-};
+enum chunk_state { CH_EMPTY = 0, CH_ACTIVE };
 
-enum chunk_downloaded
-{
-	CH_NO = 0,
-	CH_YES
-};
+enum chunk_downloaded { CH_NO = 0, CH_YES };
 
 struct chunk {
-  uint64_t offset; /* offset in file where chunk begins [bytes] */
-  uint32_t len;    /* length of the chunk */
-  char sha[20 + 1];
-  struct node *node;
-  enum chunk_state state;
-  enum chunk_downloaded downloaded;
+	uint64_t offset; /* offset in file where chunk begins [bytes] */
+	uint32_t len;    /* length of the chunk */
+	char sha[20 + 1];
+	struct node *node;
+	enum chunk_state state;
+	enum chunk_downloaded downloaded;
 };
 
 enum node_state {
-  EMPTY = 0,
-  INITIALIZED,
-  ACTIVE,
-  SENT /* seeder already sent this sha to leecher */
+	EMPTY = 0,
+	INITIALIZED,
+	ACTIVE,
+	SENT /* seeder already sent this sha to leecher */
 };
 struct node {
-  int number;                         /* number of the node */
-  struct node *left, *right, *parent; /* if parent == NULL - it is root node of the tree */
-  struct chunk *chunk;                /* pointer to chunk */
-  char sha[20 + 1];
-  enum node_state state;
+	int number;                         /* number of the node */
+	struct node *left, *right, *parent; /* if parent == NULL - it is root node of the tree */
+	struct chunk *chunk;                /* pointer to chunk */
+	char sha[20 + 1];
+	enum node_state state;
 };
 
 int mt_order2(uint32_t /*val*/);

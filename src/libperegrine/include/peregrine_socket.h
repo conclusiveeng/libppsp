@@ -60,6 +60,14 @@ struct ppspp_protocol_options {
 //   LIST_ENTRY(peregrine_file) ptrs;
 // };
 
+struct peregrine_block
+{
+	struct peregrine_file *file;
+	struct peregrine_peer *peer;
+	uint32_t chunk_num;
+	TAILQ_ENTRY(peregrine_block) entry;
+};
+
 /* shared file */
 struct peregrine_file {
   struct peregrine_context *context;
@@ -79,7 +87,8 @@ struct peregrine_file {
 };
 
 /* known peer */
-struct peregrine_peer {
+struct peregrine_peer
+{
   struct peregrine_context *context;
 
   int sock_fd;
@@ -116,14 +125,14 @@ struct peregrine_download {
 
 /* instance */
 struct peregrine_context {
-  int sock_fd;
-  uint32_t swarm_id;
-  struct sockaddr_storage addr;
-  LIST_HEAD(, peregrine_peer) peers;
-  SLIST_HEAD(, peregrine_file) files;
-  LIST_HEAD(, peregrine_download) downloads;
-  TAILQ_HEAD(, peregrine_io_request) io;
-  /* other instance state */
+	int sock_fd;
+	uint32_t swarm_id;
+	struct sockaddr_storage addr;
+	LIST_HEAD(, peregrine_peer) peers;
+	SLIST_HEAD(, peregrine_file) files;
+	LIST_HEAD(, peregrine_download) downloads;
+	TAILQ_HEAD(, peregrine_block) io;
+	/* other instance state */
 };
 
 int pg_context_create(struct sockaddr *sa, socklen_t salen, struct peregrine_context **ctxp);
