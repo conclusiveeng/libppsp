@@ -308,8 +308,8 @@ parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id, struct
 		msg_ptr += sizeof(uint8_t);
 		proto_options->supported_msgs_len = *msg_ptr;
 		msg_ptr += sizeof(uint8_t);
-		// WARN: For now we ignore this field of protocol options - normally here we should parse the bitmap of
-		// supported messages
+		// WARN: For now we ignore this field of protocol options - normally here we should
+		// parse the bitmap of supported messages
 		msg_ptr += proto_options->supported_msgs_len;
 	}
 
@@ -438,7 +438,8 @@ prepare_have(struct peregrine_peer *peer, size_t response_buffer_size, char *res
 
 			//       *(uint32_t *)d = htobe32(v + (1 << b) - 1);
 			//       d += sizeof(uint32_t);
-			//       peer->have_cache[peer->num_have_cache].end_chunk = val + (1 << bit) - 1;
+			//       peer->have_cache[peer->num_have_cache].end_chunk = val + (1 << bit)
+			//       - 1;
 
 			val = val + (1 << bit);
 			//       peer->num_have_cache++;

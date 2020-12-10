@@ -137,6 +137,7 @@ struct peregrine_context {
 
 int pg_context_create(struct sockaddr *sa, socklen_t salen, struct peregrine_context **ctxp);
 int pg_context_destroy(struct peregrine_context *ctx);
+int pg_context_get_fd(struct peregrine_context *ctx);
 int pg_handle_fd_read(struct peregrine_context *ctx);
 int pg_handle_fd_write(struct peregrine_context *ctx);
 int pg_add_peer(struct peregrine_context *ctx, struct sockaddr *sa);

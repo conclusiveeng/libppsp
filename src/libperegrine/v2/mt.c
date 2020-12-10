@@ -91,10 +91,12 @@ mt_build_tree(int num_chunks, struct node **ret)
 	//   DEBUG("num_chunks(orig): %d  after_correction: %d", num_chunks, nc);
 
 	/* DEBUG: list the tree */
-	//   for (l = 1; l <= h + 1; l++) {                        /* goes level by level from bottom up to highest
-	//   level */
-	//     first_idx = (1 << (l - 1)) - 1;                     /* first index on the given level starting
-	//                                                            from left: 0, 1, 3, 7, 15, etc */
+	//   for (l = 1; l <= h + 1; l++) {                        /* goes level by level from
+	//   bottom up to highest level */
+	//     first_idx = (1 << (l - 1)) - 1;                     /* first index on the given level
+	//     starting
+	//                                                            from left: 0, 1, 3, 7, 15, etc
+	//                                                            */
 	//     for (si = first_idx; si < 2 * nc; si += (1 << l)) { /* si - sibling index */
 	//       DEBUG("%d ", si);
 	//     }

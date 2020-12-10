@@ -36,6 +36,8 @@ enum peregrine_log_level { PEREGRINE_DEBUG, PEREGRINE_INFO, PEREGRINE_WARNING, P
 
 void pg_logf(enum peregrine_log_level level, const char *func, const char *fmt, ...);
 
+#define LIBPEREGRINE_DEBUG_ENABLED
+
 #if defined(LIBPEREGRINE_DEBUG_ENABLED)
 #define LOG(level, fmt, ...) pg_logf(level, __func__, fmt, ##__VA_ARGS__)
 #define DEBUG(fmt, ...)      pg_logf(PEREGRINE_DEBUG, __func__, fmt, ##__VA_ARGS__)

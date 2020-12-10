@@ -1,35 +1,78 @@
-#include "libperegrine/v2/log.h"
-#include "peregrine_socket.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
+#include <string.h>
+#include <sysexits.h>
+#include <getopt.h>
+#include <poll.h>
+#include "libperegrine/v2/log.h"
+#include "peregrine_socket.h"
 
 int debug;
 
 int
 main(int argc, char const *argv[])
 {
-	struct peregrine_context context;
-	unsigned long local_port;
+	struct peregrine_context *context;
+	struct sockaddr_in sin;
+	struct pollfd pfd;
+	const char *directory = NULL;
+	int local_port = 0;
+	int ch;
+	int ret;
 
-	if (argc < 3) {
-		printf("Usage: %s <local port> <work directory> \n", argv[0]);
-		return 1;
+	while ((ch = getopt(argc, argv, "p:d:h")) != -1) {
+		switch (ch) {
+		case 'p':
+			local_port = strtol(optarg, NULL, 10);
+			break;
+
+		case 'd':
+			directory = optarg;
+			break;
+		}
 	}
-	local_port = strtoul(argv[1], NULL, 0);
-	if (local_port < 1 || local_port > 65535) {
-		ERROR("Invalid local port '%s'\n", argv[1]);
-		return 1;
+
+	if (local_port == 0) {
+		fprintf(stderr, "port not specified\n");
+		exit(EX_USAGE);
 	}
 
-	//   if (peregrine_socket_setup(local_port, (char *)argv[2], &context) < 0) {
-	//     ERROR("Error while seting up server!");
-	//     return 1;
-	//   }
+	if (directory == NULL) {
+		fprintf(stderr, "directory not specified\n");
+		exit(EX_USAGE);
+	}
 
-	//   peregrine_socket_loop(&context);
+	sin.sin_family = AF_INET;
+	sin.sin_addr.s_addr = INADDR_ANY;
+	sin.sin_port = htons(local_port);
 
-	//   peregrine_socket_finish(&context);
+	if (pg_context_create((struct sockaddr *)&sin, sizeof(struct sockaddr_in), &context) != 0) {
+		fprintf(stderr, "cannot create context: %s\n", strerror(errno));
+		exit(EX_OSERR);
+	}
 
-	return 0;
+	pfd.fd = pg_context_get_fd(context);
+	pfd.events = POLLIN | /* POLLOUT | */ POLLERR;
+	pfd.revents = 0;
+
+	for (;;) {
+		ret = poll(&pfd, 1, -1);
+		if (ret < 0)
+			break;
+
+		if (pfd.revents & POLLIN)
+			pg_handle_fd_read(context);
+
+#if 0
+		if (pfd.revents & POLLOUT)
+			pg_handle_fd_write(context);
+#endif
+
+		if (pfd.revents & POLLERR)
+			break;
+	}
+
+	return (0);
 }

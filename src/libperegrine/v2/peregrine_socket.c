@@ -60,6 +60,8 @@ pg_context_create(struct sockaddr *sa, socklen_t salen, struct peregrine_context
 	}
 
 	if (bind(ctx->sock_fd, sa, salen) != 0) {
+		ERROR("Failed to bind: %s", strerror(errno));
+		return (-1);
 	}
 
 	LIST_INIT(&ctx->peers);
@@ -67,6 +69,7 @@ pg_context_create(struct sockaddr *sa, socklen_t salen, struct peregrine_context
 	SLIST_INIT(&ctx->files);
 	TAILQ_INIT(&ctx->io);
 
+	*ctxp = ctx;
 	return (0);
 }
 
@@ -75,13 +78,20 @@ pg_context_destroy(struct peregrine_context *ctx)
 {
 }
 
+int
+pg_context_get_fd(struct peregrine_context *ctx)
+{
+	return (ctx->sock_fd);
+}
+
 static int
-peregrine_handle_frame(struct peregrine_context *ctx, const struct sockaddr *client, const uint8_t *frame, size_t len)
+peregrine_handle_frame(struct peregrine_context *ctx, const struct sockaddr *client,
+    const uint8_t *frame, size_t len)
 {
 	struct peregrine_peer *peer;
 	struct msg *msg;
 	uint32_t channel_id;
-	size_t pos;
+	size_t pos = 0;
 	ssize_t ret;
 
 	channel_id = ((uint32_t *)frame)[0];
@@ -94,7 +104,6 @@ peregrine_handle_frame(struct peregrine_context *ctx, const struct sockaddr *cli
 
 	for (;;) {
 		msg = (struct msg *)&frame[pos];
-
 		ret = pg_handle_message(peer, msg);
 		if (ret < 0)
 			break;
@@ -112,9 +121,11 @@ pg_handle_fd_read(struct peregrine_context *ctx)
 	ssize_t ret;
 	ssize_t pos = 0;
 
+	DEBUG("ctx=%p fd=%d", ctx, ctx->sock_fd);
+
 	for (;;) {
-		ret = recvfrom(ctx->sock_fd, frame, sizeof(frame), MSG_DONTWAIT, (struct sockaddr *)&client_addr,
-		               &client_addr_len);
+		ret = recvfrom(ctx->sock_fd, frame, sizeof(frame), MSG_DONTWAIT,
+	 	    (struct sockaddr *)&client_addr, &client_addr_len);
 
 		if (ret == 0)
 			return (0);
@@ -140,6 +151,8 @@ pg_handle_fd_write(struct peregrine_context *ctx)
 	size_t frame_size;
 	off_t offset;
 
+	DEBUG("ctx=%p fd=%d", ctx, ctx->sock_fd);
+
 	for (;;) {
 		block = TAILQ_FIRST(&ctx->io);
 		if (block == NULL)
@@ -157,11 +170,12 @@ pg_handle_fd_write(struct peregrine_context *ctx)
 		offset = chunk_size * block->chunk_num;
 
 		if (pread(block->file->fd, &msgf->msg.data, chunk_size, offset) < 0) {
+			ERROR("cannot read from file %s: %s", block->file->path, strerror(errno));
+			continue;
 		}
 
-		if (sendto(ctx->sock_fd, frame, frame_size, MSG_DONTWAIT, (struct sockaddr *)&block->peer->addr,
-		           sizeof(struct sockaddr_in))
-		    < 0) {
+		if (sendto(ctx->sock_fd, frame, frame_size, MSG_DONTWAIT,
+		    (struct sockaddr *)&block->peer->addr, sizeof(struct sockaddr_in)) < 0) {
 			if (errno == EWOULDBLOCK)
 				break;
 		}
