@@ -28,9 +28,17 @@
 
 #include <stdint.h>
 
-enum chunk_state { CH_EMPTY = 0, CH_ACTIVE };
+enum chunk_state
+{
+	CH_EMPTY = 0,
+	CH_ACTIVE
+};
 
-enum chunk_downloaded { CH_NO = 0, CH_YES };
+enum chunk_downloaded
+{
+	CH_NO = 0,
+	CH_YES
+};
 
 struct chunk {
   uint64_t offset; /* offset in file where chunk begins [bytes] */

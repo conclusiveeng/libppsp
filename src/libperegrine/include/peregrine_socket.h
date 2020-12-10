@@ -61,37 +61,37 @@ struct ppspp_protocol_options {
 // };
 
 /* shared file */
-struct peregrine_file {
-  struct peregrine_context *context;
-  char path[1024]; /* full path to file: directory name + file name */
-  char sha[41];    /* textual representation of sha1 for a file */
-  uint64_t file_size;
-  uint32_t nl;             /* number of leaves */
-  uint32_t nc;             /* number of chunks */
-  struct chunk *tab_chunk; /* array of chunks for this file */
-  struct node *tree;       /* tree of the file */
-  struct node *tree_root;  /* pointer to root node of the tree */
-  int fd;
-  uint32_t start_chunk;
-  uint32_t end_chunk;
+struct peregrine_file
+{
+	struct peregrine_context *context;
+	char path[1024]; /* full path to file: directory name + file name */
+	char sha[41];    /* textual representation of sha1 for a file */
+	uint64_t file_size;
+	uint32_t nl;             /* number of leaves */
+	uint32_t nc;             /* number of chunks */
+	struct chunk *tab_chunk; /* array of chunks for this file */
+	struct node *tree;       /* tree of the file */
+	struct node *tree_root;  /* pointer to root node of the tree */
+	int fd;
+	uint32_t start_chunk;
+	uint32_t end_chunk;
 
-  SLIST_ENTRY(peregrine_file) ptrs;
+	SLIST_ENTRY(peregrine_file) entry;
 };
 
 /* known peer */
-struct peregrine_peer {
-  struct peregrine_context *context;
+struct peregrine_peer
+{
+	struct peregrine_context *context;
 
-  int sock_fd;
-  char str_addr[PEER_STR_ADDR];
-  struct sockaddr_in peer_addr;
-  /* other peer state: known files cache, etc */
-  LIST_ENTRY(peregrine_peer) ptrs;
-  uint8_t to_remove;
-  struct ppspp_protocol_options protocol_options;
-  uint32_t src_channel_id;
-  uint32_t dst_channel_id;
-  struct peregrine_file *file;
+	int sock_fd;
+	struct sockaddr_storage addr;
+	/* other peer state: known files cache, etc */
+	LIST_ENTRY(peregrine_peer) ptrs;
+	struct ppspp_protocol_options protocol_options;
+	uint32_t src_channel_id;
+	uint32_t dst_channel_id;
+	struct peregrine_file *file;
 };
 
 /* file being downloaded */
@@ -101,26 +101,25 @@ struct peregrine_download {
   int out_fd;
   LIST_HEAD(peregrine_download_peers, peregrine_peer) peers; // peers we download from
   /* other download state: downloaded chunks, known chunks, etc */
-  LIST_ENTRY(peregrine_download) ptrs;
+  LIST_ENTRY(peregrine_download) entry;
 };
 
 /* instance */
 struct peregrine_context {
-  int sock_fd;
-  uint32_t swarm_id;
-  struct peregrine_peer ctx_peer;
-  char *work_dir;
-  LIST_HEAD(peregrine_peers, peregrine_peer) peers;
-  SLIST_HEAD(peregrine_files, peregrine_file) files;
-  LIST_HEAD(peregrine_downloads, peregrine_download) downloads;
-  /* other instance state */
+	int sock_fd;
+	uint32_t swarm_id;
+	struct sockaddr_storage addr;
+	LIST_HEAD(, peregrine_peer) peers;
+	SLIST_HEAD(, peregrine_file) files;
+	LIST_HEAD(, peregrine_download) downloads;
+	TAILQ_HEAD(, peregrine_io_request) io;
+	/* other instance state */
 };
 
-int peregrine_socket_setup(unsigned long local_port, char *work_dir, struct peregrine_context *ctx);
-void peregrine_socket_loop(struct peregrine_context *ctx);
-int peregrine_socket_add_peer_from_cli(struct peregrine_context *ctx, char *in_buffer, struct peregrine_peer **peer);
-int peregrine_socket_add_peer_from_connection(struct peregrine_context *ctx, const struct sockaddr_in *peer_sockaddr,
-                                              struct peregrine_peer **peer);
-void peregrine_socket_finish(struct peregrine_context *ctx);
+int pg_context_create(struct sockaddr *sa, socklen_t salen, struct peregrine_context **ctxp);
+int pg_context_destroy(struct peregrine_context *ctx);
+int pg_handle_fd_read(struct peregrine_context *ctx);
+int pg_handle_fd_write(struct peregrine_context *ctx);
+int pg_add_peer(struct peregrine_context *ctx, struct sockaddr *sa);
 
 #endif
