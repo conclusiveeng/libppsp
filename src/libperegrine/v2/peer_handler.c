@@ -144,6 +144,7 @@ pg_handle_handshake(struct peregrine_peer *peer, struct msg *msg)
 				pos += sizeof(uint64_t);
 				break;
 			}
+			DEBUG("handshake: live_disc_wind = %d\n", options.live_disc_wind);
 			break;
 
 		case HANDSHAKE_OPT_SUPPORTED_MESSAGE:
