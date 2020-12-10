@@ -46,7 +46,7 @@ struct ppspp_protocol_options {
   uint8_t chunk_addr_method;
   uint64_t live_disc_wind;
   uint8_t supported_msgs_len;
-  uint32_t supported_msgs; // for now we ignore this field
+  void * supported_msgs; // for now we ignore this field
   uint32_t chunk_size;
 };
 

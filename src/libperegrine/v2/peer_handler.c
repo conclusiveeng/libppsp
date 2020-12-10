@@ -25,19 +25,21 @@ struct peregrine_frame_handler {
 	ssize_t (*handler)(struct peregrine_peer *, struct msg *);
 };
 
-static const struct peregrine_frame_handler frame_handlers[] = { { MSG_HANDSHAKE, pg_handle_handshake },
-	                                                         { MSG_DATA, pg_handle_data },
-	                                                         { MSG_ACK, pg_handle_ack },
-	                                                         { MSG_HAVE, pg_handle_have },
-	                                                         { MSG_INTEGRITY, pg_handle_integrity },
-	                                                         { MSG_PEX_RESV4, pg_handle_pex_resv4 },
-	                                                         { MSG_PEX_REQ, pg_handle_pex_req },
-	                                                         { MSG_SIGNED_INTEGRITY, pg_handle_signed_integrity },
-	                                                         { MSG_REQUEST, pg_handle_request },
-	                                                         { MSG_CANCEL, pg_handle_cancel },
-	                                                         { MSG_CHOKE, pg_handle_choke },
-	                                                         { MSG_UNCHOKE, pg_handle_unchoke },
-	                                                         { MSG_RESERVED, NULL } };
+static const struct peregrine_frame_handler frame_handlers[] = {
+    { MSG_HANDSHAKE, pg_handle_handshake },
+    { MSG_DATA, pg_handle_data },
+    { MSG_ACK, pg_handle_ack },
+    { MSG_HAVE, pg_handle_have },
+    { MSG_INTEGRITY, pg_handle_integrity },
+    { MSG_PEX_RESV4, pg_handle_pex_resv4 },
+    { MSG_PEX_REQ, pg_handle_pex_req },
+    { MSG_SIGNED_INTEGRITY, pg_handle_signed_integrity },
+    { MSG_REQUEST, pg_handle_request },
+    { MSG_CANCEL, pg_handle_cancel },
+    { MSG_CHOKE, pg_handle_choke },
+    { MSG_UNCHOKE, pg_handle_unchoke },
+    { MSG_RESERVED, NULL }
+};
 
 void
 print_dbg_protocol_options(struct ppspp_protocol_options *proto_options)
@@ -103,6 +105,12 @@ pg_handle_handshake(struct peregrine_peer *peer, struct msg *msg)
 			DEBUG("handshake: minimum_version = %d\n", options.minimum_version);
 			break;
 
+		case HANDSHAKE_OPT_CONTENT_INTEGRITY:
+			options.content_prot_method = opt->value[0];
+			pos += sizeof(opt) + sizeof(uint8_t);
+			DEBUG("handshake: content_prot_method = %d\n", options.chunk_addr_method);
+			break;
+
 		case HANDSHAKE_OPT_MERKLE_HASH_FUNC:
 			options.merkle_hash_func = opt->value[0];
 			pos += sizeof(opt) + sizeof(uint8_t);
@@ -113,6 +121,39 @@ pg_handle_handshake(struct peregrine_peer *peer, struct msg *msg)
 			options.live_signature_alg = opt->value[0];
 			pos += sizeof(opt) + sizeof(uint8_t);
 			DEBUG("handshake: live_signature_alg = %d\n", options.live_signature_alg);
+			break;
+
+		case HANDSHAKE_OPT_CHUNK_ADDRESSING_METHOD:
+			options.chunk_addr_method = opt->value[0];
+			pos += sizeof(opt) + sizeof(uint8_t);
+			DEBUG("handshake: chunk_addressing_method = %d\n", options.chunk_addr_method);
+			break;
+
+		case HANDSHAKE_OPT_LIVE_DISCARD_WINDOW:
+			pos += sizeof(opt);
+			switch (options.chunk_addr_method) {
+			case 0:
+			case 2:
+				options.live_disc_wind = be32toh(*(uint32_t *)opt->value);
+				pos += sizeof(uint32_t);
+				break;
+			case 1:
+			case 3:
+			case 4:
+				options.live_disc_wind = be64toh(*(uint32_t *)opt->value);
+				pos += sizeof(uint64_t);
+				break;
+			}
+			break;
+
+		case HANDSHAKE_OPT_SUPPORTED_MESSAGE:
+			options.supported_msgs_len = opt->value[0];
+			pos += sizeof(opt) + sizeof(uint8_t);
+
+			options.supported_msgs = calloc(1, options.supported_msgs_len);
+			memcpy(options.supported_msgs, &opt->value[1], options.supported_msgs_len);
+			pos += options.supported_msgs_len;
+			DEBUG("handshake: supported_msgs_len = %d\n", options.supported_msgs_len);
 			break;
 
 		case HANDSHAKE_OPT_CHUNK_SIZE:
@@ -495,66 +536,3 @@ peer_handle_request(struct peregrine_context *ctx, struct peregrine_peer *peer, 
 	}
 	return 0;
 }
-
-// /*
-//  * generate set of HAVE messages basing on that if given bit in number of chunks
-//  * is set or not if set - make proper HAVE subrange in other words - make HAVE
-//  * cache
-//  */
-// int
-// prepare_handshake_have(struct peregrine_peer *peer, size_t response_buffer_size, char *response)
-// {
-//   /* char *ptr, uint32_t dest_chan_id, uint32_t src_chan_id, uint8_t *opts, int opt_len,
-//                        struct peer *peer */
-//   char *d;
-//   int ret;
-//   int len;
-//   uint32_t b;
-//   uint32_t i;
-//   uint32_t v;
-//   uint32_t nc;
-
-//   /* serialize HANDSHAKE header and options */
-//   // len = make_handshake_request(ptr, dest_chan_id, src_chan_id, opts, opt_len);
-//   len = prepare_handshake(peer, response_buffer_size, response);
-
-//   /* alloc memory for HAVE cache */
-//   peer->have_cache = malloc(1024 * sizeof(struct have_cache));
-//   peer->num_have_cache = 0;
-
-//   d = ptr + len;
-//   nc = peer->file_list_entry->end_chunk - peer->file_list_entry->start_chunk + 1;
-
-//   b = 31; /* starting bit for scanning of bits */
-//   i = 0;  /* iterator */
-//   v = 0;
-//   while (i < 32) {
-//     if (nc & (1 << b)) { /* if the bit on position "b" is set? */
-//       d_printf("HAVE: %u..%u\n", v, v + (1 << b) - 1);
-
-//       /* add HAVE header + data */
-//       *d = HAVE;
-//       d++;
-
-//       *(uint32_t *)d = htobe32(v);
-//       d += sizeof(uint32_t);
-//       peer->have_cache[peer->num_have_cache].start_chunk = v;
-
-//       *(uint32_t *)d = htobe32(v + (1 << b) - 1);
-//       d += sizeof(uint32_t);
-//       peer->have_cache[peer->num_have_cache].end_chunk = v + (1 << b) - 1;
-
-//       v = v + (1 << b);
-//       peer->num_have_cache++;
-//     }
-//     i++;
-//     b--;
-//   }
-
-//   d_printf("num_have_cache: %d\n", peer->num_have_cache);
-
-//   ret = d - ptr;
-//   d_printf("%s: returning %d bytes\n", __func__, ret);
-
-//   return ret;
-// }
