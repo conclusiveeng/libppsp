@@ -35,7 +35,7 @@
 static const char *libperegrine_log_level_names[] = { "DEBUG", "INFO", "WARN", "ERROR" };
 
 void
-libperegrine_logf(enum libperegrine_log_level level, const char *func, const char *fmt, ...)
+pg_logf(enum peregrine_log_level level, const char *func, const char *fmt, ...)
 {
   const char *dest = NULL;
   static FILE *stream = NULL;

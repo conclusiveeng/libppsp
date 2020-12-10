@@ -58,7 +58,7 @@ peregrine_file_process_file(struct peregrine_file *file)
   chunk_size = CHUNK_SIZE;
   fd = open(file->path, O_RDONLY);
   if (fd < 0) {
-    PEREGRINE_ERROR("error opening file: %s", file->path);
+    ERROR("error opening file: %s", file->path);
     return -1;
   }
   fstat(fd, &stat);
@@ -169,7 +169,7 @@ peregrine_file_add_file(struct peregrine_context *context, char *name)
 
   st = lstat(name, &stat);
   if (st != 0) {
-    PEREGRINE_ERROR("Error: %s", strerror(errno));
+    ERROR("Error: %s", strerror(errno));
   }
   if (stat.st_mode & S_IFREG) { /* filename */
     struct peregrine_file *f = malloc(sizeof(struct peregrine_file));
@@ -194,9 +194,8 @@ peregrine_file_add_directory(struct peregrine_context *context, char *dname)
 
   while (1) {
     struct dirent *dirent = readdir(dir);
-    if (dirent == NULL) {
+    if (dirent == NULL)
       break;
-    }
 
     if (dirent->d_type == DT_REG) {
       sprintf(path, "%s/%s", dname, dirent->d_name);
@@ -215,5 +214,7 @@ void
 peregrine_file_list_sha1(struct peregrine_context *context)
 {
   struct peregrine_file *f;
-  SLIST_FOREACH(f, &context->files, ptrs) { PEREGRINE_INFO("File: %s, NC:%d, SHA1: %s", f->path, f->nc, f->sha); }
+  SLIST_FOREACH(f, &context->files, ptrs) {
+  	INFO("File: %s, NC:%d, SHA1: %s", f->path, f->nc, f->sha);
+  }
 }

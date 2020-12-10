@@ -83,19 +83,19 @@ mt_build_tree(int num_chunks, struct node **ret)
   struct node *root_node;
   struct node *tree;
 
-  //   PEREGRINE_DEBUG("num_chunks: %d", num_chunks);
+  //   DEBUG("num_chunks: %d", num_chunks);
 
   h = mt_order2(num_chunks); // "h" - height of the tree
   nc = 1 << h;               // if there are for example only 7 chunks - create tree with 8 leaves
-  //   PEREGRINE_DEBUG("order2(%d): %d", num_chunks, h);
-  //   PEREGRINE_DEBUG("num_chunks(orig): %d  after_correction: %d", num_chunks, nc);
+  //   DEBUG("order2(%d): %d", num_chunks, h);
+  //   DEBUG("num_chunks(orig): %d  after_correction: %d", num_chunks, nc);
 
   /* DEBUG: list the tree */
   //   for (l = 1; l <= h + 1; l++) {                        /* goes level by level from bottom up to highest level */
   //     first_idx = (1 << (l - 1)) - 1;                     /* first index on the given level starting
   //                                                            from left: 0, 1, 3, 7, 15, etc */
   //     for (si = first_idx; si < 2 * nc; si += (1 << l)) { /* si - sibling index */
-  //       PEREGRINE_DEBUG("%d ", si);
+  //       DEBUG("%d ", si);
   //     }
   //   }
 
@@ -129,7 +129,7 @@ mt_build_tree(int num_chunks, struct node **ret)
   *ret = tree; /* return just created tree */
 
   root_idx = (1 << h) - 1;
-  //   PEREGRINE_DEBUG("root node: %d", root_idx);
+  //   DEBUG("root node: %d", root_idx);
 
   root_node = &tree[root_idx];
   return root_node;
@@ -152,11 +152,11 @@ mt_show_tree_root_based(struct node *t)
   struct node min;
   struct node max;
 
-  PEREGRINE_DEBUG("print the tree starting from root node: %d", t->number);
+  DEBUG("print the tree starting from root node: %d", t->number);
 
   ti = t->number;
   mt_interval_min_max(t, &min, &max);
-  PEREGRINE_DEBUG("min: %d max: %d", min.number, max.number);
+  DEBUG("min: %d max: %d", min.number, max.number);
   nl = (max.number - min.number) / 2 + 1; /* number of leaves in given subtree */
   h = mt_order2(nl) + 1;
 
@@ -172,12 +172,12 @@ mt_show_tree_root_based(struct node *t)
     int m = iw * (2 + is) - is; /*  */
     /* d_printf("center: %d  iw: %d  m: %d  is: %d\n", center, iw, m, is); */
     for (sp = 0; sp < (center - m / 2); sp++) {
-      PEREGRINE_DEBUG("%s", " "); /* insert (center - m/2) spaces first */
+      DEBUG("%s", " "); /* insert (center - m/2) spaces first */
     }
     for (si = first_idx; si <= max.number; si += (1 << l)) {
-      PEREGRINE_DEBUG("%2d", si);
+      DEBUG("%2d", si);
       for (sp = 0; sp < is; sp++) {
-	PEREGRINE_DEBUG("%s", " "); /* add a few spaces */
+	DEBUG("%s", " "); /* add a few spaces */
       }
     }
     first_idx -= (1 << (l - 2));
@@ -205,7 +205,7 @@ mt_find_sibling(struct node *n)
     s = p->left;
   }
 
-  PEREGRINE_DEBUG("node: %d   parent: %d  sibling: %d", n->number, p->number, s->number);
+  DEBUG("node: %d   parent: %d  sibling: %d", n->number, p->number, s->number);
 
   return s;
 }
@@ -235,7 +235,7 @@ mt_interval_min_max(struct node *i, struct node *min, struct node *max)
 
   memcpy(max, c, sizeof(struct node));
 
-  PEREGRINE_DEBUG("root: %d  interval  min: %d  max: %d", i->number, min->number, max->number);
+  DEBUG("root: %d  interval  min: %d  max: %d", i->number, min->number, max->number);
 }
 
 /*
@@ -258,7 +258,7 @@ mt_dump_tree(struct node *t, int l)
     for (y = 0; y < 20; y++) {
       s += sprintf(shas + s, "%02x", t[x].sha[y] & 0xff);
     }
-    PEREGRINE_DEBUG("[%3d]  %d  %s", t[x].number, t[x].state, shas);
+    DEBUG("[%3d]  %d  %s", t[x].number, t[x].state, shas);
   }
 }
 
@@ -276,7 +276,7 @@ mt_dump_chunk_tab(struct chunk *c, int l)
   int x;
   int y;
 
-  PEREGRINE_DEBUG("l: %d", l);
+  DEBUG("l: %d", l);
   for (x = 0; x < l; x++) {
     int s = 0;
     for (y = 0; y < 20; y++) {
@@ -284,7 +284,7 @@ mt_dump_chunk_tab(struct chunk *c, int l)
     }
     buf[40] = '\0';
     if (c[x].state != CH_EMPTY) {
-      PEREGRINE_DEBUG("chunk[%3d]  off: %8lu  len: %8u  sha: %s  state: %s", x, c[x].offset, c[x].len, buf,
+      DEBUG("chunk[%3d]  off: %8lu  len: %8u  sha: %s  state: %s", x, c[x].offset, c[x].len, buf,
                       c[x].state == CH_EMPTY ? "EMPTY" : "ACTIVE");
     }
   }
@@ -342,7 +342,7 @@ mt_update_sha(struct node *t, int num_chunks)
       // 	s += sprintf(sha_parent + s, "%02x", digest[y] & 0xff);
       //       }
       //       sha_parent[40] = '\0';
-      //       PEREGRINE_DEBUG(" p[%d]: %s", t[parent].number, sha_parent);
+      //       DEBUG(" p[%d]: %s", t[parent].number, sha_parent);
 
       t[parent].state = ACTIVE;
     }

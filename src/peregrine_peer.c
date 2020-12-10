@@ -18,12 +18,12 @@ main(int argc, char const *argv[])
   }
   local_port = strtoul(argv[1], NULL, 0);
   if (local_port < 1 || local_port > 65535) {
-    PEREGRINE_ERROR("Invalid local port '%s'\n", argv[1]);
+    ERROR("Invalid local port '%s'\n", argv[1]);
     return 1;
   }
 
   if (peregrine_socket_setup(local_port, (char *)argv[2], &context) < 0) {
-    PEREGRINE_ERROR("Error while seting up server!");
+    ERROR("Error while seting up server!");
     return 1;
   }
 
