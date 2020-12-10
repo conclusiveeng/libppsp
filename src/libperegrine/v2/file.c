@@ -138,7 +138,7 @@ peregrine_file_process_file(struct peregrine_file *file)
 }
 
 void
-peregrine_file_generate_sha1(struct peregrine_context *context)
+pg_file_generate_sha1(struct peregrine_context *context)
 {
 	int s;
 	int y;
@@ -162,7 +162,7 @@ peregrine_file_generate_sha1(struct peregrine_context *context)
 }
 
 void
-peregrine_file_add_file(struct peregrine_context *context, char *name)
+pg_file_add_file(struct peregrine_context *context, char *name)
 {
 	struct stat stat;
 	int st;
@@ -181,7 +181,7 @@ peregrine_file_add_file(struct peregrine_context *context, char *name)
 	}
 }
 void
-peregrine_file_add_directory(struct peregrine_context *context, char *dname)
+pg_file_add_directory(struct peregrine_context *context, char *dname)
 {
 	DIR *dir;
 	char newdir[BUFSIZ];
@@ -199,20 +199,20 @@ peregrine_file_add_directory(struct peregrine_context *context, char *dname)
 
 		if (dirent->d_type == DT_REG) {
 			sprintf(path, "%s/%s", dname, dirent->d_name);
-			peregrine_file_add_file(context, path);
+			pg_file_add_file(context, path);
 		}
 
 		if ((dirent->d_type == DT_DIR) && (strcmp(dirent->d_name, ".") != 0)
 		    && (strcmp(dirent->d_name, "..") != 0)) {
 			snprintf(newdir, sizeof(newdir) - 1, "%s/%s", dname, dirent->d_name);
-			peregrine_file_add_directory(context, newdir);
+			pg_file_add_directory(context, newdir);
 		}
 	}
 	closedir(dir);
 }
 
 void
-peregrine_file_list_sha1(struct peregrine_context *context)
+pg_file_list_sha1(struct peregrine_context *context)
 {
 	struct peregrine_file *f;
 	SLIST_FOREACH(f, &context->files, entry) { INFO("File: %s, NC:%d, SHA1: %s", f->path, f->nc, f->sha); }

@@ -74,6 +74,14 @@ pg_context_create(struct sockaddr *sa, socklen_t salen, struct peregrine_context
 }
 
 int
+pg_context_add_directory(struct peregrine_context *ctx, const char *directory)
+{
+	pg_file_add_directory(ctx, directory);
+	pg_file_generate_sha1(ctx);
+	pg_file_list_sha1(ctx);
+}
+
+int
 pg_context_destroy(struct peregrine_context *ctx)
 {
 }
@@ -85,8 +93,7 @@ pg_context_get_fd(struct peregrine_context *ctx)
 }
 
 static int
-peregrine_handle_frame(struct peregrine_context *ctx, const struct sockaddr *client,
-    const uint8_t *frame, size_t len)
+peregrine_handle_frame(struct peregrine_context *ctx, const struct sockaddr *client, const uint8_t *frame, size_t len)
 {
 	struct peregrine_peer *peer;
 	struct msg *msg;
@@ -126,8 +133,8 @@ pg_handle_fd_read(struct peregrine_context *ctx)
 	DEBUG("ctx=%p fd=%d", ctx, ctx->sock_fd);
 
 	for (;;) {
-		ret = recvfrom(ctx->sock_fd, frame, sizeof(frame), MSG_DONTWAIT,
-	 	    (struct sockaddr *)&client_addr, &client_addr_len);
+		ret = recvfrom(ctx->sock_fd, frame, sizeof(frame), MSG_DONTWAIT, (struct sockaddr *)&client_addr,
+		               &client_addr_len);
 
 		if (ret == 0)
 			return (0);
@@ -172,8 +179,9 @@ pg_handle_fd_write(struct peregrine_context *ctx)
 			continue;
 		}
 
-		if (sendto(ctx->sock_fd, frame, frame_size, MSG_DONTWAIT,
-		    (struct sockaddr *)&block->peer->addr, sizeof(struct sockaddr_in)) < 0) {
+		if (sendto(ctx->sock_fd, frame, frame_size, MSG_DONTWAIT, (struct sockaddr *)&block->peer->addr,
+		           sizeof(struct sockaddr_in))
+		    < 0) {
 			if (errno == EWOULDBLOCK)
 				break;
 		}

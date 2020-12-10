@@ -1,13 +1,13 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-#include <sysexits.h>
-#include <getopt.h>
-#include <poll.h>
 #include "libperegrine/v2/log.h"
 #include "peregrine_socket.h"
+#include <errno.h>
+#include <getopt.h>
+#include <poll.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sysexits.h>
+#include <unistd.h>
 
 int debug;
 
@@ -50,6 +50,11 @@ main(int argc, char const *argv[])
 
 	if (pg_context_create((struct sockaddr *)&sin, sizeof(struct sockaddr_in), &context) != 0) {
 		fprintf(stderr, "cannot create context: %s\n", strerror(errno));
+		exit(EX_OSERR);
+	}
+
+	if (pg_context_add_directory(context, directory) != 0) {
+		fprintf(stderr, "cannot add directory to context: %s\n", strerror(errno));
 		exit(EX_OSERR);
 	}
 
