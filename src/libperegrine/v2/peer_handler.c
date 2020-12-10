@@ -109,7 +109,7 @@ pg_handle_handshake(struct peregrine_peer *peer, struct msg *msg)
 		case HANDSHAKE_OPT_CONTENT_INTEGRITY:
 			options.content_prot_method = opt->value[0];
 			pos += sizeof(*opt) + sizeof(uint8_t);
-			DEBUG("handshake: content_prot_method = %d\n", options.chunk_addr_method);
+			DEBUG("handshake: content_prot_method = %d", options.chunk_addr_method);
 			break;
 
 		case HANDSHAKE_OPT_MERKLE_HASH_FUNC:
@@ -127,7 +127,7 @@ pg_handle_handshake(struct peregrine_peer *peer, struct msg *msg)
 		case HANDSHAKE_OPT_CHUNK_ADDRESSING_METHOD:
 			options.chunk_addr_method = opt->value[0];
 			pos += sizeof(*opt) + sizeof(uint8_t);
-			DEBUG("handshake: chunk_addressing_method = %d\n", options.chunk_addr_method);
+			DEBUG("handshake: chunk_addressing_method = %d", options.chunk_addr_method);
 			break;
 
 		case HANDSHAKE_OPT_LIVE_DISCARD_WINDOW:
@@ -145,7 +145,7 @@ pg_handle_handshake(struct peregrine_peer *peer, struct msg *msg)
 				pos += sizeof(uint64_t);
 				break;
 			}
-			DEBUG("handshake: live_disc_wind = %d\n", options.live_disc_wind);
+			DEBUG("handshake: live_disc_wind = %d", options.live_disc_wind);
 			break;
 
 		case HANDSHAKE_OPT_SUPPORTED_MESSAGE:
@@ -155,7 +155,7 @@ pg_handle_handshake(struct peregrine_peer *peer, struct msg *msg)
 			options.supported_msgs = calloc(1, options.supported_msgs_len);
 			memcpy(options.supported_msgs, &opt->value[1], options.supported_msgs_len);
 			pos += options.supported_msgs_len;
-			DEBUG("handshake: supported_msgs_len = %d\n", options.supported_msgs_len);
+			DEBUG("handshake: supported_msgs_len = %d", options.supported_msgs_len);
 			break;
 
 		case HANDSHAKE_OPT_CHUNK_SIZE:
@@ -174,7 +174,7 @@ pg_handle_handshake(struct peregrine_peer *peer, struct msg *msg)
 	}
 
 done:
-	return sizeof(struct msg) + sizeof(struct msg_integrity);
+	return sizeof(struct msg) + sizeof(struct msg_handshake) + pos;
 }
 
 static ssize_t

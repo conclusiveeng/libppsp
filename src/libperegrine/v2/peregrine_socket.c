@@ -135,11 +135,7 @@ pg_handle_fd_read(struct peregrine_context *ctx)
 		if (ret < 0)
 			return (-1);
 
-		for (;;) {
-			pos += peregrine_handle_frame(ctx, (struct sockaddr *)&client_addr, frame, ret);
-			if (pos >= ret)
-				break;
-		}
+		peregrine_handle_frame(ctx, (struct sockaddr *)&client_addr, frame, ret);
 	}
 }
 
