@@ -86,14 +86,23 @@ struct peregrine_peer {
   int sock_fd;
   char str_addr[PEER_STR_ADDR];
   struct sockaddr_in peer_addr;
-  /* other peer state: known files cache, etc */
-  LIST_ENTRY(peregrine_peer) ptrs;
-  uint8_t to_remove;
-  uint8_t handshake_send;
-  struct ppspp_protocol_options protocol_options;
-  uint32_t src_channel_id;
+  // Operation status
+  uint8_t to_remove;                              // Peer makrked to remove (send handshake finish)
+  uint8_t handshake_send;                         // Peer under initialization (wainting for second handshake)
+  struct ppspp_protocol_options protocol_options; // Protocol configuration for peer
+  struct peregrine_file *file;                    // Selected file
+  // Main peer info
   uint32_t dst_channel_id;
-  struct peregrine_file *file;
+  uint32_t src_channel_id;
+  // Handle REQUEST message
+  uint8_t *seeder_data_bmp;
+  uint32_t seeder_current_chunk;
+  uint32_t seeder_request_start_chunk;
+  uint32_t seeder_request_end_chunk;
+  uint8_t seeder_pex_request;
+
+  // Make a list of them
+  LIST_ENTRY(peregrine_peer) ptrs;
 };
 
 /* file being downloaded */

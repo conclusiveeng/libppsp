@@ -22,19 +22,19 @@ proto_print_protocol_options(struct ppspp_protocol_options *proto_options)
 }
 
 enum ppspp_handshake_type
-proto_parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id,
+proto_parse_handshake(char *input, uint32_t *dest_chan_id, uint32_t *src_chan_id,
                       struct ppspp_protocol_options *proto_options, uint32_t *bytes_parsed)
 {
   // FIXME: Maybe 'struct msg_handshake' could be use for parsing
   //  Descritpion can be found at section 8.4 of https://tools.ietf.org/rfc/rfc7574.txt
-  uint8_t *msg_ptr = (uint8_t *)ptr;
+  uint8_t *msg_ptr = (uint8_t *)input;
   enum ppspp_handshake_type ret = HANDSHAKE_ERROR;
 
   *dest_chan_id = be32toh(*(uint32_t *)msg_ptr);
   msg_ptr += sizeof(uint32_t);
   if (*msg_ptr != MSG_HANDSHAKE) {
     PEREGRINE_ERROR("[PEER] Wrong HANDSHAKE message format. Should be %u, actual value: %u", 0, *msg_ptr);
-    *bytes_parsed = (char *)msg_ptr - ptr;
+    *bytes_parsed = (char *)msg_ptr - input;
     return HANDSHAKE_ERROR;
   }
   msg_ptr += sizeof(uint8_t);
@@ -48,7 +48,7 @@ proto_parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id,
   // Peer wants to close connection
   if ((*dest_chan_id != 0x0) && (*src_chan_id == 0x0)) {
     // Don't parse handshake if it's close request!
-    *bytes_parsed = (char *)msg_ptr - ptr;
+    *bytes_parsed = (char *)msg_ptr - input;
     return HANDSHAKE_CLOSE;
   }
 
@@ -112,7 +112,7 @@ proto_parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id,
       msg_ptr += sizeof(uint64_t);
       break;
     default:
-      *bytes_parsed = (char *)msg_ptr - ptr;
+      *bytes_parsed = (char *)msg_ptr - input;
       return HANDSHAKE_ERROR;
     }
   }
@@ -135,11 +135,12 @@ proto_parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id,
   if ((*msg_ptr & 0xff) == F_END_OPTION) {
     msg_ptr += sizeof(uint8_t);
   } else {
-    PEREGRINE_ERROR("[PEER] Should be END_OPTION(0xff) but it is: d[%td]: %d", (char *)msg_ptr - ptr, *msg_ptr & 0xff);
+    PEREGRINE_ERROR("[PEER] Should be END_OPTION(0xff) but it is: d[%td]: %d", (char *)msg_ptr - input,
+                    *msg_ptr & 0xff);
     return HANDSHAKE_ERROR;
   }
 
-  *bytes_parsed = (char *)msg_ptr - ptr;
+  *bytes_parsed = (char *)msg_ptr - input;
   PEREGRINE_DEBUG("[PEER] parsed %td bytes", *bytes_parsed);
   return ret;
 }
@@ -258,6 +259,14 @@ proto_prepare_have(struct peregrine_peer *peer, size_t response_buffer_size, cha
     bit--;
   }
   return offset;
+}
+
+int
+proto_unpack_channel_id(const char *input, uint32_t *remote_channel_id)
+{
+  uint32_t channel_id = be32toh(*(uint32_t *)input);
+  *remote_channel_id = channel_id;
+  return sizeof(uint32_t);
 }
 
 size_t

@@ -199,11 +199,13 @@ struct msg {
 } __attribute__((packed));
 
 void proto_print_protocol_options(struct ppspp_protocol_options *proto_options);
-enum ppspp_handshake_type proto_parse_handshake(char *ptr, uint32_t *dest_chan_id, uint32_t *src_chan_id,
+enum ppspp_handshake_type proto_parse_handshake(char *input, uint32_t *dest_chan_id, uint32_t *src_chan_id,
                                                 struct ppspp_protocol_options *proto_options, uint32_t *bytes_parsed);
 int proto_prepare_handshake_replay(struct peregrine_peer *peer, size_t response_buffer_size, char *response);
 int proto_prepare_handshake(struct peregrine_peer *peer, size_t response_buffer_size, char *response);
 int proto_prepare_have(struct peregrine_peer *peer, size_t response_buffer_size, char *response);
+
+int proto_unpack_channel_id(const char *input, uint32_t *remote_channel_id);
 
 size_t pack_have(void *dptr, uint32_t start_chunk, uint32_t end_chunk);
 size_t pack_data(void *dptr, uint32_t start_chunk, uint32_t end_chunk, uint64_t timestamp);
