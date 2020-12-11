@@ -1,7 +1,8 @@
-#include <netinet/in.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
-#include "peregrine/utils.h"
+#include <netinet/in.h>
 #include "internal.h"
 
 int
@@ -54,16 +55,36 @@ struct pg_file *
 pg_context_file_by_sha(struct pg_context *ctx, const char *sha)
 {
 	struct pg_file *file;
+
 	SLIST_FOREACH(file, &ctx->files, entry) {
-		if (strcmp(file->sha, sha) == 0)
+		if (memcmp(file->sha, sha, sizeof(file->sha)) == 0)
 			return (file);
 	}
 
 	return (NULL);
 }
 
+const char *
+pg_hexdump(const uint8_t *buf, size_t len)
+{
+	static char storage[1024];
+	int bytes = 0;
+	size_t i;
+
+	for (i = 0; i < len; i++)
+		bytes += sprintf(&storage[bytes], "%02x", buf[i]);
+
+	return (storage);
+}
+
+const char *
+pg_swarm_to_str(struct pg_swarm *swarm)
+{
+	return pg_hexdump(swarm->swarm_id, swarm->swarm_id_len);
+}
+
 uint32_t
 pg_new_channel_id(void)
 {
-	
+	return (rand());
 }

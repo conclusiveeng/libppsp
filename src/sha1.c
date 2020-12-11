@@ -56,7 +56,7 @@
  *
  */
 
-#include "peregrine/sha1.h"
+#include "sha1.h"
 #include "internal.h"
 
 /*

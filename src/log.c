@@ -26,14 +26,18 @@
  *
  */
 
-#include "peregrine/log.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "internal.h"
+#include "log.h"
 
-static const char *libperegrine_log_level_names[] = { "DEBUG", "INFO", "WARN", "ERROR" };
+static const char *pg_log_level_names[] = {
+	"DEBUG",
+	"INFO",
+	"WARN",
+	"ERROR"
+};
 
 void
 pg_logf(enum peregrine_log_level level, const char *func, const char *fmt, ...)
@@ -54,27 +58,9 @@ pg_logf(enum peregrine_log_level level, const char *func, const char *fmt, ...)
 	}
 
 	va_start(ap, fmt);
-	fprintf(stream, "[%s]\t %s: ", libperegrine_log_level_names[level], func);
+	fprintf(stream, "[%s]\t %s: ", pg_log_level_names[level], func);
 	vfprintf(stream, fmt, ap);
 	fprintf(stream, "\n");
 	fflush(stream);
 	va_end(ap);
-}
-
-void
-dbgutil_str2hex(char *in, size_t in_size, char *out, size_t out_size)
-{
-	char *ptr_in = in;
-	const char *hex = "0123456789ABCDEF";
-	char *ptr_out = out;
-	for (; ptr_in < in + in_size; ptr_out += 3, ptr_in++) {
-		ptr_out[0] = hex[(*ptr_in >> 4) & 0xF];
-		ptr_out[1] = hex[*ptr_in & 0xF];
-		ptr_out[2] = ':';
-		if (ptr_out + 3 - out > (long)out_size) {
-			// Truncate instead of overflow...
-			break;
-		}
-	}
-	out[ptr_out - out - 1] = 0;
 }

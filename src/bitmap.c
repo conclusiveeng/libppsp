@@ -23,23 +23,22 @@
  * SUCH DAMAGE.
  */
 
-#include "peregrine/bitmap.h"
 #include <stdlib.h>
 #include "internal.h"
 
-void
-pg_bitmap_create(uint64_t size, struct pg_bitmap **bmpp)
+struct pg_bitmap *
+pg_bitmap_create(uint64_t size)
 {
 	struct pg_bitmap *bmp;
 	uint64_t data_size;
 
+	data_size = size % 8 ? (size / 8) + 1 : size / 8;
+
 	bmp = calloc(1, sizeof(*bmp));
 	bmp->size = size;
-
-	data_size = size % 8 ? (size / 8) + 1 : size / 8;
 	bmp->data = calloc(1, data_size);
 
-	*bmpp = bmp;
+	return (bmp);
 }
 
 void

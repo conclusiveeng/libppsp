@@ -22,13 +22,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "peregrine/mt.h"
-#include "peregrine/log.h"
-#include "peregrine/sha1.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "sha1.h"
 #include "internal.h"
+#include "log.h"
 
 /**
  * @brief return rounded order of 32-bit variable, similar to log2()

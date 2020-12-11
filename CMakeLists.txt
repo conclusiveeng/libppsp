@@ -43,12 +43,12 @@ set(SOURCE_FILES
         src/internal.h
         src/log.c
         src/socket.c
-        src/peer_handler.c
+        src/peer.c
         src/file.c
         src/sha1.c
         src/mt.c
         src/utils.c
-        src/proto_helper.c
+        src/proto.c
         src/bitmap.c)
 
 add_library(libperegrine SHARED ${SOURCE_FILES})

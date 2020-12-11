@@ -1,8 +1,4 @@
-#include "peregrine/socket.h"
-#include "peregrine/file.h"
-#include "peregrine/log.h"
-#include "peregrine/peer_handler.h"
-#include "peregrine/utils.h"
+
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
@@ -16,14 +12,15 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include "internal.h"
+#include "proto.h"
+#include "log.h"
 
 static struct pg_peer *
 pg_find_peer(struct pg_context *ctx, const struct sockaddr *saddr)
 {
 	struct pg_peer *peer;
 
-	LIST_FOREACH(peer, &ctx->peers, ptrs)
-	{
+	LIST_FOREACH(peer, &ctx->peers, entry) {
 		if (pg_sockaddr_cmp((struct sockaddr *)&peer->addr, saddr) == 0)
 			return (peer);
 	}
@@ -43,6 +40,9 @@ pg_find_or_add_peer(struct pg_context *ctx, const struct sockaddr *saddr)
 	peer = calloc(1, sizeof(*peer));
 	peer->context = ctx;
 	pg_sockaddr_copy(&peer->addr, saddr);
+
+	LIST_INIT(&peer->swarms);
+	LIST_INSERT_HEAD(&ctx->peers, peer, entry);
 
 	return (peer);
 }
@@ -75,30 +75,15 @@ pg_context_create(struct sockaddr *sa, socklen_t salen, struct pg_context **ctxp
 }
 
 int
-pg_context_add_directory(struct pg_context *ctx, const char *directory)
+pg_context_destroy(struct pg_context *ctx)
 {
-	pg_file_add_directory(ctx, directory);
-	pg_file_generate_sha1(ctx);
-	pg_file_list_sha1(ctx);
-
-	return (0);
-}
-
-struct pg_file*
-pg_context_add_file(struct pg_context *ctx, const char *path)
-{
-	return (pg_file_add_file(ctx, path));
-}
-
-int
-pg_context_destroy(struct pg_context *ctx) {
 	struct pg_peer *peer;
 	struct pg_download *download;
 	struct pg_file *file;
 	struct pg_block *block;
 
-	LIST_FOREACH(peer, &ctx->peers, ptrs) {
-		LIST_REMOVE(peer, ptrs);
+	LIST_FOREACH(peer, &ctx->peers, entry) {
+		LIST_REMOVE(peer, entry);
 		free(peer);
 	}
 
@@ -136,7 +121,7 @@ peregrine_handle_frame(struct pg_context *ctx, const struct sockaddr *client, co
 	size_t pos;
 	ssize_t ret;
 
-	channel_id = ((uint32_t *)frame)[0];
+	channel_id = be32toh(*(uint32_t *)frame);
 	peer = pg_find_or_add_peer(ctx, client);
 
 	if (len == 4) {
@@ -146,7 +131,7 @@ peregrine_handle_frame(struct pg_context *ctx, const struct sockaddr *client, co
 
 	for (pos = 4; pos < len;) {
 		msg = (struct msg *)&frame[pos];
-		ret = pg_handle_message(peer, msg);
+		ret = pg_handle_message(peer, channel_id, msg);
 		if (ret < 0)
 			break;
 
@@ -199,13 +184,13 @@ pg_handle_fd_write(struct pg_context *ctx)
 			break;
 
 		msgf = (struct msg_frame *)frame;
-		msgf->channel_id = block->peer->dst_channel_id;
+		msgf->channel_id = block->ps->dst_channel_id;
 		msgf->msg.message_type = MSG_DATA;
 		msgf->msg.data.start_chunk = block->chunk_num;
 		msgf->msg.data.end_chunk = block->chunk_num;
 		msgf->msg.data.timestamp = 0; /* ??? */
 
-		chunk_size = block->peer->protocol_options.chunk_size;
+		chunk_size = block->ps->options.chunk_size;
 		frame_size = sizeof(msgf->channel_id) + sizeof(msgf->msg.data) + chunk_size;
 		offset = chunk_size * block->chunk_num;
 
@@ -214,9 +199,8 @@ pg_handle_fd_write(struct pg_context *ctx)
 			continue;
 		}
 
-		if (sendto(ctx->sock_fd, frame, frame_size, MSG_DONTWAIT, (struct sockaddr *)&block->peer->addr,
-		           sizeof(struct sockaddr_in))
-		    < 0) {
+		if (sendto(ctx->sock_fd, frame, frame_size, MSG_DONTWAIT,
+		    (struct sockaddr *)&block->ps->peer->addr, sizeof(struct sockaddr_in)) < 0) {
 			if (errno == EWOULDBLOCK)
 				break;
 		}

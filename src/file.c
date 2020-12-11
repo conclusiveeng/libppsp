@@ -23,12 +23,6 @@
  * SUCH DAMAGE.
  */
 
-#include "peregrine/file.h"
-#include "peregrine/log.h"
-#include "peregrine/mt.h"
-#include "peregrine/peer_handler.h"
-#include "peregrine/socket.h"
-#include "peregrine/sha1.h"
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -37,7 +31,11 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "peregrine/file.h"
+#include "peregrine/socket.h"
+#include "sha1.h"
 #include "internal.h"
+#include "log.h"
 
 int
 peregrine_file_process_file(struct pg_file *file)
@@ -149,14 +147,8 @@ pg_file_generate_sha1(struct pg_context *context)
 		/* does the tree already exist for given file? */
 		if (f->tree_root == NULL) { /* no - so create tree for it */
 			peregrine_file_process_file(f);
-
-			char sha[40 + 1];
-			memset(sha, 0, sizeof(sha));
-			s = 0;
-			for (y = 0; y < 20; y++) {
-				s += sprintf(sha + s, "%02x", f->tree_root->sha[y] & 0xff);
-			}
-			memcpy(f->sha, sha, 41);
+			memcpy(f->sha, f->tree_root->sha, sizeof(f->sha));
+			strcpy(f->hash, pg_hexdump(f->sha, sizeof(f->sha)));
 		}
 	}
 }
@@ -169,7 +161,7 @@ pg_file_add_file(struct pg_context *context, const char *name)
 
 	st = lstat(name, &stat);
 	if (st != 0) {
-		ERROR("Error: %s", strerror(errno));
+		ERROR("stat: %s", strerror(errno));
 	}
 	if (stat.st_mode & S_IFREG) { /* filename */
 		struct pg_file *f = malloc(sizeof(struct pg_file));
@@ -184,7 +176,7 @@ pg_file_add_file(struct pg_context *context, const char *name)
 	return (NULL);
 }
 
-void
+int
 pg_file_add_directory(struct pg_context *context, const char *dname)
 {
 	DIR *dir;
@@ -192,9 +184,8 @@ pg_file_add_directory(struct pg_context *context, const char *dname)
 	char path[BUFSIZ];
 
 	dir = opendir(dname);
-	if (dir == NULL) {
-		return;
-	}
+	if (dir == NULL)
+		return (-1);
 
 	while (1) {
 		struct dirent *dirent = readdir(dir);
@@ -212,14 +203,16 @@ pg_file_add_directory(struct pg_context *context, const char *dname)
 			pg_file_add_directory(context, newdir);
 		}
 	}
+
 	closedir(dir);
+	return (0);
 }
 
 void
 pg_file_list_sha1(struct pg_context *context)
 {
 	struct pg_file *f;
-	SLIST_FOREACH(f, &context->files, entry) {
-		INFO("File: %s, NC:%d, SHA1: %s", f->path, f->nc, f->sha); }
-	}
+
+	SLIST_FOREACH(f, &context->files, entry)
+		INFO("File: %s, NC:%d, SHA1: %s", f->path, f->nc, f->hash);
 }

@@ -1,11 +1,7 @@
-#include "peregrine/proto_helper.h"
-#include "peregrine/log.h"
-#include "peregrine/peer_handler.h"
-#include "peregrine/socket.h"
-#include "peregrine/log.h"
 #include <stdlib.h>
 #include <string.h>
 #include "internal.h"
+#include "log.h"
 
 size_t
 pack_handshake(void *dptr, uint32_t src_channel_id)
