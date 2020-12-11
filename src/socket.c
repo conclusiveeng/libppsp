@@ -1,4 +1,4 @@
-#include "peregrine/peregrine_socket.h"
+#include "peregrine/socket.h"
 #include "peregrine/file.h"
 #include "peregrine/log.h"
 #include "peregrine/peer_handler.h"

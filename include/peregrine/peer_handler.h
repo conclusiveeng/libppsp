@@ -26,7 +26,7 @@
 #ifndef _PEER_HANDLER_H_
 #define _PEER_HANDLER_H_
 
-#include "peregrine_socket.h"
+#include "socket.h"
 #include <stddef.h>
 #include <stdint.h>
 

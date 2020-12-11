@@ -26,7 +26,7 @@
 #ifndef _PROTO_HELPER_H_
 #define _PROTO_HELPER_H_
 
-#include "peregrine_socket.h"
+#include "socket.h"
 #include <netinet/in.h>
 #include <stddef.h>
 #include <stdint.h>

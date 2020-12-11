@@ -42,7 +42,7 @@ include_directories(include)
 set(SOURCE_FILES
         src/internal.h
         src/log.c
-        src/peregrine_socket.c
+        src/socket.c
         src/peer_handler.c
         src/file.c
         src/sha1.c

@@ -27,7 +27,7 @@
 #include "peregrine/log.h"
 #include "peregrine/mt.h"
 #include "peregrine/peer_handler.h"
-#include "peregrine/peregrine_socket.h"
+#include "peregrine/socket.h"
 #include "peregrine/sha1.h"
 #include <dirent.h>
 #include <errno.h>

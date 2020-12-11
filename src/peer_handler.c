@@ -1,6 +1,6 @@
 #include "peregrine/peer_handler.h"
 #include "peregrine/log.h"
-#include "peregrine/peregrine_socket.h"
+#include "peregrine/socket.h"
 #include "peregrine/proto_helper.h"
 #include <stdint.h>
 #include <stdlib.h>

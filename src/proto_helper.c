@@ -1,7 +1,7 @@
 #include "peregrine/proto_helper.h"
 #include "peregrine/log.h"
 #include "peregrine/peer_handler.h"
-#include "peregrine/peregrine_socket.h"
+#include "peregrine/socket.h"
 #include "peregrine/log.h"
 #include <stdlib.h>
 #include <string.h>

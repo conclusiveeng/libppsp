@@ -25,7 +25,7 @@
 
 #ifndef _PEER_H_
 #define _PEER_H_
-#include "peregrine_socket.h"
+#include "socket.h"
 
 void pg_file_generate_sha1(struct pg_context *context);
 struct pg_file *pg_file_add_file(struct pg_context *context, const char *name);
