@@ -133,7 +133,7 @@ pg_send_have(struct pg_peer_swarm *ps)
 }
 
 static ssize_t
-pg_handle_handshake(struct pg_peer *peer, uint32_t source_channel_id, struct msg *msg)
+pg_handle_handshake(struct pg_peer *peer, uint32_t dst_channel_id, struct msg *msg)
 {
 	struct pg_peer_swarm *ps;
 	struct pg_swarm *swarm;
@@ -254,17 +254,26 @@ done:
 		return (-1);
 	}
 
+	// Handshake finish
+	if (be32toh(dst_channel_id) != 0 && be32toh(msg->handshake.src_channel_id) == 0) {
+		ps->peer->to_remove = 1;
+		return sizeof(struct msg) + sizeof(struct msg_handshake) + pos;
+	}
+
+	// HANDSHAKE INIT dst_channel_id = 0, src_channel_id != 0
 	ps = calloc(1, sizeof(struct pg_peer_swarm));
 	ps->peer = peer;
 	ps->swarm = swarm;
-	ps->src_channel_id = htobe32(pg_new_channel_id());
-	ps->dst_channel_id = msg->handshake.src_channel_id;
+	ps->src_channel_id = be32toh(msg->handshake.src_channel_id); // Keep in host form, 'pack_' will convert to wire
+	if (ps->dst_channel_id == 0) {
+		ps->dst_channel_id = pg_new_channel_id();
+	}
 	ps->options = options;
 	LIST_INSERT_HEAD(&peer->swarms, ps, entry);
 	LIST_INSERT_HEAD(&swarm->peers, ps, entry);
 
-	len = pack_dest_chan(response, ps->dst_channel_id);
-	len += pack_handshake(response + len, ps->src_channel_id);
+	len = pack_dest_chan(response, ps->src_channel_id);
+	len += pack_handshake(response + len, ps->dst_channel_id);
 	len += pack_handshake_opt_u8(response + len, HANDSHAKE_OPT_VERSION, 1);
 	len += pack_handshake_opt_u8(response + len, HANDSHAKE_OPT_MIN_VERSION, 1);
 	len += pack_handshake_opt_u8(response + len, HANDSHAKE_OPT_CONTENT_INTEGRITY, 1);
