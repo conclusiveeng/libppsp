@@ -113,4 +113,4 @@ struct msg_frame {
 	struct msg msg;
 };
 
-#endif // LIBPEREGRINE_PROTO_H
+#endif //LIBPEREGRINE_PROTO_H
