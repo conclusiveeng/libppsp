@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/queue.h>
+#include "internal.h"
 
 
 static ssize_t pg_handle_handshake(struct pg_peer *peer, struct msg *msg);

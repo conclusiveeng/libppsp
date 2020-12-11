@@ -15,6 +15,7 @@
 #include <sys/queue.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include "internal.h"
 
 static struct pg_peer *
 pg_find_peer(struct pg_context *ctx, const struct sockaddr *saddr)

@@ -25,6 +25,7 @@
 
 #include "peregrine/bitmap.h"
 #include <stdlib.h>
+#include "internal.h"
 
 void
 pg_bitmap_create(uint64_t size, struct pg_bitmap **bmpp)

@@ -29,6 +29,8 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
+struct pg_bitmap;
+
 typedef bool (*pg_bitmap_scan_func_t)(uint64_t start, uint64_t end, bool value,
     void *arg);
 
@@ -37,12 +39,6 @@ enum pg_bitmap_scan_mode
 	BITMAP_SCAN_0,
 	BITMAP_SCAN_1,
 	BITMAP_SCAN_BOTH
-};
-
-struct pg_bitmap
-{
-	uint64_t size;
-	uint8_t *data;
 };
 
 void pg_bitmap_create(uint64_t size, struct pg_bitmap **bmpp);

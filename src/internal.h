@@ -26,4 +26,30 @@
 #ifndef PEREGRINE_INTERNAL_H
 #define PEREGRINE_INTERNAL_H
 
+#include <stdint.h>
+#include <peregrine/mt.h>
+
+struct pg_bitmap
+{
+	uint64_t size;
+	uint8_t *data;
+};
+
+struct chunk {
+	uint64_t offset; /* offset in file where chunk begins [bytes] */
+	uint32_t len;    /* length of the chunk */
+	char sha[20 + 1];
+	struct node *node;
+	enum chunk_state state;
+	enum chunk_downloaded downloaded;
+};
+
+struct node {
+	int number;                         /* number of the node */
+	struct node *left, *right, *parent; /* if parent == NULL - it is root node of the tree */
+	struct chunk *chunk;                /* pointer to chunk */
+	char sha[20 + 1];
+	enum node_state state;
+};
+
 #endif //PEREGRINE_INTERNAL_H

@@ -37,6 +37,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "internal.h"
 
 int
 peregrine_file_process_file(struct pg_file *file)

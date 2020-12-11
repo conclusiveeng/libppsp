@@ -17,7 +17,7 @@ message(STATUS "Operating System: " "${CMAKE_SYSTEM}"        )
 message(STATUS "I am building   : " "${PROJECT_NAME}"        )
 
 # Setup code check using clang-tidy
-set(CMAKE_C_CLANG_TIDY clang-tidy)
+# set(CMAKE_C_CLANG_TIDY clang-tidy)
 
 # Create compile_comands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS, 1)

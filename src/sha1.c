@@ -57,6 +57,7 @@
  */
 
 #include "peregrine/sha1.h"
+#include "internal.h"
 
 /*
  *  Define the SHA1 circular left shift macro

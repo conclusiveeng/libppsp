@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "internal.h"
 
 static const char *libperegrine_log_level_names[] = { "DEBUG", "INFO", "WARN", "ERROR" };
 

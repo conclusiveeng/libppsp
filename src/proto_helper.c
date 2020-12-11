@@ -5,6 +5,7 @@
 #include "peregrine/log.h"
 #include <stdlib.h>
 #include <string.h>
+#include "internal.h"
 
 size_t
 prepare_have_msg(struct pg_peer *peer, char *response_buffer)

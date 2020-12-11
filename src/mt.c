@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "internal.h"
 
 /**
  * @brief return rounded order of 32-bit variable, similar to log2()
