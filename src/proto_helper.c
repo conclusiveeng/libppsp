@@ -8,47 +8,45 @@
 #include "internal.h"
 
 size_t
-prepare_have_msg(struct pg_peer *peer, char *response_buffer)
-{
-
-	uint32_t bit = 31; /* starting bit for scanning of bits */
-	uint32_t it = 0;   /* iterator */
-	uint32_t val = 0;
-	uint32_t offset = 0;
-
-	// allocate memory for HAVE cache
-	if (peer->have_cache == NULL) {
-		peer->have_cache = malloc(1024 * sizeof(struct have_cache));
-		peer->have_cache_usage = 0;
-	}
-
-	while (it < 32) {
-		if (peer->file->nc & (1 << bit)) { // if the bit on position "b" is set?
-			DEBUG("HAVE: %u..%u", val, val + (1 << bit) - 1);
-
-			offset += pack_have(response_buffer + offset, val, val + (1 << bit) - 1);
-			peer->have_cache[peer->have_cache_usage].start_chunk = val;
-			peer->have_cache[peer->have_cache_usage].end_chunk = val + (1 << bit) - 1;
-
-			val = val + (1 << bit);
-			peer->have_cache_usage++;
-		}
-		it++;
-		bit--;
-	}
-	return offset;
-}
-
-size_t
-pack_handshake(void *dptr, uint32_t src_channel_id, uint8_t *options, size_t optlen)
+pack_handshake(void *dptr, uint32_t src_channel_id)
 {
 	struct msg *msg = dptr;
 
 	msg->message_type = MSG_HANDSHAKE;
 	msg->handshake.src_channel_id = htobe32(src_channel_id);
-	memcpy(msg->handshake.protocol_options, options, optlen);
 
-	return (sizeof(uint8_t) + sizeof(msg->handshake) + optlen);
+	return (sizeof(uint8_t) + sizeof(msg->handshake));
+}
+
+size_t
+pack_handshake_opt(void *dptr, uint8_t code, void *data, size_t len)
+{
+	struct msg_handshake_opt *opt = dptr;
+
+	opt->code = code;
+	memcpy(opt->value, data, len);
+	return (sizeof(uint8_t) + len);
+}
+
+size_t
+pack_handshake_opt_u8(void *dptr, uint8_t code, uint8_t value)
+{
+	struct msg_handshake_opt *opt = dptr;
+
+	opt->code = code;
+	opt->value[0] = value;
+
+	return (sizeof(uint8_t) * 2);
+}
+
+size_t
+pack_handshake_opt_end(void *dptr)
+{
+	struct msg_handshake_opt *opt = dptr;
+
+	opt->code = HANDSHAKE_OPT_END;
+
+	return (sizeof(uint8_t));
 }
 
 size_t

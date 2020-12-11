@@ -61,3 +61,9 @@ pg_context_file_by_sha(struct pg_context *ctx, const char *sha)
 
 	return (NULL);
 }
+
+uint32_t
+pg_new_channel_id(void)
+{
+	
+}

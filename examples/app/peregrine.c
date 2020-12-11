@@ -53,10 +53,12 @@ main(int argc, char const *argv[])
 		exit(EX_OSERR);
 	}
 
+#if 0
 	if (pg_context_add_directory(context, directory) != 0) {
 		fprintf(stderr, "cannot add directory to context: %s\n", strerror(errno));
 		exit(EX_OSERR);
 	}
+#endif
 
 	pfd.fd = pg_context_get_fd(context);
 	pfd.events = POLLIN | /* POLLOUT | */ POLLERR;

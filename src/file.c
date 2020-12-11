@@ -86,9 +86,8 @@ peregrine_file_process_file(struct pg_file *file)
 	memset(file->tab_chunk, 0, nl * sizeof(struct chunk));
 
 	/* initialize array of chunks */
-	for (x = 0; x < nl; x++) {
+	for (x = 0; x < nl; x++)
 		file->tab_chunk[x].state = CH_EMPTY;
-	}
 
 	root8 = mt_build_tree(number_chunks, &ret);
 	file->tree_root = root8;
@@ -220,5 +219,7 @@ void
 pg_file_list_sha1(struct pg_context *context)
 {
 	struct pg_file *f;
-	SLIST_FOREACH(f, &context->files, entry) { INFO("File: %s, NC:%d, SHA1: %s", f->path, f->nc, f->sha); }
+	SLIST_FOREACH(f, &context->files, entry) {
+		INFO("File: %s, NC:%d, SHA1: %s", f->path, f->nc, f->sha); }
+	}
 }

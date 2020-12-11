@@ -38,15 +38,16 @@
  * @param response_buffer output buffer to store the message
  * @return size_t amount of data stored in the buffer
  */
-size_t prepare_have_msg(struct pg_peer *peer, char *response_buffer);
-
-size_t pack_handshake(void *dptr, uint32_t src_channel_id, uint8_t *options, size_t optlen);
+size_t pack_handshake(void *dptr, uint32_t src_channel_id);
+size_t pack_handshake_opt(void *dptr, uint8_t code, void *data, size_t len);
+size_t pack_handshake_opt_u8(void *dptr, uint8_t code, uint8_t value);
+size_t pack_handshake_opt_end(void *dptr);
 size_t pack_have(void *dptr, uint32_t start_chunk, uint32_t end_chunk);
 size_t pack_data(void *dptr, uint32_t start_chunk, uint32_t end_chunk, uint64_t timestamp);
 size_t pack_ack(void *dptr, uint32_t start_chunk, uint32_t end_chunk, uint64_t sample);
 size_t pack_integrity(void *dptr, uint32_t end_chunk, uint8_t *hash);
-size_t pack_signed_integrity(void *dptr, uint32_t start_chunk, uint32_t end_chunk, int64_t timestamp,
-                             uint8_t *signature, size_t siglen);
+size_t pack_signed_integrity(void *dptr, uint32_t start_chunk, uint32_t end_chunk,
+    int64_t timestamp, uint8_t *signature, size_t siglen);
 size_t pack_request(void *dptr, uint32_t start_chunk, uint32_t end_chunk);
 size_t pack_cancel(void *dptr, uint32_t start_chunk, uint32_t end_chunk);
 size_t pack_dest_chan(void *dptr, uint32_t dst_channel_id);

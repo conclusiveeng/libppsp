@@ -40,6 +40,14 @@ enum node_state {
 	SENT /* seeder already sent this sha to leecher */
 };
 
+struct node {
+	int number;                         /* number of the node */
+	struct node *left, *right, *parent; /* if parent == NULL - it is root node of the tree */
+	struct chunk *chunk;                /* pointer to chunk */
+	char sha[20 + 1];
+	enum node_state state;
+};
+
 int mt_order2(uint32_t /*val*/);
 struct node *mt_build_tree(int /*num_chunks*/, struct node ** /*ret*/);
 void mt_show_tree_root_based(struct node * /*t*/);

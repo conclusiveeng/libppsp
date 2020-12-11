@@ -1,26 +1,25 @@
-#include "peregrine/peer_handler.h"
-#include "peregrine/log.h"
-#include "peregrine/socket.h"
-#include "peregrine/proto_helper.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/queue.h>
 #include "internal.h"
+#include "peer_handler.h"
+#include "log.h"
+#include "peregrine_socket.h"
+#include "proto_helper.h"
 
-
-static ssize_t pg_handle_handshake(struct pg_peer *peer, struct msg *msg);
-static ssize_t pg_handle_data(struct pg_peer *peer, struct msg *msg);
-static ssize_t pg_handle_ack(struct pg_peer *peer, struct msg *msg);
-static ssize_t pg_handle_have(struct pg_peer *peer, struct msg *msg);
-static ssize_t pg_handle_integrity(struct pg_peer *peer, struct msg *msg);
-static ssize_t pg_handle_pex_resv4(struct pg_peer *peer, struct msg *msg);
-static ssize_t pg_handle_pex_req(struct pg_peer *peer, struct msg *msg);
-static ssize_t pg_handle_signed_integrity(struct pg_peer *peer, struct msg *msg);
-static ssize_t pg_handle_request(struct pg_peer *peer, struct msg *msg);
-static ssize_t pg_handle_cancel(struct pg_peer *peer, struct msg *msg);
-static ssize_t pg_handle_choke(struct pg_peer *peer, struct msg *msg);
-static ssize_t pg_handle_unchoke(struct pg_peer *peer, struct msg *msg);
+static ssize_t pg_handle_handshake(struct peregrine_peer *peer, struct msg *msg);
+static ssize_t pg_handle_data(struct peregrine_peer *peer, struct msg *msg);
+static ssize_t pg_handle_ack(struct peregrine_peer *peer, struct msg *msg);
+static ssize_t pg_handle_have(struct peregrine_peer *peer, struct msg *msg);
+static ssize_t pg_handle_integrity(struct peregrine_peer *peer, struct msg *msg);
+static ssize_t pg_handle_pex_resv4(struct peregrine_peer *peer, struct msg *msg);
+static ssize_t pg_handle_pex_req(struct peregrine_peer *peer, struct msg *msg);
+static ssize_t pg_handle_signed_integrity(struct peregrine_peer *peer, struct msg *msg);
+static ssize_t pg_handle_request(struct peregrine_peer *peer, struct msg *msg);
+static ssize_t pg_handle_cancel(struct peregrine_peer *peer, struct msg *msg);
+static ssize_t pg_handle_choke(struct peregrine_peer *peer, struct msg *msg);
+static ssize_t pg_handle_unchoke(struct peregrine_peer *peer, struct msg *msg);
 
 struct peregrine_frame_handler {
 	enum peregrine_message_type type;
@@ -62,7 +61,13 @@ print_dbg_protocol_options(struct pg_protocol_options *proto_options)
 }
 
 ssize_t
-pg_handle_message(struct pg_peer *peer, struct msg *msg)
+pg_peer_send(struct peregrine_peer *peer, const void *buf, size_t len)
+{
+	return (sendto(peer->context->sock_fd, buf, len, 0, &peer->addr, sizeof(struct sockaddr_in)));
+}
+
+ssize_t
+pg_handle_message(struct peregrine_peer *peer, struct msg *msg)
 {
 	const struct peregrine_frame_handler *handler;
 
@@ -75,12 +80,57 @@ pg_handle_message(struct pg_peer *peer, struct msg *msg)
 	return (-1);
 }
 
+static struct peregrine_swarm *
+pg_find_swarm_by_id(struct peregrine_context *ctx, uint8_t *swarm_id, size_t id_len)
+{
+	struct peregrine_swarm *s;
+
+	LIST_FOREACH(s, &ctx->swarms, entry) {
+		if (memcmp(s->swarm_id, swarm_id, id_len) == 0)
+			return (s);
+	}
+
+	return (NULL);
+}
+
+static struct peregrine_peer_swarm *
+pg_find_peerswarm_by_id(struct peregrine_peer *peer, uint8_t *swarm_id, size_t id_len)
+{
+	struct peregrine_peer_swarm *ps;
+
+	LIST_FOREACH(ps, &peer->swarms, entry) {
+		if (memcmp(ps->swarm->swarm_id, swarm_id, id_len) == 0)
+			return (ps);
+	}
+
+	return (NULL);
+}
+
+static struct peregrine_swarm *
+pg_find_swarm_by_channel(struct peregrine_peer *peer, uint32_t channel_id)
+{
+	struct peregrine_swarm *ps;
+
+	LIST_FOREACH(ps, &peer->swarms, entry) {
+		if (ps->dst_channel_id == channel_id)
+			return (ps);
+	}
+
+	return (NULL);
+}
+
 static ssize_t
 pg_handle_handshake(struct pg_peer *peer, struct msg *msg)
 {
+	struct peregrine_peer_swarm *ps;
+	struct peregrine_swarm *swarm;
 	struct msg_handshake_opt *opt;
 	struct pg_protocol_options options;
+	uint16_t swarm_id_len;
+	uint8_t swarm_id[20];
+	uint8_t response[sizeof(struct msg_handshake) + 256];
 	int pos = 0;
+	size_t len;
 
 	DEBUG("handshake: peer=%p", peer);
 
@@ -175,6 +225,35 @@ pg_handle_handshake(struct pg_peer *peer, struct msg *msg)
 	}
 
 done:
+	/* Check if we have a peer-swarm association with this ID already */
+	ps = pg_find_peerswarm_by_id(peer, swarm_id, swarm_id_len);
+	if (ps != NULL) {
+		/* Error! Already member of this swarm */
+	}
+
+	swarm = pg_find_swarm_by_id(peer->context, swarm_id, swarm_id_len);
+	if (swarm == NULL) {
+		/* Error! Cannot find or create swarm */
+	}
+
+	ps = calloc(1, sizeof(struct peregrine_peer_swarm));
+	ps->peer = peer;
+	ps->swarm = swarm;
+	ps->src_channel_id = pg_new_channel_id();
+	ps->dst_channel_id = msg->handshake.src_channel_id;
+	LIST_INSERT_HEAD(&peer->swarms, ps, entry);
+	LIST_INSERT_HEAD(&swarm->peers, ps, entry);
+
+	len = pack_dest_chan(response, swarm->dst_channel_id);
+	len += pack_handshake(response + len, swarm->src_channel_id);
+	len += pack_handshake_opt_u8(response + len, HANDSHAKE_OPT_VERSION, 1);
+	len += pack_handshake_opt_u8(response + len, HANDSHAKE_OPT_MIN_VERSION, 1);
+	len += pack_handshake_opt_u8(response + len, HANDSHAKE_OPT_CONTENT_INTEGRITY, 1);
+	len += pack_handshake_opt_u8(response + len, HANDSHAKE_OPT_MERKLE_HASH_FUNC, 0);
+	len += pack_handshake_opt_u8(response + len, HANDSHAKE_OPT_CHUNK_ADDRESSING_METHOD, 2);
+	len += pack_handshake_opt_end(response + len);
+	pg_peer_send(peer, response, len);
+
 	return sizeof(struct msg) + sizeof(struct msg_handshake) + pos;
 }
 

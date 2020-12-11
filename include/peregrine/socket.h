@@ -34,21 +34,6 @@
 #define BUFSIZE       1500
 #define PEER_STR_ADDR 32
 #define CHUNK_SIZE    1024
-/* protocol options for peer send with HANDSHAKE */
-struct pg_protocol_options {
-	uint8_t version;
-	uint8_t minimum_version;
-	uint16_t swarm_id_len;
-	uint8_t swarm_id[20];
-	uint8_t content_prot_method;
-	uint8_t merkle_hash_func;
-	uint8_t live_signature_alg;
-	uint8_t chunk_addr_method;
-	uint64_t live_disc_wind;
-	uint8_t supported_msgs_len;
-	void *supported_msgs; // for now we ignore this field
-	uint32_t chunk_size;
-};
 
 // /* shared file */
 // struct peregrine_file {
@@ -147,6 +132,8 @@ struct pg_context {
 	TAILQ_HEAD(, pg_block) io;
 	/* other instance state */
 };
+
+struct peregrine_context;
 
 int pg_context_create(struct sockaddr *sa, socklen_t salen, struct pg_context **ctxp);
 int pg_context_add_directory(struct pg_context *ctx, const char *directory);
