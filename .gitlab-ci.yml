@@ -3,7 +3,6 @@ image: gcc
 build:
   stage: build
   before_script:
-    - sudo apt update && sudo apt -y install make cmake clang-tidy
     - mkdir build && cd build
   script:
     - cmake ..
