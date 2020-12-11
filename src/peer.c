@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/queue.h>
+#include <sys/types.h>
 
 static ssize_t pg_handle_handshake(struct pg_peer *peer, uint32_t chid, struct msg *msg);
 static ssize_t pg_handle_data(struct pg_peer *peer, uint32_t chid, struct msg *msg);
@@ -126,10 +127,22 @@ pg_send_have_scan_fn(uint64_t start, uint64_t end, bool value, void *arg)
 }
 
 static int
-pg_send_have(struct pg_peer_swarm *ps)
+pg_prepare_have(struct pg_peer_swarm *ps, char *response, ssize_t *length)
 {
-	pg_bitmap_scan(ps->swarm->have_bitmap, BITMAP_SCAN_1, pg_send_have_scan_fn, ps);
-	return (0);
+	uint64_t bit = 31;
+	uint32_t i = 0;
+	uint32_t value = 0;
+	ssize_t len = 0;
+
+	while (i < 32) {
+		if (ps->swarm->file->nc & (1 << bit)) {
+			len += pack_have(response + len, value, value + (1 << bit) - 1);
+			value = value + (1 << bit);
+		}
+		i++;
+		bit--;
+	}
+	return (len);
 }
 
 static ssize_t
@@ -141,7 +154,7 @@ pg_handle_handshake(struct pg_peer *peer, uint32_t dst_channel_id, struct msg *m
 	struct pg_protocol_options options;
 	uint16_t swarm_id_len;
 	uint8_t swarm_id[20];
-	uint8_t response[sizeof(struct msg_handshake) + 256];
+	uint8_t response[sizeof(struct msg_handshake) + 1024];
 	int pos = 0;
 	size_t len;
 
@@ -281,7 +294,9 @@ done:
 	len += pack_handshake_opt_u8(response + len, HANDSHAKE_OPT_CHUNK_ADDRESSING_METHOD, 2);
 	len += pack_handshake_opt_end(response + len);
 	pg_peer_send(peer, response, len);
-	pg_send_have(ps);
+	bzero(response, 1024);
+	pg_prepare_have(ps, response, len);
+	pg_peer_send(peer, response, len);
 
 	return sizeof(struct msg) + sizeof(struct msg_handshake) + pos;
 }
