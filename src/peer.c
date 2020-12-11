@@ -52,9 +52,8 @@ pg_handle_message(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	const struct peregrine_frame_handler *handler;
 
 	for (handler = &frame_handlers[0]; handler->handler != NULL; handler++) {
-		if (handler->type == msg->message_type) {
+		if (handler->type == msg->message_type)
 			return (handler->handler(peer, chid, msg));
-		}
 	}
 
 	return (-1);
