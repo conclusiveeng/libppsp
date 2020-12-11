@@ -1,9 +1,9 @@
+#include "internal.h"
+#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include "internal.h"
 
 int
 pg_sockaddr_cmp(const struct sockaddr *s1, const struct sockaddr *s2)
@@ -56,7 +56,8 @@ pg_context_file_by_sha(struct pg_context *ctx, const char *sha)
 {
 	struct pg_file *file;
 
-	SLIST_FOREACH(file, &ctx->files, entry) {
+	SLIST_FOREACH(file, &ctx->files, entry)
+	{
 		if (memcmp(file->sha, sha, sizeof(file->sha)) == 0)
 			return (file);
 	}
@@ -86,5 +87,6 @@ pg_swarm_to_str(struct pg_swarm *swarm)
 uint32_t
 pg_new_channel_id(void)
 {
-	return (rand());
+	// Chanell 0 is special
+	return (rand() + 1 % (UINT32_MAX - 1));
 }
