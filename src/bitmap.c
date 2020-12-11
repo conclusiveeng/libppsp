@@ -23,7 +23,7 @@
  * SUCH DAMAGE.
  */
 
-#include "bitmap.h"
+#include "peregrine/bitmap.h"
 #include <stdlib.h>
 
 void

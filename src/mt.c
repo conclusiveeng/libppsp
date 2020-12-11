@@ -22,9 +22,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "mt.h"
-#include "log.h"
-#include "sha1.h"
+#include "peregrine/mt.h"
+#include "peregrine/log.h"
+#include "peregrine/sha1.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

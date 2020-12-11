@@ -26,7 +26,7 @@
  *
  */
 
-#include "log.h"
+#include "peregrine/log.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>

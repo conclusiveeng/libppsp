@@ -1,5 +1,5 @@
-#include "libperegrine/v2/log.h"
-#include "peregrine_socket.h"
+#include "peregrine/log.h"
+#include "peregrine/peregrine_socket.h"
 #include <errno.h>
 #include <getopt.h>
 #include <poll.h>

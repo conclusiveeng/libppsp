@@ -1,8 +1,8 @@
-#include "peregrine_socket.h"
-#include "file.h"
-#include "log.h"
-#include "peer_handler.h"
-#include "utils.h"
+#include "peregrine/peregrine_socket.h"
+#include "peregrine/file.h"
+#include "peregrine/log.h"
+#include "peregrine/peer_handler.h"
+#include "peregrine/utils.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>

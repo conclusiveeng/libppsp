@@ -23,12 +23,12 @@
  * SUCH DAMAGE.
  */
 
-#include "file.h"
-#include "log.h"
-#include "mt.h"
-#include "peer_handler.h"
-#include "peregrine_socket.h"
-#include "sha1.h"
+#include "peregrine/file.h"
+#include "peregrine/log.h"
+#include "peregrine/mt.h"
+#include "peregrine/peer_handler.h"
+#include "peregrine/peregrine_socket.h"
+#include "peregrine/sha1.h"
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>

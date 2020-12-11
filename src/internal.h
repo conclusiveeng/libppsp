@@ -23,45 +23,7 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _MT_H_
-#define _MT_H_
+#ifndef PEREGRINE_INTERNAL_H
+#define PEREGRINE_INTERNAL_H
 
-#include <stdint.h>
-
-enum chunk_state { CH_EMPTY = 0, CH_ACTIVE };
-
-enum chunk_downloaded { CH_NO = 0, CH_YES };
-
-struct chunk {
-  uint64_t offset; /* offset in file where chunk begins [bytes] */
-  uint32_t len;    /* length of the chunk */
-  char sha[20 + 1];
-  struct node *node;
-  enum chunk_state state;
-  enum chunk_downloaded downloaded;
-};
-
-enum node_state {
-  EMPTY = 0,
-  INITIALIZED,
-  ACTIVE,
-  SENT /* seeder already sent this sha to leecher */
-};
-struct node {
-  int number;                         /* number of the node */
-  struct node *left, *right, *parent; /* if parent == NULL - it is root node of the tree */
-  struct chunk *chunk;                /* pointer to chunk */
-  char sha[20 + 1];
-  enum node_state state;
-};
-
-int order2(uint32_t /*val*/);
-struct node *build_tree(int /*num_chunks*/, struct node ** /*ret*/);
-void show_tree_root_based(struct node * /*t*/);
-struct node *find_sibling(struct node * /*n*/);
-void interval_min_max(struct node * /*i*/, struct node * /*min*/, struct node * /*max*/);
-void dump_tree(struct node * /*t*/, int /*l*/);
-void dump_chunk_tab(struct chunk * /*c*/, int /*l*/);
-void update_sha(struct node * /*t*/, int /*num_chunks*/);
-
-#endif /* _MT_H_ */
+#endif //PEREGRINE_INTERNAL_H

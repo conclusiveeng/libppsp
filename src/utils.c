@@ -1,7 +1,7 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <sys/socket.h>
-#include "utils.h"
+#include "peregrine/utils.h"
 
 int
 pg_sockaddr_cmp(const struct sockaddr *s1, const struct sockaddr *s2)
