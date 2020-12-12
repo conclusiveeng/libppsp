@@ -44,6 +44,7 @@ static int hf_swift_handshake_option_value = -1;
 /* 01 Data fields */
 static int hf_swift_data_start_chunk = -1;
 static int hf_swift_data_end_chunk = -1;
+static int hf_swift_data_timestamp = -1;
 static int hf_swift_data_payload = -1;
 
 /* 02 Ack fields */
@@ -166,6 +167,15 @@ proto_register_swift(void)
             {
                 "Data End Chunk", "swift.data.end_chunk",
                 FT_UINT32, BASE_HEX,
+                NULL, 0x0,
+                NULL, HFILL
+            }
+        },
+        {
+            &hf_swift_data_timestamp,
+            {
+                "Data End Chunk", "swift.data.timestamp",
+                FT_UINT64, BASE_HEX,
                 NULL, 0x0,
                 NULL, HFILL
             }
@@ -482,6 +492,8 @@ dissect_swift(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *arg)
                 offset += 4;
                 proto_tree_add_item(swift_tree, hf_swift_data_end_chunk, tvb, offset, 4, FALSE);
                 offset += 4;
+                proto_tree_add_item(swift_tree, hf_swift_data_timestamp, tvb, offset, 8, FALSE);
+                offset += 8;
                 /* We assume that the data field comprises the rest of this packet */
                 dat_len = tvb_captured_length(tvb) - offset;
                 proto_tree_add_item(swift_tree, hf_swift_data_payload, tvb, offset, dat_len, FALSE);
@@ -506,7 +518,7 @@ dissect_swift(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *arg)
                 offset += 4;
                 proto_tree_add_item(swift_tree, hf_swift_hash_end_chunk, tvb, offset, 4, FALSE);
                 offset += 4;
-                proto_tree_add_item(swift_tree, hf_swift_hash_value, tvb, offset, 256, FALSE);
+                proto_tree_add_item(swift_tree, hf_swift_hash_value, tvb, offset, 20, FALSE);
                 offset += 20;
                 break;
             case 5: /* PEX+ */
