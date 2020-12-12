@@ -219,3 +219,24 @@ pg_file_list_sha1(struct pg_context *context)
 		mt_show_tree_root_based(f->tree_root);
 	}
 }
+
+const uint8_t *
+pg_file_get_sha(struct pg_file *file)
+{
+
+	return (file->sha);
+}
+
+struct pg_file *
+pg_file_by_sha(struct pg_context *ctx, const uint8_t *sha)
+{
+	struct pg_file *file;
+
+	SLIST_FOREACH(file, &ctx->files, entry) {
+		if (memcmp(file->sha, sha, sizeof(file->sha)) == 0)
+			return (file);
+	}
+
+	return (NULL);
+}
+

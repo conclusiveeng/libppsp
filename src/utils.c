@@ -45,26 +45,6 @@ pg_sockaddr_copy(struct sockaddr_storage *dest, const struct sockaddr *src)
 }
 
 const char *
-pg_context_sha_by_file(struct pg_file *file)
-{
-
-	return (file->sha);
-}
-
-struct pg_file *
-pg_context_file_by_sha(struct pg_context *ctx, const char *sha)
-{
-	struct pg_file *file;
-
-	SLIST_FOREACH(file, &ctx->files, entry) {
-		if (memcmp(file->sha, sha, sizeof(file->sha)) == 0)
-			return (file);
-	}
-
-	return (NULL);
-}
-
-const char *
 pg_hexdump(const uint8_t *buf, size_t len)
 {
 	static char storage[1024];
