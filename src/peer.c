@@ -1,11 +1,27 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 #include <sys/types.h>
 #include <sys/queue.h>
 #include "internal.h"
 #include "log.h"
 #include "proto.h"
+
+#define MAX_FRAME_SIZE	1400
+
+struct pg_have_scan_state
+{
+	struct pg_peer_swarm *ps;
+	uint8_t *response;
+	size_t used;
+};
+
+struct pg_frame_handler
+{
+	enum peregrine_message_type type;
+	ssize_t (*handler)(struct pg_peer *, uint32_t, struct msg *);
+};
 
 static ssize_t pg_handle_handshake(struct pg_peer *peer, uint32_t chid, struct msg *msg);
 static ssize_t pg_handle_data(struct pg_peer *peer, uint32_t chid, struct msg *msg);
@@ -20,12 +36,7 @@ static ssize_t pg_handle_cancel(struct pg_peer *peer, uint32_t chid, struct msg 
 static ssize_t pg_handle_choke(struct pg_peer *peer, uint32_t chid, struct msg *msg);
 static ssize_t pg_handle_unchoke(struct pg_peer *peer, uint32_t chid, struct msg *msg);
 
-struct peregrine_frame_handler {
-	enum peregrine_message_type type;
-	ssize_t (*handler)(struct pg_peer *, uint32_t, struct msg *);
-};
-
-static const struct peregrine_frame_handler frame_handlers[] = {
+static const struct pg_frame_handler frame_handlers[] = {
 	{ MSG_HANDSHAKE, pg_handle_handshake },
 	{ MSG_DATA, pg_handle_data },
 	{ MSG_ACK, pg_handle_ack },
@@ -44,6 +55,8 @@ static const struct peregrine_frame_handler frame_handlers[] = {
 ssize_t
 pg_peer_send(struct pg_peer *peer, const void *buf, size_t len)
 {
+	DEBUG("send %d bytes to peer %p", len, peer);
+
 	return (sendto(peer->context->sock_fd, buf, len, 0, (struct sockaddr *)&peer->addr,
 	    sizeof(struct sockaddr_in)));
 }
@@ -51,7 +64,7 @@ pg_peer_send(struct pg_peer *peer, const void *buf, size_t len)
 ssize_t
 pg_handle_message(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 {
-	const struct peregrine_frame_handler *handler;
+	const struct pg_frame_handler *handler;
 
 	for (handler = &frame_handlers[0]; handler->handler != NULL; handler++) {
 		if (handler->type == msg->message_type)
@@ -81,7 +94,8 @@ pg_find_swarm_by_id(struct pg_context *ctx, const uint8_t *swarm_id, size_t id_l
 	s->file = file;
 	s->context = ctx;
 	s->have_bitmap = pg_bitmap_create(file->nc);
-	s->request_bitmap = pg_bitmap_create(file->nc);
+	s->nc = file->nc;
+	pg_bitmap_fill(s->have_bitmap, true);
 	memcpy(s->swarm_id, swarm_id, id_len);
 	LIST_INSERT_HEAD(&ctx->swarms, s, entry);
 
@@ -109,7 +123,7 @@ pg_find_peerswarm_by_channel(struct pg_peer *peer, uint32_t channel_id)
 	struct pg_peer_swarm *ps;
 
 	LIST_FOREACH(ps, &peer->swarms, entry) {
-		if (ps->dst_channel_id == channel_id)
+		if (ps->src_channel_id == channel_id)
 			return (ps);
 	}
 
@@ -119,28 +133,75 @@ pg_find_peerswarm_by_channel(struct pg_peer *peer, uint32_t channel_id)
 static bool
 pg_send_have_scan_fn(uint64_t start, uint64_t end, bool value, void *arg)
 {
-	struct pg_peer_swarm *ps = arg;
+	struct pg_have_scan_state *state = arg;
+
+	DEBUG("send_have: adding range % " PRIu64 "..%" PRIu64, start, end);
 
 	/* prepare and send HAVE message */
+	state->used += pack_have(state->response, start, end);
+	if (state->used + sizeof(struct msg_have) > MAX_FRAME_SIZE) {
+		pg_peer_send(state->ps->peer, state->response, state->used);
+		state->used = pack_dest_chan(state->response, state->ps->dst_channel_id);
+	}
+
+	return (true);
 }
 
 static int
-pg_prepare_have(struct pg_peer_swarm *ps, char *response, ssize_t *length)
+pg_send_have(struct pg_peer_swarm *ps)
 {
-	uint64_t bit = 31;
-	uint32_t i = 0;
-	uint32_t value = 0;
-	ssize_t len = 0;
+	struct pg_have_scan_state state;
+	uint8_t response[MAX_FRAME_SIZE];
 
-	while (i < 32) {
-		if (ps->swarm->file->nc & (1 << bit)) {
-			len += pack_have(response + len, value, value + (1 << bit) - 1);
-			value = value + (1 << bit);
+	state.ps = ps;
+	state.response = response;
+	state.used = pack_dest_chan(response, ps->dst_channel_id);
+
+	pg_bitmap_scan(ps->swarm->have_bitmap, BITMAP_SCAN_1, pg_send_have_scan_fn, &state);
+
+	if (state.used != 4)
+		pg_peer_send(ps->peer, state.response, state.used);
+
+	return (0);
+}
+
+static int
+pg_send_integrity(struct pg_peer_swarm *ps, uint32_t block)
+{
+	struct node *node, *sibling;
+	struct node n_min, n_max;
+	uint8_t response[MAX_FRAME_SIZE];
+	size_t len;
+	LIST_HEAD(, node) nodes;
+
+	LIST_INIT(&nodes);
+
+	/* Start with the leaf node */
+	node = &ps->swarm->file->tree[block * 2];
+
+	while (node != NULL) {
+		if (node->state != SENT) {
+			LIST_INSERT_HEAD(&nodes, node, entry);
+			node->state = SENT;
 		}
-		i++;
-		bit--;
+
+		sibling = mt_find_sibling(node);
+		if (sibling != NULL && sibling->state != SENT) {
+			LIST_INSERT_HEAD(&nodes, sibling, entry);
+			sibling->state = SENT;
+		}
+
+		node = node->parent;
 	}
-	return (len);
+
+	len = pack_dest_chan(response, ps->dst_channel_id);
+
+	LIST_FOREACH(node, &nodes, entry) {
+		mt_interval_min_max(node, &n_min, &n_max);
+		len += pack_integrity(response + len, n_min.number / 2, n_max.number / 2, node->sha);
+	}
+
+	pg_peer_send(ps->peer, response, len);
 }
 
 static ssize_t
@@ -157,6 +218,8 @@ pg_handle_handshake(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	size_t len;
 
 	DEBUG("handshake: peer=%p", peer);
+
+	options.chunk_size = 1024;
 
 	for (;;) {
 		opt = (struct msg_handshake_opt *)&msg->handshake.protocol_options[pos];
@@ -268,7 +331,7 @@ done:
 	}
 
 	// Handshake finish
-	if (be32toh(dst_channel_id) != 0 && be32toh(msg->handshake.src_channel_id) == 0) {
+	if (be32toh(chid) != 0 && be32toh(msg->handshake.src_channel_id) == 0) {
 		ps->peer->to_remove = 1;
 		return sizeof(struct msg) + sizeof(struct msg_handshake) + pos;
 	}
@@ -279,22 +342,23 @@ done:
 	ps->swarm = swarm;
 	ps->src_channel_id = pg_new_channel_id();
 	ps->dst_channel_id = be32toh(msg->handshake.src_channel_id);
+	ps->request_bitmap = pg_bitmap_create(swarm->file->nc);
 	ps->options = options;
 	LIST_INSERT_HEAD(&peer->swarms, ps, entry);
 	LIST_INSERT_HEAD(&swarm->peers, ps, entry);
 
-	len = pack_dest_chan(response, ps->src_channel_id);
-	len += pack_handshake(response + len, ps->dst_channel_id);
+	len = pack_dest_chan(response, ps->dst_channel_id);
+	len += pack_handshake(response + len, ps->src_channel_id);
 	len += pack_handshake_opt_u8(response + len, HANDSHAKE_OPT_VERSION, 1);
 	len += pack_handshake_opt_u8(response + len, HANDSHAKE_OPT_MIN_VERSION, 1);
 	len += pack_handshake_opt_u8(response + len, HANDSHAKE_OPT_CONTENT_INTEGRITY, 1);
 	len += pack_handshake_opt_u8(response + len, HANDSHAKE_OPT_MERKLE_HASH_FUNC, 0);
 	len += pack_handshake_opt_u8(response + len, HANDSHAKE_OPT_CHUNK_ADDRESSING_METHOD, 2);
+	//len += pack_handshake_opt_u32(response + len, HANDSHAKE_OPT_CHUNK_SIZE, options.chunk_size);
 	len += pack_handshake_opt_end(response + len);
+	len += pack_have(response + len, 0, ps->swarm->nc - 1);
 	pg_peer_send(peer, response, len);
-	bzero(response, 1024);
-	pg_prepare_have(ps, response, len);
-	pg_peer_send(peer, response, len);
+	pg_send_have(ps);
 
 	return sizeof(struct msg) + sizeof(struct msg_handshake) + pos;
 }
@@ -404,6 +468,10 @@ static ssize_t
 pg_handle_request(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 {
 	struct pg_peer_swarm *ps;
+	struct pg_block *req;
+	uint32_t i;
+	uint32_t start_chunk = be32toh(msg->request.start_chunk);
+	uint32_t end_chunk = be32toh(msg->request.end_chunk);
 
 	ps = pg_find_peerswarm_by_channel(peer, chid);
 	if (ps == NULL) {
@@ -411,8 +479,20 @@ pg_handle_request(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 		return (-1);
 	}
 
-	DEBUG("request: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
+	DEBUG("request: peer=%p, swarm=%s, start=%u, end=%u", peer, pg_swarm_to_str(ps->swarm),
+	    start_chunk, end_chunk);
 
+	for (i = start_chunk; i <= end_chunk; i++) {
+		req = calloc(1, sizeof(*req));
+		req->ps = ps;
+		req->file = ps->swarm->file;
+		req->chunk_num = i;
+		pg_send_integrity(ps, i);
+		pg_socket_enqueue_tx(peer->context, req);
+	}
+
+	pg_bitmap_set_range(ps->request_bitmap, start_chunk, end_chunk, true);
+	return (sizeof(msg->message_type) + sizeof(msg->request));
 }
 
 static ssize_t

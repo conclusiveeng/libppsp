@@ -37,7 +37,15 @@
 
 struct pg_context;
 
+struct pg_context_callbacks
+{
+	void (*pg_start_sending)(struct pg_context *, void *);
+	void (*pg_stop_sending)(struct pg_context *, void *);
+};
+
 int pg_context_create(struct sockaddr *sa, socklen_t salen, struct pg_context **ctxp);
+void pg_context_set_callbacks(struct pg_context *ctx, struct pg_context_callbacks *callbacks,
+    void *arg);
 int pg_context_add_directory(struct pg_context *ctx, const char *directory);
 struct pg_file *pg_context_add_file(struct pg_context *ctx, const char *path);
 int pg_context_destroy(struct pg_context *ctx);

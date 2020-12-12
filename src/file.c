@@ -164,11 +164,12 @@ pg_file_add_file(struct pg_context *context, const char *name)
 		ERROR("stat: %s", strerror(errno));
 	}
 	if (stat.st_mode & S_IFREG) { /* filename */
-		struct pg_file *f = malloc(sizeof(struct pg_file));
+		struct pg_file *f = calloc(1, sizeof(*f));
 		memset(f->path, 0, sizeof(f->path));
 		strcpy(f->path, name);
 		lstat(f->path, &stat);
 		f->file_size = stat.st_size;
+		f->fd = open(f->path, O_RDONLY);
 		SLIST_INSERT_HEAD(&context->files, f, entry);
 		return (f);
 	}
@@ -213,6 +214,8 @@ pg_file_list_sha1(struct pg_context *context)
 {
 	struct pg_file *f;
 
-	SLIST_FOREACH(f, &context->files, entry)
-		INFO("File: %s, NC:%d, SHA1: %s", f->path, f->nc, f->hash);
+	SLIST_FOREACH(f, &context->files, entry) {
+		INFO("file: %s, NC:%d, SHA1: %s", f->path, f->nc, f->hash);
+		mt_show_tree_root_based(f->tree_root);
+	}
 }

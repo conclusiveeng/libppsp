@@ -4,7 +4,16 @@
 #include "log.h"
 
 size_t
-pack_handshake(void *dptr, uint32_t src_channel_id)
+pack_dest_chan(struct *pg_buffer uint32_t dst_channel_id)
+{
+	uint32_t *chan_id = dptr;
+
+	*chan_id = htobe32(dst_channel_id);
+	return (sizeof(*chan_id));
+}
+
+size_t
+pack_handshake(struct *pg_buffer, uint32_t src_channel_id)
 {
 	struct msg *msg = dptr;
 
@@ -15,7 +24,7 @@ pack_handshake(void *dptr, uint32_t src_channel_id)
 }
 
 size_t
-pack_handshake_opt(void *dptr, uint8_t code, void *data, size_t len)
+pack_handshake_opt(struct *pg_buffer, uint8_t code, void *data, size_t len)
 {
 	struct msg_handshake_opt *opt = dptr;
 
@@ -25,7 +34,7 @@ pack_handshake_opt(void *dptr, uint8_t code, void *data, size_t len)
 }
 
 size_t
-pack_handshake_opt_u8(void *dptr, uint8_t code, uint8_t value)
+pack_handshake_opt_u8(struct *pg_buffer, uint8_t code, uint8_t value)
 {
 	struct msg_handshake_opt *opt = dptr;
 
@@ -36,7 +45,18 @@ pack_handshake_opt_u8(void *dptr, uint8_t code, uint8_t value)
 }
 
 size_t
-pack_handshake_opt_end(void *dptr)
+pack_handshake_opt_u32(struct *pg_buffer uint8_t code, uint32_t value)
+{
+	struct msg_handshake_opt *opt = dptr;
+
+	opt->code = code;
+	memcpy(opt->value, &value, sizeof(uint32_t));
+
+	return (sizeof(uint8_t) + sizeof(uint32_t));
+}
+
+size_t
+pack_handshake_opt_end(struct *pg_buffer)
 {
 	struct msg_handshake_opt *opt = dptr;
 
@@ -46,7 +66,7 @@ pack_handshake_opt_end(void *dptr)
 }
 
 size_t
-pack_have(void *dptr, uint32_t start_chunk, uint32_t end_chunk)
+pack_have(struct *pg_buffer, uint32_t start_chunk, uint32_t end_chunk)
 {
 	struct msg *msg = dptr;
 
@@ -58,7 +78,7 @@ pack_have(void *dptr, uint32_t start_chunk, uint32_t end_chunk)
 }
 
 size_t
-pack_data(void *dptr, uint32_t start_chunk, uint32_t end_chunk, uint64_t timestamp)
+pack_data(struct *pg_buffer, uint32_t start_chunk, uint32_t end_chunk, uint64_t timestamp)
 {
 	struct msg *msg = dptr;
 
@@ -71,7 +91,7 @@ pack_data(void *dptr, uint32_t start_chunk, uint32_t end_chunk, uint64_t timesta
 }
 
 size_t
-pack_ack(void *dptr, uint32_t start_chunk, uint32_t end_chunk, uint64_t sample)
+pack_ack(struct *pg_buffer, uint32_t start_chunk, uint32_t end_chunk, uint64_t sample)
 {
 	struct msg *msg = dptr;
 
@@ -84,11 +104,12 @@ pack_ack(void *dptr, uint32_t start_chunk, uint32_t end_chunk, uint64_t sample)
 }
 
 size_t
-pack_integrity(void *dptr, uint32_t end_chunk, uint8_t *hash)
+pack_integrity(struct *pg_buffer, uint32_t start_chunk, uint32_t end_chunk, uint8_t *hash)
 {
 	struct msg *msg = dptr;
 
 	msg->message_type = MSG_INTEGRITY;
+	msg->integrity.start_chunk = htobe32(start_chunk);
 	msg->integrity.end_chunk = htobe32(end_chunk);
 	memcpy(msg->integrity.hash, hash, sizeof(msg->integrity.hash));
 
@@ -96,8 +117,8 @@ pack_integrity(void *dptr, uint32_t end_chunk, uint8_t *hash)
 }
 
 size_t
-pack_signed_integrity(void *dptr, uint32_t start_chunk, uint32_t end_chunk, int64_t timestamp, uint8_t *signature,
-                      size_t siglen)
+pack_signed_integrity(struct *pg_buffer, uint32_t start_chunk, uint32_t end_chunk,
+    int64_t timestamp, uint8_t *signature, size_t siglen)
 {
 	struct msg *msg = dptr;
 
@@ -111,9 +132,10 @@ pack_signed_integrity(void *dptr, uint32_t start_chunk, uint32_t end_chunk, int6
 }
 
 size_t
-pack_request(void *dptr, uint32_t start_chunk, uint32_t end_chunk)
+pack_request(struct *pg_buffer, uint32_t start_chunk, uint32_t end_chunk)
 {
 	struct msg *msg = dptr;
+	uint64_t i;
 
 	msg->message_type = MSG_REQUEST;
 	msg->request.start_chunk = htobe32(start_chunk);
@@ -123,7 +145,7 @@ pack_request(void *dptr, uint32_t start_chunk, uint32_t end_chunk)
 }
 
 size_t
-pack_cancel(void *dptr, uint32_t start_chunk, uint32_t end_chunk)
+pack_cancel(struct *pg_buffer, uint32_t start_chunk, uint32_t end_chunk)
 {
 	struct msg *msg = dptr;
 
@@ -135,16 +157,7 @@ pack_cancel(void *dptr, uint32_t start_chunk, uint32_t end_chunk)
 }
 
 size_t
-pack_dest_chan(void *dptr, uint32_t dst_channel_id)
-{
-	uint32_t *chan_id = dptr;
-
-	*chan_id = htobe32(dst_channel_id);
-	return (sizeof(*chan_id));
-}
-
-size_t
-pack_pex_resv4(void *dptr, in_addr_t ip_address, uint16_t port)
+pack_pex_resv4(struct *pg_buffer, in_addr_t ip_address, uint16_t port)
 {
 	struct msg *msg = dptr;
 
@@ -156,7 +169,7 @@ pack_pex_resv4(void *dptr, in_addr_t ip_address, uint16_t port)
 }
 
 size_t
-pack_pex_req(void *dptr)
+pack_pex_req(struct *pg_buffer)
 {
 	struct msg *msg = dptr;
 

@@ -74,6 +74,19 @@ pg_context_create(struct sockaddr *sa, socklen_t salen, struct pg_context **ctxp
 	return (0);
 }
 
+void
+pg_context_set_callbacks(struct pg_context *ctx, struct pg_context_callbacks *callbacks, void *arg)
+{
+	ctx->callbacks = *callbacks;
+	ctx->callbacks_arg = arg;
+}
+
+void pg_socket_enqueue_tx(struct pg_context *ctx, struct pg_block *block)
+{
+	TAILQ_INSERT_TAIL(&ctx->io, block, entry);
+	ctx->callbacks.pg_start_sending(ctx, ctx->callbacks_arg);
+}
+
 int
 pg_context_destroy(struct pg_context *ctx)
 {
@@ -180,21 +193,23 @@ pg_handle_fd_write(struct pg_context *ctx)
 
 	for (;;) {
 		block = TAILQ_FIRST(&ctx->io);
-		if (block == NULL)
+		if (block == NULL) {
+			ctx->callbacks.pg_stop_sending(ctx, ctx->callbacks_arg);
 			break;
+		}
 
 		msgf = (struct msg_frame *)frame;
-		msgf->channel_id = block->ps->dst_channel_id;
+		msgf->channel_id = htobe32(block->ps->dst_channel_id);
 		msgf->msg.message_type = MSG_DATA;
-		msgf->msg.data.start_chunk = block->chunk_num;
-		msgf->msg.data.end_chunk = block->chunk_num;
+		msgf->msg.data.start_chunk = htobe32(block->chunk_num);
+		msgf->msg.data.end_chunk = htobe32(block->chunk_num);
 		msgf->msg.data.timestamp = 0; /* ??? */
 
 		chunk_size = block->ps->options.chunk_size;
 		frame_size = sizeof(msgf->channel_id) + sizeof(msgf->msg.data) + chunk_size;
 		offset = chunk_size * block->chunk_num;
 
-		if (pread(block->file->fd, &msgf->msg.data, chunk_size, offset) < 0) {
+		if (pread(block->file->fd, &msgf->msg.data.data, chunk_size, offset) < 0) {
 			ERROR("cannot read from file %s: %s", block->file->path, strerror(errno));
 			continue;
 		}

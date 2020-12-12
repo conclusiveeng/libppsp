@@ -24,6 +24,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include "internal.h"
 
 struct pg_bitmap *
@@ -57,10 +58,23 @@ pg_bitmap_set(struct pg_bitmap *bmp, uint64_t position)
 }
 
 void
+pg_bitmap_set_range(struct pg_bitmap *bmp, uint64_t start, uint64_t end, bool value)
+{
+
+}
+
+void
 pg_bitmap_clear(struct pg_bitmap *bmp, uint64_t position)
 {
 
 	bmp->data[position / 8] &= ~(1 << (position %8));
+}
+
+void
+pg_bitmap_fill(struct pg_bitmap *bmp, bool value)
+{
+	uint64_t data_size = bmp->size % 8 ? (bmp->size / 8) + 1 : bmp->size / 8;
+	memset(bmp->data, 0xff, data_size);
 }
 
 bool

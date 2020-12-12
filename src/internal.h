@@ -61,6 +61,14 @@ struct pg_block
 	TAILQ_ENTRY(pg_block) entry;
 };
 
+struct pg_buffer
+{
+	struct pg_peer *peer;
+	void *storage;
+	size_t used;
+	size_t allocated;
+};
+
 struct pg_protocol_options
 {
 	uint8_t version;
@@ -118,7 +126,6 @@ struct pg_swarm
 	struct pg_context *context;
 	struct pg_file *file;
 	struct pg_bitmap *have_bitmap;
-	struct pg_bitmap *request_bitmap;
 	uint64_t nc;
 	uint8_t swarm_id[20];
 	uint16_t swarm_id_len;
@@ -132,6 +139,8 @@ struct pg_peer_swarm
 	struct pg_peer *peer;
 	struct pg_swarm *swarm;
 	struct pg_protocol_options options;
+	struct pg_bitmap *request_bitmap;
+	struct pg_bitmap *integrity_bitmap;
 	uint32_t dst_channel_id;
 	uint32_t src_channel_id;
 
@@ -155,6 +164,8 @@ struct pg_context
 	int sock_fd;
 	uint32_t swarm_id;
 	struct sockaddr_storage addr;
+	struct pg_context_callbacks callbacks;
+	void *callbacks_arg;
 
 	LIST_HEAD(, pg_peer) peers;
 	LIST_HEAD(, pg_swarm) swarms;
@@ -198,12 +209,15 @@ struct node {
 	struct chunk *chunk;                /* pointer to chunk */
 	char sha[20 + 1];
 	enum node_state state;
+	LIST_ENTRY(node) entry;
 };
 
 struct pg_bitmap *pg_bitmap_create(uint64_t size);
 void pg_bitmap_free(struct pg_bitmap *bmp);
 void pg_bitmap_set(struct pg_bitmap *bmp, uint64_t position);
+void pg_bitmap_set_range(struct pg_bitmap *bmp, uint64_t start, uint64_t end, bool value);
 void pg_bitmap_clear(struct pg_bitmap *bmp, uint64_t position);
+void pg_bitmap_fill(struct pg_bitmap *bmp, bool value);
 bool pg_bitmap_get(struct pg_bitmap *bmp, uint64_t position);
 void pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
     pg_bitmap_scan_func_t fn, void *arg);
@@ -217,7 +231,7 @@ size_t pack_handshake_opt_end(void *dptr);
 size_t pack_have(void *dptr, uint32_t start_chunk, uint32_t end_chunk);
 size_t pack_data(void *dptr, uint32_t start_chunk, uint32_t end_chunk, uint64_t timestamp);
 size_t pack_ack(void *dptr, uint32_t start_chunk, uint32_t end_chunk, uint64_t sample);
-size_t pack_integrity(void *dptr, uint32_t end_chunk, uint8_t *hash);
+size_t pack_integrity(void *dptr, uint32_t start_chunk, uint32_t end_chunk, uint8_t *hash);
 size_t pack_signed_integrity(void *dptr, uint32_t start_chunk, uint32_t end_chunk,
 			     int64_t timestamp, uint8_t *signature, size_t siglen);
 size_t pack_request(void *dptr, uint32_t start_chunk, uint32_t end_chunk);
@@ -242,5 +256,7 @@ struct pg_file *pg_context_file_by_sha(struct pg_context *ctx, const char *sha);
 const char *pg_hexdump(const uint8_t *buf, size_t len);
 const char *pg_swarm_to_str(struct pg_swarm *swarm);
 uint32_t pg_new_channel_id(void);
+
+void pg_socket_enqueue_tx(struct pg_context *ctx, struct pg_block *block);
 
 #endif //PEREGRINE_INTERNAL_H

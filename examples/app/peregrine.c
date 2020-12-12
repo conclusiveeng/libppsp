@@ -9,7 +9,19 @@
 #include "peregrine/socket.h"
 #include "peregrine/file.h"
 
-int debug;
+static int tx = 0;
+
+void
+peregrine_start_tx(struct pg_context *ctx, void *arg)
+{
+	tx = 1;
+}
+
+void
+peregrine_stop_tx(struct pg_context *ctx, void *arg)
+{
+	tx = 0;
+}
 
 int
 main(int argc, char *const argv[])
@@ -21,6 +33,11 @@ main(int argc, char *const argv[])
 	int local_port = 0;
 	int ch;
 	int ret;
+
+	struct pg_context_callbacks callbacks = {
+	    .pg_start_sending = peregrine_start_tx,
+	    .pg_stop_sending = peregrine_stop_tx
+	};
 
 	while ((ch = getopt(argc, argv, "p:d:h")) != -1) {
 		switch (ch) {
@@ -53,6 +70,8 @@ main(int argc, char *const argv[])
 		exit(EX_OSERR);
 	}
 
+	pg_context_set_callbacks(context, &callbacks, NULL);
+
 	if (pg_file_add_directory(context, directory) != 0) {
 		fprintf(stderr, "cannot add directory to context: %s\n", strerror(errno));
 		exit(EX_OSERR);
@@ -62,10 +81,13 @@ main(int argc, char *const argv[])
 	pg_file_list_sha1(context);
 
 	pfd.fd = pg_context_get_fd(context);
-	pfd.events = POLLIN | /* POLLOUT | */ POLLERR;
+	pfd.events = POLLIN  | POLLERR;
 	pfd.revents = 0;
 
 	for (;;) {
+		if (tx)
+			pfd.events |= POLLOUT;
+
 		ret = poll(&pfd, 1, -1);
 		if (ret < 0)
 			break;
@@ -73,10 +95,8 @@ main(int argc, char *const argv[])
 		if (pfd.revents & POLLIN)
 			pg_handle_fd_read(context);
 
-#if 0
 		if (pfd.revents & POLLOUT)
 			pg_handle_fd_write(context);
-#endif
 
 		if (pfd.revents & POLLERR)
 			break;

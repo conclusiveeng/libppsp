@@ -116,12 +116,13 @@ mt_build_tree(int num_chunks, struct node **ret)
 
 	/* build the tree by linking nodes */
 	for (l = 1; l <= h; l++) {
+		/* DEBUG("building level %d", l); */
 		int first_idx = (1 << (l - 1)) - 1;
 		for (si = first_idx; si < 2 * nc; si += (2 << l)) {
 			left = si;
 			right = (si | (1 << l));
 			parent = (left + right) / 2;
-			/* d_printf("pair %d-%d will have parent: %d\n", left, right, parent); */
+			/* DEBUG("pair %d-%d will have parent: %d", left, right, parent); */
 			tree[left].parent = &tree[parent];  /* parent for left node */
 			tree[right].parent = &tree[parent]; /* parent for right node */
 
