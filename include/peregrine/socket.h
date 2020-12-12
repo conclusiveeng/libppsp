@@ -32,26 +32,26 @@
 #include <sys/socket.h>
 
 #define BUFSIZE       1500
-#define PEER_STR_ADDR 32
 #define CHUNK_SIZE    1024
 
 struct pg_context;
 
-struct pg_context_callbacks
+struct pg_context_options
 {
-	void (*pg_start_sending)(struct pg_context *, void *);
-	void (*pg_stop_sending)(struct pg_context *, void *);
+	struct sockaddr *listen_addr;
+	socklen_t listen_addr_len;
+	void (*add_fd)(struct pg_context *ctx, void *arg, int fd, int events);
+	void (*mod_fd)(struct pg_context *ctx, void *arg, int fd, int events);
+	void (*del_fd)(struct pg_context *ctx, void *arg, int fd);
+	void *arg;
 };
 
-int pg_context_create(struct sockaddr *sa, socklen_t salen, struct pg_context **ctxp);
-void pg_context_set_callbacks(struct pg_context *ctx, struct pg_context_callbacks *callbacks,
-    void *arg);
+int pg_context_create(struct pg_context_options *options, struct pg_context **ctxp);
 int pg_context_add_directory(struct pg_context *ctx, const char *directory);
 struct pg_file *pg_context_add_file(struct pg_context *ctx, const char *path);
 int pg_context_destroy(struct pg_context *ctx);
-int pg_context_get_fd(struct pg_context *ctx);
-int pg_handle_fd_read(struct pg_context *ctx);
-int pg_handle_fd_write(struct pg_context *ctx);
+int pg_handle_fd_read(struct pg_context *ctx, int fd);
+int pg_handle_fd_write(struct pg_context *ctx, int fd);
 int pg_add_peer(struct pg_context *ctx, struct sockaddr *sa);
 
 #endif

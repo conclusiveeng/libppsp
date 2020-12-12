@@ -48,7 +48,7 @@ pg_find_or_add_peer(struct pg_context *ctx, const struct sockaddr *saddr)
 }
 
 int
-pg_context_create(struct sockaddr *sa, socklen_t salen, struct pg_context **ctxp)
+pg_context_create(struct pg_context_options *options, struct pg_context **ctxp)
 {
 	struct pg_context *ctx;
 
@@ -60,7 +60,7 @@ pg_context_create(struct sockaddr *sa, socklen_t salen, struct pg_context **ctxp
 		return (-1);
 	}
 
-	if (bind(ctx->sock_fd, sa, salen) != 0) {
+	if (bind(ctx->sock_fd, options->listen_addr, options->listen_addr_len) != 0) {
 		ERROR("Failed to bind: %s", strerror(errno));
 		return (-1);
 	}
@@ -76,16 +76,16 @@ pg_context_create(struct sockaddr *sa, socklen_t salen, struct pg_context **ctxp
 }
 
 void
-pg_context_set_callbacks(struct pg_context *ctx, struct pg_context_callbacks *callbacks, void *arg)
-{
-	ctx->callbacks = *callbacks;
-	ctx->callbacks_arg = arg;
-}
-
-void pg_socket_enqueue_tx(struct pg_context *ctx, struct pg_block *block)
+pg_socket_enqueue_tx(struct pg_context *ctx, struct pg_block *block)
 {
 	TAILQ_INSERT_TAIL(&ctx->io, block, entry);
-	ctx->callbacks.pg_start_sending(ctx, ctx->callbacks_arg);
+	ctx->options.mod_fd(ctx, ctx->options.arg, ctx->sock_fd, POLLIN | POLLOUT);
+}
+
+void
+pg_socket_suspend_tx(struct pg_context *ctx)
+{
+	ctx->options.mod_fd(ctx, ctx->options.arg, ctx->sock_fd, POLLIN);
 }
 
 int
@@ -133,7 +133,8 @@ pg_context_get_fd(struct pg_context *ctx)
 }
 
 static int
-peregrine_handle_frame(struct pg_context *ctx, const struct sockaddr *client, const uint8_t *frame, size_t len)
+peregrine_handle_frame(struct pg_context *ctx, const struct sockaddr *client,
+    const uint8_t *frame, size_t len)
 {
 	struct pg_peer *peer;
 	struct msg *msg;
@@ -146,7 +147,7 @@ peregrine_handle_frame(struct pg_context *ctx, const struct sockaddr *client, co
 
 	if (len == 4) {
 		DEBUG("keep-alive received");
-		return 0;
+		return (0);
 	}
 
 	for (pos = 4; pos < len;) {
@@ -162,7 +163,7 @@ peregrine_handle_frame(struct pg_context *ctx, const struct sockaddr *client, co
 }
 
 int
-pg_handle_fd_read(struct pg_context *ctx)
+pg_handle_fd_read(struct pg_context *ctx, int fd)
 {
 	struct sockaddr_storage client_addr;
 	socklen_t client_addr_len;
@@ -187,7 +188,7 @@ pg_handle_fd_read(struct pg_context *ctx)
 }
 
 int
-pg_handle_fd_write(struct pg_context *ctx)
+pg_handle_fd_write(struct pg_context *ctx, int fd)
 {
 	struct pg_block *block;
 	struct msg_frame *msgf;
@@ -201,7 +202,7 @@ pg_handle_fd_write(struct pg_context *ctx)
 	for (;;) {
 		block = TAILQ_FIRST(&ctx->io);
 		if (block == NULL) {
-			ctx->callbacks.pg_stop_sending(ctx, ctx->callbacks_arg);
+			pg_socket_suspend_tx(ctx);
 			break;
 		}
 
@@ -234,6 +235,8 @@ pg_handle_fd_write(struct pg_context *ctx)
 int
 pg_add_peer(struct pg_context *ctx, struct sockaddr *sa)
 {
+	DEBUG("add peer %s into context %p", pg_sockaddr_to_str(sa), ctx);
+
 	if (pg_find_or_add_peer(ctx, sa) == NULL)
 		return (-1);
 

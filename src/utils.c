@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include "internal.h"
 
 int
@@ -45,6 +46,21 @@ pg_sockaddr_copy(struct sockaddr_storage *dest, const struct sockaddr *src)
 }
 
 const char *
+pg_sockaddr_to_str(struct sockaddr *sa)
+{
+	struct sockaddr_in *sin;
+	struct sockaddr_in6 *sin6;
+	static char storage[64];
+
+	switch (sa->sa_family) {
+	case AF_INET:
+		sin = (struct sockaddr_in *)sa;
+		sprintf(storage, "%s:%d", inet_ntoa(sin->sin_addr), ntohs(sin->sin_port));
+		return (storage);
+	}
+}
+
+const char *
 pg_context_sha_by_file(struct pg_file *file)
 {
 
@@ -81,6 +97,12 @@ const char *
 pg_swarm_to_str(struct pg_swarm *swarm)
 {
 	return pg_hexdump(swarm->swarm_id, swarm->swarm_id_len);
+}
+
+const char *
+pg_peer_to_str(struct pg_peer *peer)
+{
+	return pg_sockaddr_to_str((struct sockaddr *)&peer->addr);
 }
 
 uint32_t

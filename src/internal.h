@@ -141,12 +141,14 @@ struct pg_peer_swarm
 	struct pg_peer *peer;
 	struct pg_swarm *swarm;
 	struct pg_protocol_options options;
+	struct pg_bitmap *have_bitmap;
 	struct pg_bitmap *request_bitmap;
 	struct pg_bitmap *integrity_bitmap;
 	uint32_t dst_channel_id;
 	uint32_t src_channel_id;
 
-	LIST_ENTRY(pg_peer_swarm) entry;
+	LIST_ENTRY(pg_peer_swarm) peer_entry;
+	LIST_ENTRY(pg_peer_swarm) swarm_entry;
 };
 
 /* file being downloaded */
@@ -164,10 +166,8 @@ struct pg_download
 struct pg_context
 {
 	int sock_fd;
-	uint32_t swarm_id;
 	struct sockaddr_storage addr;
-	struct pg_context_callbacks callbacks;
-	void *callbacks_arg;
+	struct pg_context_options options;
 
 	LIST_HEAD(, pg_peer) peers;
 	LIST_HEAD(, pg_swarm) swarms;
@@ -199,14 +199,16 @@ struct chunk
 	enum chunk_downloaded downloaded;
 };
 
-enum node_state {
+enum node_state
+{
 	EMPTY = 0,
 	INITIALIZED,
 	ACTIVE,
 	SENT /* seeder already sent this sha to leecher */
 };
 
-struct node {
+struct node
+{
 	int number;                         /* number of the node */
 	struct node *left, *right, *parent; /* if parent == NULL - it is root node of the tree */
 	struct chunk *chunk;                /* pointer to chunk */
@@ -227,21 +229,21 @@ void pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
 
 ssize_t pg_handle_message(struct pg_peer *peer, uint32_t chid, struct msg *msg);
 
-size_t pack_handshake(void *dptr, uint32_t src_channel_id);
-size_t pack_handshake_opt(void *dptr, uint8_t code, void *data, size_t len);
-size_t pack_handshake_opt_u8(void *dptr, uint8_t code, uint8_t value);
-size_t pack_handshake_opt_end(void *dptr);
-size_t pack_have(void *dptr, uint32_t start_chunk, uint32_t end_chunk);
-size_t pack_data(void *dptr, uint32_t start_chunk, uint32_t end_chunk, uint64_t timestamp);
-size_t pack_ack(void *dptr, uint32_t start_chunk, uint32_t end_chunk, uint64_t sample);
-size_t pack_integrity(void *dptr, uint32_t start_chunk, uint32_t end_chunk, uint8_t *hash);
-size_t pack_signed_integrity(void *dptr, uint32_t start_chunk, uint32_t end_chunk,
+void pack_handshake(struct pg_buffer *buf, uint32_t src_channel_id);
+void pack_handshake_opt(struct pg_buffer *buf, uint8_t code, void *data, size_t len);
+void pack_handshake_opt_u8(struct pg_buffer *buf, uint8_t code, uint8_t value);
+void pack_handshake_opt_end(struct pg_buffer *buf);
+void pack_have(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk);
+void pack_data(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk, uint64_t timestamp);
+void pack_ack(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk, uint64_t sample);
+void pack_integrity(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk, uint8_t *hash);
+void pack_signed_integrity(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk,
 			     int64_t timestamp, uint8_t *signature, size_t siglen);
-size_t pack_request(void *dptr, uint32_t start_chunk, uint32_t end_chunk);
-size_t pack_cancel(void *dptr, uint32_t start_chunk, uint32_t end_chunk);
-size_t pack_dest_chan(void *dptr, uint32_t dst_channel_id);
-size_t pack_pex_resv4(void *dptr, in_addr_t ip_address, uint16_t port);
-size_t pack_pex_req(void *dptr);
+void pack_request(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk);
+void pack_cancel(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk);
+void pack_dest_chan(struct pg_buffer *buf, uint32_t dst_channel_id);
+void pack_pex_resv4(struct pg_buffer *buf, in_addr_t ip_address, uint16_t port);
+void pack_pex_req(struct pg_buffer *buf);
 
 int mt_order2(uint32_t /*val*/);
 struct node *mt_build_tree(int /*num_chunks*/, struct node ** /*ret*/);
@@ -251,13 +253,16 @@ void mt_interval_min_max(struct node * /*i*/, struct node * /*min*/, struct node
 void mt_dump_tree(struct node * /*t*/, int /*l*/);
 void mt_dump_chunk_tab(struct chunk * /*c*/, int /*l*/);
 void mt_update_sha(struct node * /*t*/, int /*num_chunks*/);
+int mt_verify_node(struct node *);
 
 int pg_sockaddr_cmp(const struct sockaddr *s1, const struct sockaddr *s2);
 void pg_sockaddr_copy(struct sockaddr_storage *dest, const struct sockaddr *src);
+const char *pg_sockaddr_to_str(struct sockaddr *sa);
 const char *pg_context_sha_by_file(struct pg_file *file);
 struct pg_file *pg_context_file_by_sha(struct pg_context *ctx, const char *sha);
 const char *pg_hexdump(const uint8_t *buf, size_t len);
 const char *pg_swarm_to_str(struct pg_swarm *swarm);
+const char *pg_peer_to_str(struct pg_peer *peer);
 uint32_t pg_new_channel_id(void);
 
 void pg_socket_enqueue_tx(struct pg_context *ctx, struct pg_block *block);
