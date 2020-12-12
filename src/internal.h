@@ -67,6 +67,8 @@ struct pg_buffer
 	void *storage;
 	size_t used;
 	size_t allocated;
+	uint32_t channel_id;
+	TAILQ_ENTRY(pg_buffer) entry;
 };
 
 struct pg_protocol_options
@@ -172,6 +174,7 @@ struct pg_context
 	SLIST_HEAD(, pg_file) files;
 	LIST_HEAD(, pg_download) downloads;
 	TAILQ_HEAD(, pg_block) io;
+	TAILQ_HEAD(, pg_buffer) tx_queue;
 };
 
 enum chunk_state
@@ -258,5 +261,13 @@ const char *pg_swarm_to_str(struct pg_swarm *swarm);
 uint32_t pg_new_channel_id(void);
 
 void pg_socket_enqueue_tx(struct pg_context *ctx, struct pg_block *block);
+
+struct pg_buffer *pg_buffer_create(struct pg_peer *peer, uint32_t channel_id);
+void pg_buffer_free(struct pg_buffer *buffer);
+void *pg_buffer_advance(struct pg_buffer *buffer, size_t len);
+void *pg_buffer_ptr(struct pg_buffer *buffer);
+size_t pg_buffer_size_left(struct pg_buffer *buffer);
+void pg_buffer_enqueue(struct pg_buffer *buffer);
+void pg_buffer_reset(struct pg_buffer *buffer);
 
 #endif //PEREGRINE_INTERNAL_H

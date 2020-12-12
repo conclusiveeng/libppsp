@@ -41,6 +41,7 @@ get_filename_component(PARENT_DIR .. REALPATH DIRECTORY)
 include_directories(include)
 set(SOURCE_FILES
         src/internal.h
+        src/buffer.c
         src/log.c
         src/socket.c
         src/peer.c

@@ -69,6 +69,7 @@ pg_context_create(struct sockaddr *sa, socklen_t salen, struct pg_context **ctxp
 	LIST_INIT(&ctx->downloads);
 	SLIST_INIT(&ctx->files);
 	TAILQ_INIT(&ctx->io);
+	TAILQ_INIT(&ctx->tx_queue);
 
 	*ctxp = ctx;
 	return (0);
@@ -94,6 +95,7 @@ pg_context_destroy(struct pg_context *ctx)
 	struct pg_download *download;
 	struct pg_file *file;
 	struct pg_block *block;
+	struct pg_buffer *buffer;
 
 	LIST_FOREACH(peer, &ctx->peers, entry) {
 		LIST_REMOVE(peer, entry);
@@ -114,6 +116,11 @@ pg_context_destroy(struct pg_context *ctx)
 	TAILQ_FOREACH(block, &ctx->io, entry) {
 		TAILQ_REMOVE(&ctx->io, block, entry);
 		free(block);
+	}
+
+	TAILQ_FOREACH(buffer, &ctx->tx_queue, entry) {
+		TAILQ_REMOVE(&ctx->tx_queue, buffer, entry);
+		pg_buffer_free(buffer);
 	}
 
 	return (0);
