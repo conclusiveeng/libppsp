@@ -202,7 +202,7 @@ pg_file_add_directory(struct pg_context *context, const char *dname,
 
 		if (dirent->d_type == DT_REG) {
 			sprintf(path, "%s/%s", dname, dirent->d_name);
-			new_file = pg_file_add_file(context, path);
+			new_file = pg_file_add_file(context, NULL, path);
 			if (fn != NULL)
 				fn(new_file, dname);
 		}
@@ -210,7 +210,7 @@ pg_file_add_directory(struct pg_context *context, const char *dname,
 		if ((dirent->d_type == DT_DIR) && (strcmp(dirent->d_name, ".") != 0)
 		    && (strcmp(dirent->d_name, "..") != 0)) {
 			snprintf(newdir, sizeof(newdir) - 1, "%s/%s", dname, dirent->d_name);
-			pg_file_add_directory(context, newdir);
+			pg_file_add_directory(context, newdir, NULL);
 		}
 	}
 

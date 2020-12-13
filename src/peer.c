@@ -444,7 +444,7 @@ pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 
 	if (ps->swarm->file->tree == NULL) {
 		uint64_t order = be32toh(msg->integrity.end_chunk) - be32toh(msg->integrity.end_chunk);
-		DEBUG("integrity: creating merkle tree with order %d")
+		DEBUG("integrity: creating merkle tree with order %d", order);
 	}
 
 	return (MSG_LENGTH(msg_integrity));
