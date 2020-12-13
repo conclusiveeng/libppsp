@@ -84,7 +84,7 @@ pg_find_swarm_by_id(struct pg_context *ctx, const uint8_t *swarm_id, size_t id_l
 	}
 
 	/* Let's create a new swarm from a known file or stream */
-	file = pg_context_file_by_sha(ctx, (const char *)swarm_id);
+	file = pg_file_by_sha(ctx, swarm_id);
 	if (file == NULL)
 		return (NULL);
 

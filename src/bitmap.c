@@ -112,6 +112,7 @@ pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
 			}
 			break;
 		case BITMAP_SCAN_BOTH:
+		default:
 			break;
 		}
 
@@ -132,6 +133,7 @@ pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
 			fn(start, bmp->size - 1, old_val, arg);
 		break;
 	case BITMAP_SCAN_BOTH:
+	default:
 		fn(start, bmp->size - 1, old_val, arg);
 		break;
 	}

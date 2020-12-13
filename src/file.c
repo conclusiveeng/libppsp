@@ -120,17 +120,8 @@ peregrine_file_process_file(struct pg_file *file)
 		file->tab_chunk[x].node = &ret[x * 2];
 	}
 
-	// Only fot debug
-	// mt_show_tree_root_based(&ret[root8->number]);
-
-	// Only fot debug
-	// mt_dump_chunk_tab(file->tab_chunk, nl);
-
 	/* update all the SHAs in the tree */
 	mt_update_sha(ret, nl);
-
-	// Only fot debug
-	// mt_dump_tree(ret, nl);
 
 	free(buf);
 
@@ -140,8 +131,6 @@ peregrine_file_process_file(struct pg_file *file)
 void
 pg_file_generate_sha1(struct pg_context *context)
 {
-	int s;
-	int y;
 	struct pg_file *f;
 
 	SLIST_FOREACH(f, &context->files, entry)
@@ -194,11 +183,13 @@ pg_file_add_file(struct pg_context *context, const uint8_t *sha1, const char *pa
 }
 
 int
-pg_file_add_directory(struct pg_context *context, const char *dname)
+pg_file_add_directory(struct pg_context *context, const char *dname,
+    pg_file_dir_add_func_t fn)
 {
 	DIR *dir;
 	char newdir[BUFSIZ];
 	char path[BUFSIZ];
+	struct pg_file *new_file;
 
 	dir = opendir(dname);
 	if (dir == NULL)
@@ -211,7 +202,9 @@ pg_file_add_directory(struct pg_context *context, const char *dname)
 
 		if (dirent->d_type == DT_REG) {
 			sprintf(path, "%s/%s", dname, dirent->d_name);
-			pg_file_add_file(context, NULL, path);
+			new_file = pg_file_add_file(context, path);
+			if (fn != NULL)
+				fn(new_file, dname);
 		}
 
 		if ((dirent->d_type == DT_DIR) && (strcmp(dirent->d_name, ".") != 0)
@@ -234,3 +227,31 @@ pg_file_list_sha1(struct pg_context *context)
 		INFO("file: %s, NC:%d, SHA1: %s", f->path, f->nc, f->hash);
 	}
 }
+
+const char *
+pg_file_get_path(struct pg_file *file)
+{
+
+	return (file->path);
+}
+
+const uint8_t *
+pg_file_get_sha(struct pg_file *file)
+{
+
+	return (file->sha);
+}
+
+struct pg_file *
+pg_file_by_sha(struct pg_context *ctx, const uint8_t *sha)
+{
+	struct pg_file *file;
+
+	SLIST_FOREACH(file, &ctx->files, entry) {
+		if (memcmp(file->sha, sha, sizeof(file->sha)) == 0)
+			return (file);
+	}
+
+	return (NULL);
+}
+

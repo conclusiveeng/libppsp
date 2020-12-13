@@ -96,6 +96,13 @@ add_peer(const char *peerspec)
 	return (0);
 }
 
+void
+peregrine_print_new_file(struct pg_file *file, const char *dname)
+{
+	printf("Added new file: %s, parent dir: %s",
+	    pg_file_get_path(file), dname);
+}
+
 int
 main(int argc, char *const argv[])
 {
@@ -168,7 +175,7 @@ main(int argc, char *const argv[])
 	if (peer != NULL)
 		add_peer(peer);
 
-	if (pg_file_add_directory(context, directory) != 0) {
+	if (pg_file_add_directory(context, directory, peregrine_print_new_file) != 0) {
 		fprintf(stderr, "cannot add directory to context: %s\n", strerror(errno));
 		exit(EX_OSERR);
 	}
