@@ -27,9 +27,14 @@
 #define _PEER_H_
 #include "socket.h"
 
+typedef void (*pg_file_dir_add_func_t)(struct pg_file *file, const char *dname);
+
 void pg_file_generate_sha1(struct pg_context *context);
 struct pg_file *pg_file_add_file(struct pg_context *context, const char *name);
-int pg_file_add_directory(struct pg_context *context, const char *dname);
+int pg_file_add_directory(struct pg_context *context, const char *dname,
+    pg_file_dir_add_func_t fn);
 void pg_file_list_sha1(struct pg_context *context);
+const uint8_t *pg_file_get_sha(struct pg_file *file);
+const char *pg_file_get_path(struct pg_file *file);
 
 #endif /* _PEER_H_ */
