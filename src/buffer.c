@@ -25,7 +25,6 @@
 
 
 #include <stdlib.h>
-#include <string.h>
 #include "internal.h"
 
 #define MAX_FRAME_SIZE	1400
@@ -70,7 +69,7 @@ pg_buffer_enqueue(struct pg_buffer *buffer)
 	struct pg_buffer *buffer_copy;
 
 	buffer_copy = calloc (1, sizeof(*buffer_copy));
-	memcpy(buffer_copy, buffer, sizeof(*buffer));
+	*buffer_copy = *buffer;
 	pg_buffer_reset(buffer);
 
 	TAILQ_INSERT_TAIL(&buffer->peer->context->tx_queue, buffer_copy, entry);
