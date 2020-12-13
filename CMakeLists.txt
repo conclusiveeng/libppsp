@@ -47,6 +47,7 @@ set(SOURCE_FILES
         src/peer.c
         src/file.c
         src/sha1.c
+        src/swarm.c
         src/mt.c
         src/utils.c
         src/proto.c

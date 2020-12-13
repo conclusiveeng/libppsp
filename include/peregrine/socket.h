@@ -40,6 +40,7 @@ struct pg_context_options
 {
 	struct sockaddr *listen_addr;
 	socklen_t listen_addr_len;
+	const char *working_dir;
 	void (*add_fd)(struct pg_context *ctx, void *arg, int fd, int events);
 	void (*mod_fd)(struct pg_context *ctx, void *arg, int fd, int events);
 	void (*del_fd)(struct pg_context *ctx, void *arg, int fd);

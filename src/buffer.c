@@ -39,7 +39,8 @@ pg_buffer_create(struct pg_peer *peer, uint32_t channel_id)
 	buffer->peer = peer;
 	buffer->allocated = MAX_FRAME_SIZE;
 	buffer->storage = malloc(buffer->allocated);
-	((uint32_t *)buffer->storage)[0] = channel_id;
+	buffer->channel_id = channel_id;
+	((uint32_t *)buffer->storage)[0] = htobe32(channel_id);
 	buffer->used = sizeof(channel_id);
 
 	return (buffer);
@@ -56,31 +57,38 @@ pg_buffer_free(struct pg_buffer *buffer)
 void *
 pg_buffer_advance(struct pg_buffer *buffer, size_t len)
 {
+	void *ret;
 
 	if (buffer->allocated - buffer->used - len <= 0)
 		pg_buffer_enqueue(buffer);
 
+	ret = buffer->storage + buffer->used;
 	buffer->used += len;
-	return (buffer->storage + buffer->used);
+
+	return (ret);
 }
 
-void
+size_t
 pg_buffer_enqueue(struct pg_buffer *buffer)
 {
 	struct pg_buffer *buffer_copy;
+	size_t used = buffer->used;
 
-	buffer_copy = calloc (1, sizeof(*buffer_copy));
-	memcpy(buffer_copy, buffer, sizeof(*buffer));
+	buffer_copy = malloc(sizeof(*buffer_copy));
+	*buffer_copy = *buffer;
+
+	buffer->storage = malloc(MAX_FRAME_SIZE);
 	pg_buffer_reset(buffer);
 
-	TAILQ_INSERT_TAIL(&buffer->peer->context->tx_queue, buffer_copy, entry);
+	pg_socket_enqueue_tx(buffer->peer->context, buffer_copy);
+	return (used);
 }
 
 void
 pg_buffer_reset(struct pg_buffer *buffer)
 {
 
-	((uint32_t *)buffer->storage)[0] = buffer->channel_id;
+	((uint32_t *)buffer->storage)[0] = htobe32(buffer->channel_id);
 	buffer->used = sizeof(buffer->channel_id);
 }
 

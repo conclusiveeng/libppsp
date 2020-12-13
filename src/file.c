@@ -23,14 +23,16 @@
  * SUCH DAMAGE.
  */
 
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
+#include <sys/mman.h>
 #include "peregrine/file.h"
 #include "peregrine/socket.h"
 #include "sha1.h"
@@ -145,7 +147,7 @@ pg_file_generate_sha1(struct pg_context *context)
 	SLIST_FOREACH(f, &context->files, entry)
 	{
 		/* does the tree already exist for given file? */
-		if (f->tree_root == NULL) { /* no - so create tree for it */
+		if (f->tree_root == NULL && f->file_size > 0) { /* no - so create tree for it */
 			peregrine_file_process_file(f);
 			memcpy(f->sha, f->tree_root->sha, sizeof(f->sha));
 			strcpy(f->hash, pg_hexdump(f->sha, sizeof(f->sha)));
@@ -154,27 +156,41 @@ pg_file_generate_sha1(struct pg_context *context)
 }
 
 struct pg_file *
-pg_file_add_file(struct pg_context *context, const char *name)
+pg_file_add_file(struct pg_context *context, const uint8_t *sha1, const char *path)
 {
+	struct pg_file *file;
 	struct stat stat;
-	int st;
+	int fd;
 
-	st = lstat(name, &stat);
-	if (st != 0) {
-		ERROR("stat: %s", strerror(errno));
-	}
-	if (stat.st_mode & S_IFREG) { /* filename */
-		struct pg_file *f = calloc(1, sizeof(*f));
-		memset(f->path, 0, sizeof(f->path));
-		strcpy(f->path, name);
-		lstat(f->path, &stat);
-		f->file_size = stat.st_size;
-		f->fd = open(f->path, O_RDONLY);
-		SLIST_INSERT_HEAD(&context->files, f, entry);
-		return (f);
+	if (sha1 != NULL && path == NULL) {
+		/* Create path from SHA1 */
+		path = strdup(pg_hexdump(sha1, 20));
 	}
 
-	return (NULL);
+	fd = open(path, O_RDWR | O_CREAT, 0660);
+	if (fd < 0) {
+		WARN("cannot open or create %s: %s", path, strerror(errno));
+		return (NULL);
+	}
+
+	if (fstat(fd, &stat) != 0) {
+		WARN("cannot fstat on fd %d: %s", fd, strerror(errno));
+		return (NULL);
+	}
+
+	file = calloc(1, sizeof(*file));
+	file->fd = fd;
+	file->path = strdup(path);
+	file->file_size = stat.st_size;
+	file->nc = 8;
+	SLIST_INSERT_HEAD(&context->files, file, entry);
+
+	if (sha1 != NULL) {
+		/* SHA1 is provided, so this is a file to be downloaded. Create a swarm for it */
+		pg_swarm_create(context, file);
+	}
+
+	return (file);
 }
 
 int
@@ -195,7 +211,7 @@ pg_file_add_directory(struct pg_context *context, const char *dname)
 
 		if (dirent->d_type == DT_REG) {
 			sprintf(path, "%s/%s", dname, dirent->d_name);
-			pg_file_add_file(context, path);
+			pg_file_add_file(context, NULL, path);
 		}
 
 		if ((dirent->d_type == DT_DIR) && (strcmp(dirent->d_name, ".") != 0)
@@ -216,6 +232,5 @@ pg_file_list_sha1(struct pg_context *context)
 
 	SLIST_FOREACH(f, &context->files, entry) {
 		INFO("file: %s, NC:%d, SHA1: %s", f->path, f->nc, f->hash);
-		mt_show_tree_root_based(f->tree_root);
 	}
 }

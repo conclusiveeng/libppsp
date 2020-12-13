@@ -28,10 +28,8 @@
 #include "socket.h"
 
 void pg_file_generate_sha1(struct pg_context *context);
-struct pg_file *pg_file_add_file(struct pg_context *context, const char *name);
+struct pg_file *pg_file_add_file(struct pg_context *context, const uint8_t *sha1, const char *path);
 int pg_file_add_directory(struct pg_context *context, const char *dname);
 void pg_file_list_sha1(struct pg_context *context);
-
-struct pg_file *pg_file_request_file(struct pg_context *context, uint8_t *sha1, const char *name);
 
 #endif /* _PEER_H_ */

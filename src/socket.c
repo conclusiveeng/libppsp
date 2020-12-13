@@ -53,6 +53,7 @@ pg_context_create(struct pg_context_options *options, struct pg_context **ctxp)
 	struct pg_context *ctx;
 
 	ctx = calloc(1, sizeof(*ctx));
+	ctx->options = *options;
 
 	ctx->sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (ctx->sock_fd < 0) {
@@ -65,6 +66,9 @@ pg_context_create(struct pg_context_options *options, struct pg_context **ctxp)
 		return (-1);
 	}
 
+	/* Add the initial socket in read mode */
+	ctx->options.add_fd(ctx, ctx->options.arg, ctx->sock_fd, POLLIN);
+
 	LIST_INIT(&ctx->peers);
 	LIST_INIT(&ctx->downloads);
 	SLIST_INIT(&ctx->files);
@@ -76,9 +80,11 @@ pg_context_create(struct pg_context_options *options, struct pg_context **ctxp)
 }
 
 void
-pg_socket_enqueue_tx(struct pg_context *ctx, struct pg_block *block)
+pg_socket_enqueue_tx(struct pg_context *ctx, struct pg_buffer *buffer)
 {
-	TAILQ_INSERT_TAIL(&ctx->io, block, entry);
+	DEBUG("enqueue_tx: peer=%s length=%d", pg_peer_to_str(buffer->peer), buffer->used);
+
+	TAILQ_INSERT_TAIL(&ctx->tx_queue, buffer, entry);
 	ctx->options.mod_fd(ctx, ctx->options.arg, ctx->sock_fd, POLLIN | POLLOUT);
 }
 
@@ -190,55 +196,50 @@ pg_handle_fd_read(struct pg_context *ctx, int fd)
 int
 pg_handle_fd_write(struct pg_context *ctx, int fd)
 {
-	struct pg_block *block;
-	struct msg_frame *msgf;
-	uint8_t frame[sizeof(struct msg_data) + 1500];
-	size_t chunk_size;
-	size_t frame_size;
-	off_t offset;
+	struct pg_buffer *buffer;
 
 	DEBUG("ctx=%p fd=%d", ctx, ctx->sock_fd);
 
 	for (;;) {
-		block = TAILQ_FIRST(&ctx->io);
-		if (block == NULL) {
+		buffer = TAILQ_FIRST(&ctx->tx_queue);
+		if (buffer == NULL) {
 			pg_socket_suspend_tx(ctx);
 			break;
 		}
 
-		msgf = (struct msg_frame *)frame;
-		msgf->channel_id = htobe32(block->ps->dst_channel_id);
-		msgf->msg.message_type = MSG_DATA;
-		msgf->msg.data.start_chunk = htobe32(block->chunk_num);
-		msgf->msg.data.end_chunk = htobe32(block->chunk_num);
-		msgf->msg.data.timestamp = 0; /* ??? */
-
-		chunk_size = block->ps->options.chunk_size;
-		frame_size = sizeof(msgf->channel_id) + sizeof(msgf->msg.data) + chunk_size;
-		offset = chunk_size * block->chunk_num;
-
-		if (pread(block->file->fd, &msgf->msg.data.data, chunk_size, offset) < 0) {
-			ERROR("cannot read from file %s: %s", block->file->path, strerror(errno));
+		if (sendto(ctx->sock_fd, buffer->storage, buffer->used, 0,
+		    (struct sockaddr *)&buffer->peer->addr, sizeof(struct sockaddr_in)) < 0) {
+			ERROR("sendto: peer=%s error=%s", pg_peer_to_str(buffer->peer),
+			    strerror(errno));
 			continue;
 		}
 
-		if (sendto(ctx->sock_fd, frame, frame_size, MSG_DONTWAIT,
-		    (struct sockaddr *)&block->ps->peer->addr, sizeof(struct sockaddr_in)) < 0) {
-			if (errno == EWOULDBLOCK)
-				break;
-		}
-
-		TAILQ_REMOVE(&ctx->io, block, entry);
+		DEBUG("sent buffer %p with %d bytes", buffer, buffer->used);
+		TAILQ_REMOVE(&ctx->tx_queue, buffer, entry);
+		pg_buffer_free(buffer);
 	}
 }
 
 int
 pg_add_peer(struct pg_context *ctx, struct sockaddr *sa)
 {
+	struct pg_peer *peer;
+	struct pg_swarm *swarm;
+	struct pg_peer_swarm *ps;
+	struct pg_protocol_options options;
+
+	options.chunk_size = 1024;
+
 	DEBUG("add peer %s into context %p", pg_sockaddr_to_str(sa), ctx);
 
-	if (pg_find_or_add_peer(ctx, sa) == NULL)
+	peer = pg_find_or_add_peer(ctx, sa);
+	if (peer == NULL)
 		return (-1);
+
+	/* Try to connect to all known swarms? */
+	LIST_FOREACH(swarm, &ctx->swarms, entry) {
+		pg_peerswarm_create(peer, swarm, &options, 0);
+	}
 
 	return (0);
 }

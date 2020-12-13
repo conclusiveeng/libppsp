@@ -1,10 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <inttypes.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "internal.h"
+#include "peregrine/utils.h"
 
 int
 pg_sockaddr_cmp(const struct sockaddr *s1, const struct sockaddr *s2)
@@ -58,13 +61,9 @@ pg_sockaddr_to_str(struct sockaddr *sa)
 		sprintf(storage, "%s:%d", inet_ntoa(sin->sin_addr), ntohs(sin->sin_port));
 		return (storage);
 	}
-}
 
-const char *
-pg_context_sha_by_file(struct pg_file *file)
-{
-
-	return (file->sha);
+	errno = EINVAL;
+	return (NULL);
 }
 
 struct pg_file *
@@ -109,4 +108,24 @@ uint32_t
 pg_new_channel_id(void)
 {
 	return (rand());
+}
+
+uint8_t *
+pg_parse_sha1(const char *str)
+{
+	int i;
+	int pos = 0;
+	uint8_t *result = malloc(20);
+
+	for (i = 0; i < 20; i++) {
+		if (sscanf(str + pos, "%02" SCNx8, &result[i]) < 1) {
+			errno = EINVAL;
+			free(result);
+			return (NULL);
+		}
+
+		pos += 2;
+	}
+
+	return (result);
 }

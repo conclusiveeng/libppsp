@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "internal.h"
+#include "proto.h"
 #include "log.h"
 
 void
@@ -78,7 +79,7 @@ pack_data(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk, uint6
 }
 
 void
-pack_ack(struct pg_buffer *buff, uint32_t start_chunk, uint32_t end_chunk, uint64_t sample)
+pack_ack(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk, uint64_t sample)
 {
 	struct msg *msg = pg_buffer_advance(buf, MSG_LENGTH(msg_ack));
 
@@ -115,26 +116,22 @@ pack_signed_integrity(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_
 void
 pack_request(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk)
 {
-	struct msg *msg = dptr;
+	struct msg *msg = pg_buffer_advance(buf, MSG_LENGTH(msg_request));
 	uint64_t i;
 
 	msg->message_type = MSG_REQUEST;
 	msg->request.start_chunk = htobe32(start_chunk);
 	msg->request.end_chunk = htobe32(end_chunk);
-
-	return (sizeof(uint8_t) + sizeof(msg->request));
 }
 
 void
-pack_cancel(struct *pg_buffer, uint32_t start_chunk, uint32_t end_chunk)
+pack_cancel(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk)
 {
-	struct msg *msg = dptr;
+	struct msg *msg = pg_buffer_advance(buf, MSG_LENGTH(msg_cancel));
 
 	msg->message_type = MSG_CANCEL;
 	msg->cancel.start_chunk = htonl(start_chunk);
 	msg->cancel.end_chunk = htonl(end_chunk);
-
-	return (sizeof(uint8_t) + sizeof(msg->cancel));
 }
 
 void

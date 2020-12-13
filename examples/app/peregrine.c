@@ -14,7 +14,7 @@
 #include <arpa/inet.h>
 #include "peregrine/socket.h"
 #include "peregrine/file.h"
-
+#include "peregrine/utils.h"
 
 static struct pg_context *context;
 static int epollfd;
@@ -59,13 +59,26 @@ peregrine_del_fd(struct pg_context *ctx, void *arg, int fd)
 }
 
 static int
+add_file(const char *sha1str)
+{
+	uint8_t *sha1;
+
+	sha1 = pg_parse_sha1(sha1str);
+
+	if (pg_file_add_file(context, sha1, NULL) == NULL)
+		err(1, "pg_file_add_file");
+
+	return (0);
+}
+
+static int
 add_peer(const char *peerspec)
 {
 	struct sockaddr_in sin;
 	char addr[32];
 	uint16_t port;
 
-	if (sscanf(peerspec, "%s:%" SCNd16, addr, &port) < 2) {
+	if (sscanf(peerspec, "%[^:]:%hd", addr, &port) < 2) {
 		errno = EINVAL;
 		return (-1);
 	}
@@ -89,6 +102,8 @@ main(int argc, char *const argv[])
 	struct sockaddr_in sin;
 	struct epoll_event events[16];
 	const char *directory = NULL;
+	const char *sha1 = NULL;
+	const char *peer = NULL;
 	int local_port = 0;
 	int ch;
 	int ret;
@@ -101,13 +116,18 @@ main(int argc, char *const argv[])
 	    .arg = NULL,
 	};
 
-	while ((ch = getopt(argc, argv, "l:p:d:h")) != -1) {
+	while ((ch = getopt(argc, argv, "l:p:s:d:h")) != -1) {
 		switch (ch) {
 		case 'p':
-
+			peer = optarg;
+			break;
 
 		case 'l':
 			local_port = strtol(optarg, NULL, 10);
+			break;
+
+		case 's':
+			sha1 = optarg;
 			break;
 
 		case 'd':
@@ -126,6 +146,11 @@ main(int argc, char *const argv[])
 		exit(EX_USAGE);
 	}
 
+	epollfd = epoll_create(1);
+	if (epollfd < 0) {
+		err(1, "epoll_create");
+	}
+
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = INADDR_ANY;
 	sin.sin_port = htons(local_port);
@@ -137,6 +162,12 @@ main(int argc, char *const argv[])
 		exit(EX_OSERR);
 	}
 
+	if (sha1 != NULL)
+		add_file(sha1);
+
+	if (peer != NULL)
+		add_peer(peer);
+
 	if (pg_file_add_directory(context, directory) != 0) {
 		fprintf(stderr, "cannot add directory to context: %s\n", strerror(errno));
 		exit(EX_OSERR);
@@ -147,8 +178,12 @@ main(int argc, char *const argv[])
 
 	for (;;) {
 		ret = epoll_wait(epollfd, events, sizeof(events) / sizeof(events[0]), -1);
-		if (ret < 0)
-			errx(1, "epoll_wait");
+		if (ret < 0) {
+			if (errno == EINTR)
+				continue;
+
+			err(1, "epoll_wait");
+		}
 
 		for (i = 0; i < ret; i++) {
 			if (events[i].events & EPOLLIN)

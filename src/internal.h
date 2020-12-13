@@ -29,8 +29,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "peregrine/socket.h"
-#include "proto.h"
 
+struct msg;
 struct pg_context;
 struct pg_swarm;
 struct pg_peer;
@@ -44,6 +44,15 @@ enum pg_bitmap_scan_mode
 	BITMAP_SCAN_0,
 	BITMAP_SCAN_1,
 	BITMAP_SCAN_BOTH
+};
+
+enum pg_peer_swarm_state
+{
+	PEERSWARM_CREATED,
+	PEERSWARM_HANDSHAKE,
+	PEERSWARM_WAIT_HAVE,
+	PEERSWARM_WAIT_FIRST_INTEGRITY,
+	PEERSWARM_READY
 };
 
 struct pg_bitmap
@@ -89,7 +98,7 @@ struct pg_protocol_options
 struct pg_file
 {
 	struct pg_context *context;
-	char path[1024]; /* full path to file: directory name + file name */
+	const char *path;
 	char hash[41];    /* textual representation of sha1 for a file */
 	uint8_t sha[20];
 	uint64_t file_size;
@@ -99,6 +108,7 @@ struct pg_file
 	struct node *tree;       /* tree of the file */
 	struct node *tree_root;  /* pointer to root node of the tree */
 	int fd;
+	void *mmap_handle;
 	uint32_t start_chunk;
 	uint32_t end_chunk;
 
@@ -112,7 +122,6 @@ struct pg_file
 struct pg_peer
 {
 	struct pg_context *context;
-
 	struct sockaddr_storage addr;
 	// Operation status
 	uint8_t to_remove;                              // Peer makrked to remove (send handshake finish)
@@ -144,6 +153,8 @@ struct pg_peer_swarm
 	struct pg_bitmap *have_bitmap;
 	struct pg_bitmap *request_bitmap;
 	struct pg_bitmap *integrity_bitmap;
+	struct pg_buffer *buffer;
+	enum pg_peer_swarm_state state;
 	uint32_t dst_channel_id;
 	uint32_t src_channel_id;
 
@@ -228,22 +239,14 @@ void pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
     pg_bitmap_scan_func_t fn, void *arg);
 
 ssize_t pg_handle_message(struct pg_peer *peer, uint32_t chid, struct msg *msg);
+int pg_send_have(struct pg_peer_swarm *ps);
+int pg_send_handshake(struct pg_peer_swarm *ps);
 
-void pack_handshake(struct pg_buffer *buf, uint32_t src_channel_id);
-void pack_handshake_opt(struct pg_buffer *buf, uint8_t code, void *data, size_t len);
-void pack_handshake_opt_u8(struct pg_buffer *buf, uint8_t code, uint8_t value);
-void pack_handshake_opt_end(struct pg_buffer *buf);
-void pack_have(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk);
-void pack_data(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk, uint64_t timestamp);
-void pack_ack(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk, uint64_t sample);
-void pack_integrity(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk, uint8_t *hash);
-void pack_signed_integrity(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk,
-			     int64_t timestamp, uint8_t *signature, size_t siglen);
-void pack_request(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk);
-void pack_cancel(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk);
-void pack_dest_chan(struct pg_buffer *buf, uint32_t dst_channel_id);
-void pack_pex_resv4(struct pg_buffer *buf, in_addr_t ip_address, uint16_t port);
-void pack_pex_req(struct pg_buffer *buf);
+struct pg_peer_swarm *pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
+    struct pg_protocol_options *options, uint32_t dst_channel_id);
+void pg_peerswarm_destroy(struct pg_peer_swarm *ps);
+void pg_peerswarm_request(struct pg_peer_swarm *ps);
+struct pg_swarm *pg_swarm_create(struct pg_context *ctx, struct pg_file *file);
 
 int mt_order2(uint32_t /*val*/);
 struct node *mt_build_tree(int /*num_chunks*/, struct node ** /*ret*/);
@@ -265,14 +268,15 @@ const char *pg_swarm_to_str(struct pg_swarm *swarm);
 const char *pg_peer_to_str(struct pg_peer *peer);
 uint32_t pg_new_channel_id(void);
 
-void pg_socket_enqueue_tx(struct pg_context *ctx, struct pg_block *block);
+void pg_socket_enqueue_tx(struct pg_context *ctx, struct pg_buffer *block);
+void pg_socket_suspend_tx(struct pg_context *ctx);
 
 struct pg_buffer *pg_buffer_create(struct pg_peer *peer, uint32_t channel_id);
 void pg_buffer_free(struct pg_buffer *buffer);
 void *pg_buffer_advance(struct pg_buffer *buffer, size_t len);
 void *pg_buffer_ptr(struct pg_buffer *buffer);
 size_t pg_buffer_size_left(struct pg_buffer *buffer);
-void pg_buffer_enqueue(struct pg_buffer *buffer);
+size_t pg_buffer_enqueue(struct pg_buffer *buffer);
 void pg_buffer_reset(struct pg_buffer *buffer);
 
 #endif //PEREGRINE_INTERNAL_H
