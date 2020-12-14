@@ -60,7 +60,14 @@ pg_bitmap_set(struct pg_bitmap *bmp, uint64_t position)
 void
 pg_bitmap_set_range(struct pg_bitmap *bmp, uint64_t start, uint64_t end, bool value)
 {
+	uint64_t i;
 
+	for (i = start; i <= end; i++) {
+		if (value)
+			pg_bitmap_set(bmp, i);
+		else
+			pg_bitmap_clear(bmp, i);
+	}
 }
 
 void
