@@ -71,8 +71,9 @@ peregrine_file_process_file(struct pg_file *file)
 	file->nc = number_chunks;
 	//   PEREGRINE_DEBUG("number of chunks [%u]: %lu", chunk_size, number_chunks);
 
+	ret = pg_tree_create(number_chunks);
 	/* compute number of leaves - it is not the same as number of chunks */
-	nl = 1 << (pg_tree_calc_height(number_chunks));
+	nl = pg_tree_get_leaves_count(ret);
 	//   PEREGRINE_DEBUG("number of leaves %lu", nl);
 	file->nl = nl;
 
@@ -84,7 +85,6 @@ peregrine_file_process_file(struct pg_file *file)
 	for (x = 0; x < nl; x++)
 		file->tab_chunk[x].state = CH_EMPTY;
 
-	ret = pg_tree_create(number_chunks);
 	file->tree_root = pg_tree_get_root(ret);
 	file->tree = ret;
 
