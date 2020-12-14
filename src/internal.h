@@ -28,7 +28,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "peregrine/socket.h"
+#include <sys/queue.h>
+#include <peregrine/peregrine.h>
 #include "eventloop.h"
 
 struct msg;
@@ -86,7 +87,6 @@ struct pg_protocol_options
 	uint32_t chunk_size;
 };
 
-/* shared file */
 struct pg_file
 {
 	struct pg_context *context;
@@ -213,7 +213,7 @@ struct node
 	int number;                         /* number of the node */
 	struct node *left, *right, *parent; /* if parent == NULL - it is root node of the tree */
 	struct chunk *chunk;                /* pointer to chunk */
-	char sha[20 + 1];
+	uint8_t sha[20];
 	enum node_state state;
 	LIST_ENTRY(node) entry;
 };
@@ -257,8 +257,6 @@ const char *pg_sockaddr_to_str(struct sockaddr *sa);
 struct pg_file *pg_context_file_by_sha(struct pg_context *ctx, const char *sha);
 struct pg_file *pg_file_by_sha(struct pg_context *ctx, const uint8_t *sha);
 const char *pg_hexdump(const uint8_t *buf, size_t len);
-const char *pg_swarm_to_str(struct pg_swarm *swarm);
-const char *pg_peer_to_str(struct pg_peer *peer);
 uint32_t pg_new_channel_id(void);
 
 void pg_socket_enqueue_tx(struct pg_context *ctx, struct pg_buffer *block);
@@ -274,6 +272,8 @@ void pg_buffer_reset(struct pg_buffer *buffer);
 
 int pg_file_read_chunks(struct pg_file *file, uint64_t chunk, uint64_t count, void *buf);
 int pg_file_write_chunks(struct pg_file *file, uint64_t chunk, uint64_t count, void *buf);
+
+void pg_emit_event(struct pg_event *event);
 
 void *xmalloc(size_t length);
 void *xcalloc(size_t nelems, size_t length);

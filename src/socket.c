@@ -25,7 +25,7 @@
 
 #include <sys/param.h>
 #include <sys/types.h>
-#include <sys/endian.h>
+#include <endian.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
@@ -40,6 +40,8 @@
 #include "eventloop.h"
 #include "proto.h"
 #include "log.h"
+
+#define FRAME_LENGTH	1500
 
 static bool pg_handle_fd_read(void *arg);
 static bool pg_handle_fd_write(void *arg);
@@ -61,6 +63,7 @@ static struct pg_peer *
 pg_find_or_add_peer(struct pg_context *ctx, const struct sockaddr *saddr)
 {
 	struct pg_peer *peer;
+	struct pg_event event;
 
 	peer = pg_find_peer(ctx, saddr);
 	if (peer != NULL)
@@ -72,6 +75,11 @@ pg_find_or_add_peer(struct pg_context *ctx, const struct sockaddr *saddr)
 
 	LIST_INIT(&peer->swarms);
 	LIST_INSERT_HEAD(&ctx->peers, peer, entry);
+
+	event.type = EVENT_PEER_ADDED;
+	event.ctx = ctx;
+	event.peer = peer;
+	pg_emit_event(&event);
 
 	return (peer);
 }
@@ -150,7 +158,6 @@ pg_context_destroy(struct pg_context *ctx)
 	struct pg_peer *peer;
 	struct pg_download *download;
 	struct pg_file *file;
-	struct pg_block *block;
 	struct pg_buffer *buffer;
 
 	LIST_FOREACH(peer, &ctx->peers, entry) {
@@ -213,7 +220,7 @@ pg_handle_fd_read(void *arg)
 	struct pg_context *ctx = arg;
 	struct sockaddr_storage client_addr;
 	socklen_t client_addr_len = sizeof(struct sockaddr_storage);
-	uint8_t frame[BUFSIZE];
+	uint8_t frame[FRAME_LENGTH];
 	ssize_t ret;
 
 	DEBUG("ctx=%p fd=%d", ctx, ctx->sock_fd);
@@ -266,12 +273,22 @@ pg_handle_fd_write(void *arg)
 	return (true);
 }
 
+void
+pg_emit_event(struct pg_event *event)
+{
+	struct pg_context *ctx = event->ctx;
+
+	if (ctx->options.event_fn == NULL)
+		return;
+
+	ctx->options.event_fn(event, ctx->options.fn_arg);
+}
+
 int
-pg_add_peer(struct pg_context *ctx, struct sockaddr *sa)
+pg_add_peer(struct pg_context *ctx, struct sockaddr *sa, struct pg_peer **peerp)
 {
 	struct pg_peer *peer;
 	struct pg_swarm *swarm;
-	struct pg_peer_swarm *ps;
 	struct pg_protocol_options options = { .chunk_size = 1024 };
 
 	DEBUG("add peer %s into context %p", pg_sockaddr_to_str(sa), ctx);
@@ -285,6 +302,9 @@ pg_add_peer(struct pg_context *ctx, struct sockaddr *sa)
 		if (!pg_find_peerswarm_by_id(peer, swarm->swarm_id, swarm->swarm_id_len))
 			pg_peerswarm_create(peer, swarm, &options, pg_new_channel_id(), 0);
 	}
+
+	if (peerp != NULL)
+		*peerp = peer;
 
 	return (0);
 }

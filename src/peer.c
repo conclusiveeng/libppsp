@@ -1,6 +1,6 @@
 #include <sys/param.h>
 #include <sys/types.h>
-#include <sys/endian.h>
+#include <endian.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -51,6 +51,19 @@ static const struct pg_frame_handler frame_handlers[] = {
 	{ MSG_UNCHOKE, pg_handle_unchoke },
 	{ MSG_RESERVED, NULL }
 };
+
+bool
+pg_peer_iterate(struct pg_context *ctx, pg_peer_iter_fn_t fn, void *arg)
+{
+	struct pg_peer *peer;
+
+	LIST_FOREACH(peer, &ctx->peers, entry) {
+		if (!fn(peer, arg))
+			return (false);
+	}
+
+	return (true);
+}
 
 ssize_t
 pg_peer_send(struct pg_peer *peer, const void *buf, size_t len)
@@ -108,6 +121,8 @@ static bool
 pg_send_have_scan_fn(uint64_t start, uint64_t end, bool value, void *arg)
 {
 	struct pg_peer_swarm *ps = arg;
+
+	(void)value;
 
 	DEBUG("send_have: adding range % " PRIu64 "..%" PRIu64, start, end);
 
@@ -185,7 +200,6 @@ static int
 pg_send_data(struct pg_peer_swarm *ps, uint64_t chunk)
 {
 	void *ptr;
-	uint64_t offset = ps->options.chunk_size * chunk;
 
 	pack_data(ps->buffer, chunk, chunk, 0);
 	ptr = pg_buffer_advance(ps->buffer, ps->options.chunk_size);
@@ -492,7 +506,7 @@ pg_handle_pex_resv4(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	sin.sin_addr.s_addr = msg->pex_resv4.ip_address;
 	sin.sin_port = msg->pex_resv4.port;
 
-	if (pg_add_peer(peer->context, (struct sockaddr *)&sin) != 0) {
+	if (pg_add_peer(peer->context, (struct sockaddr *)&sin, NULL) != 0) {
 
 	}
 

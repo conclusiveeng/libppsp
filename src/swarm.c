@@ -4,7 +4,7 @@
 
 #include <sys/param.h>
 #include <sys/types.h>
-#include <sys/endian.h>
+#include <endian.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -50,6 +50,8 @@ pg_peerswarm_request_find_fn(uint64_t start, uint64_t end, bool value, void *arg
 {
 	struct pg_swarm_scan_state *state = arg;
 	uint64_t count = MIN(end - start + 1, state->budget);
+
+	(void)value;
 
 	DEBUG("requesting %d blocks @ %d", count, start);
 
@@ -102,6 +104,7 @@ pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
     uint32_t dst_channel_id)
 {
 	struct pg_peer_swarm *ps;
+	struct pg_event event;
 
 	DEBUG("peer=%s, swarm=%s, dst_channel_id=0x%08x", pg_peer_to_str(peer),
 	    pg_swarm_to_str(swarm), dst_channel_id);
@@ -121,6 +124,12 @@ pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
 	pg_send_handshake(ps);
 	pg_send_have(ps);
 	pg_peerswarm_request(ps);
+
+	event.ctx = peer->context;
+	event.peer = peer;
+	event.swarm = swarm;
+	event.type = EVENT_PEER_JOINED_SWARM;
+	pg_emit_event(&event);
 
 	return (ps);
 }
@@ -155,6 +164,57 @@ pg_swarm_create(struct pg_context *ctx, struct pg_file *file)
 	}
 
 	return (swarm);
+}
+
+bool
+pg_swarm_iterate(struct pg_context *ctx, pg_swarm_iter_fn_t fn, void *arg)
+{
+	struct pg_swarm *swarm;
+
+	LIST_FOREACH(swarm, &ctx->swarms, entry) {
+		if (!fn(swarm, arg))
+			return (false);
+	}
+
+	return (true);
+}
+
+size_t
+pg_swarm_get_id(struct pg_swarm *swarm, uint8_t **hash)
+{
+	uint8_t *ret;
+
+	ret = xmalloc(swarm->swarm_id_len);
+	memcpy(ret, swarm->swarm_id, swarm->swarm_id_len);
+
+	if (hash)
+		*hash = ret;
+
+	return (swarm->swarm_id_len);
+}
+
+uint64_t
+pg_swarm_get_content_size(struct pg_swarm *swarm)
+{
+	return (0);
+}
+
+uint64_t
+pg_swarm_get_total_chunks(struct pg_swarm *swarm)
+{
+	return (swarm->nc);
+}
+
+uint64_t
+pg_swarm_get_received_chunks(struct pg_swarm *swarm)
+{
+	return (swarm->fetched_chunks);
+}
+
+uint64_t
+pg_swarm_get_sent_chunks(struct pg_swarm *swarm)
+{
+	return (swarm->sent_chunks);
 }
 
 int

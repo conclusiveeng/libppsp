@@ -39,9 +39,7 @@
 #include <sys/param.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include "peregrine/socket.h"
-#include "peregrine/file.h"
-#include "peregrine/utils.h"
+#include <peregrine/peregrine.h>
 
 #define SHA1STR_MAX	41
 
@@ -191,8 +189,9 @@ main(int argc, char *const argv[])
 	}
 
 	TAILQ_FOREACH(peer, &peers, entry) {
-		if (pg_add_peer(context, (struct sockaddr *)&peer->sa) != 0) {
-
+		if (pg_add_peer(context, (struct sockaddr *)&peer->sa, NULL) != 0) {
+			fprintf(stderr, "cannot add peer: %s\n", strerror(errno));
+			exit(EX_OSERR);
 		}
 	}
 

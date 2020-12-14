@@ -33,8 +33,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
-#include "peregrine/file.h"
-#include "peregrine/socket.h"
+#include <peregrine/peregrine.h>
 #include "sha1.h"
 #include "internal.h"
 #include "log.h"
@@ -56,11 +55,11 @@ peregrine_file_process_file(struct pg_file *file)
 	struct node *root8;
 	uint32_t chunk_size;
 
-	chunk_size = CHUNK_SIZE;
+	chunk_size = file->chunk_size;
 	fd = open(file->path, O_RDONLY);
 	if (fd < 0) {
-		ERROR("error opening file: %s", file->path);
-		return -1;
+		ERROR("error opening file %s: %s", file->path, strerror(errno));
+		return (-1);
 	}
 	fstat(fd, &stat);
 

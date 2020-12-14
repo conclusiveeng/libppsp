@@ -89,6 +89,8 @@ pg_bitmap_clear(struct pg_bitmap *bmp, uint64_t position)
 void
 pg_bitmap_fill(struct pg_bitmap *bmp, bool value)
 {
+	(void)value;
+
 	uint64_t data_size = bmp->size % 8 ? (bmp->size / 8) + 1 : bmp->size / 8;
 	memset(bmp->data, 0xff, data_size);
 }

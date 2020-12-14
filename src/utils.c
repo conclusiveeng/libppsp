@@ -7,8 +7,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <peregrine/peregrine.h>
 #include "internal.h"
-#include "peregrine/utils.h"
 
 int
 pg_sockaddr_cmp(const struct sockaddr *s1, const struct sockaddr *s2)
