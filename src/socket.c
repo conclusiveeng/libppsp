@@ -1,19 +1,45 @@
+/*
+ * Copyright (c) 2020 Conclusive Engineering Sp. z o.o.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <poll.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
-#include <unistd.h>
 #include "internal.h"
+#include "eventloop.h"
 #include "proto.h"
 #include "log.h"
+
+static bool pg_handle_fd_read(void *arg);
+static bool pg_handle_fd_write(void *arg);
 
 static struct pg_peer *
 pg_find_peer(struct pg_context *ctx, const struct sockaddr *saddr)
@@ -54,6 +80,7 @@ pg_context_create(struct pg_context_options *options, struct pg_context **ctxp)
 
 	ctx = calloc(1, sizeof(*ctx));
 	ctx->options = *options;
+	ctx->eventloop = pg_eventloop_create();
 
 	ctx->sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (ctx->sock_fd < 0) {
@@ -67,7 +94,8 @@ pg_context_create(struct pg_context_options *options, struct pg_context **ctxp)
 	}
 
 	/* Add the initial socket in read mode */
-	ctx->options.add_fd(ctx, ctx->options.arg, ctx->sock_fd, POLLIN);
+	pg_eventloop_add_fd(ctx->eventloop, ctx->sock_fd, pg_handle_fd_read,
+	    EVENTLOOP_FD_READABLE, ctx);
 
 	LIST_INIT(&ctx->peers);
 	LIST_INIT(&ctx->downloads);
@@ -79,19 +107,38 @@ pg_context_create(struct pg_context_options *options, struct pg_context **ctxp)
 	return (0);
 }
 
+int
+pg_context_get_fd(struct pg_context *ctx)
+{
+	return (pg_eventloop_get_fd(ctx->eventloop));
+}
+
+int
+pg_context_step(struct pg_context *ctx)
+{
+	return (pg_eventloop_step(ctx->eventloop));
+}
+
+int
+pg_context_run(struct pg_context *ctx)
+{
+	return (pg_eventloop_run(ctx->eventloop));
+}
+
 void
 pg_socket_enqueue_tx(struct pg_context *ctx, struct pg_buffer *buffer)
 {
 	DEBUG("enqueue_tx: peer=%s length=%d", pg_peer_to_str(buffer->peer), buffer->used);
 
 	TAILQ_INSERT_TAIL(&ctx->tx_queue, buffer, entry);
-	ctx->options.mod_fd(ctx, ctx->options.arg, ctx->sock_fd, POLLIN | POLLOUT);
+	pg_eventloop_add_fd(ctx->eventloop, ctx->sock_fd, pg_handle_fd_write,
+	    EVENTLOOP_FD_WRITEABLE, ctx);
 }
 
 void
 pg_socket_suspend_tx(struct pg_context *ctx)
 {
-	ctx->options.mod_fd(ctx, ctx->options.arg, ctx->sock_fd, POLLIN);
+
 }
 
 int
@@ -127,12 +174,6 @@ pg_context_destroy(struct pg_context *ctx)
 	return (0);
 }
 
-int
-pg_context_get_fd(struct pg_context *ctx)
-{
-	return (ctx->sock_fd);
-}
-
 static int
 peregrine_handle_frame(struct pg_context *ctx, const struct sockaddr *client,
     const uint8_t *frame, size_t len)
@@ -163,14 +204,14 @@ peregrine_handle_frame(struct pg_context *ctx, const struct sockaddr *client,
 	return (0);
 }
 
-int
-pg_handle_fd_read(struct pg_context *ctx, int fd)
+static bool
+pg_handle_fd_read(void *arg)
 {
+	struct pg_context *ctx = arg;
 	struct sockaddr_storage client_addr;
 	socklen_t client_addr_len = sizeof(struct sockaddr_storage);
 	uint8_t frame[BUFSIZE];
 	ssize_t ret;
-	ssize_t pos = 0;
 
 	DEBUG("ctx=%p fd=%d", ctx, ctx->sock_fd);
 
@@ -179,18 +220,23 @@ pg_handle_fd_read(struct pg_context *ctx, int fd)
 		               &client_addr_len);
 
 		if (ret == 0)
-			return (0);
+			return (true);
 
-		if (ret < 0)
-			return (-1);
+		if (ret < 0) {
+			if (errno == EWOULDBLOCK)
+				return (true);
+
+			return (false);
+		}
 
 		peregrine_handle_frame(ctx, (struct sockaddr *)&client_addr, frame, ret);
 	}
 }
 
-int
-pg_handle_fd_write(struct pg_context *ctx, int fd)
+static bool
+pg_handle_fd_write(void *arg)
 {
+	struct pg_context *ctx = arg;
 	struct pg_buffer *buffer;
 
 	DEBUG("ctx=%p fd=%d", ctx, ctx->sock_fd);
@@ -199,7 +245,7 @@ pg_handle_fd_write(struct pg_context *ctx, int fd)
 		buffer = TAILQ_FIRST(&ctx->tx_queue);
 		if (buffer == NULL) {
 			pg_socket_suspend_tx(ctx);
-			break;
+			return (false);
 		}
 
 		if (sendto(ctx->sock_fd, buffer->storage, buffer->used, 0,
@@ -213,6 +259,8 @@ pg_handle_fd_write(struct pg_context *ctx, int fd)
 		TAILQ_REMOVE(&ctx->tx_queue, buffer, entry);
 		pg_buffer_free(buffer);
 	}
+
+	return (true);
 }
 
 int

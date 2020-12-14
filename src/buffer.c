@@ -23,7 +23,7 @@
  * SUCH DAMAGE.
  */
 
-
+#include <sys/types.h>
 #include <stdlib.h>
 #include "internal.h"
 

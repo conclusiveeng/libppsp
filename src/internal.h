@@ -29,6 +29,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "peregrine/socket.h"
+#include "eventloop.h"
 
 struct msg;
 struct pg_context;
@@ -167,6 +168,7 @@ struct pg_context
 	int sock_fd;
 	struct sockaddr_storage addr;
 	struct pg_context_options options;
+	struct pg_eventloop *eventloop;
 
 	LIST_HEAD(, pg_peer) peers;
 	LIST_HEAD(, pg_swarm) swarms;
@@ -273,4 +275,8 @@ void pg_buffer_reset(struct pg_buffer *buffer);
 int pg_file_read_chunks(struct pg_file *file, uint64_t chunk, uint64_t count, void *buf);
 int pg_file_write_chunks(struct pg_file *file, uint64_t chunk, uint64_t count, void *buf);
 
-#endif //PEREGRINE_INTERNAL_H
+void *xmalloc(size_t length);
+void *xcalloc(size_t nelems, size_t length);
+void *xrealloc(void *ptr, size_t length);
+
+#endif /* PEREGRINE_INTERNAL_H */

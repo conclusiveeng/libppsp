@@ -118,7 +118,6 @@ void
 pack_request(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk)
 {
 	struct msg *msg = pg_buffer_advance(buf, MSG_LENGTH(msg_request));
-	uint64_t i;
 
 	msg->message_type = MSG_REQUEST;
 	msg->request.start_chunk = htobe32(start_chunk);

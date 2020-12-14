@@ -64,3 +64,19 @@ pg_logf(enum peregrine_log_level level, const char *func, const char *fmt, ...)
 	fflush(stream);
 	va_end(ap);
 }
+
+void
+pg_panic(const char *file, int line, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	fprintf(stderr, "Panic at %s: %d: ", file, line);
+	vfprintf(stderr, fmt, ap);
+	fprintf(stderr, "\n");
+	va_end(ap);
+
+	fflush(stdout);
+	fflush(stderr);
+	abort();
+}

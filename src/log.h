@@ -41,15 +41,16 @@ enum peregrine_log_level
 };
 
 void pg_logf(enum peregrine_log_level level, const char *func, const char *fmt, ...);
+void pg_panic(const char *file, int line, const char *fmt, ...) __attribute__((noreturn));
 
 #define LIBPEREGRINE_DEBUG_ENABLED
 
 #if defined(LIBPEREGRINE_DEBUG_ENABLED)
-#define LOG(level, fmt, ...) pg_logf(level, __func__, fmt, ##__VA_ARGS__)
-#define DEBUG(fmt, ...)      pg_logf(PEREGRINE_DEBUG, __func__, fmt, ##__VA_ARGS__)
-#define INFO(fmt, ...)       pg_logf(PEREGRINE_INFO, __func__, fmt, ##__VA_ARGS__)
-#define WARN(fmt, ...)       pg_logf(PEREGRINE_WARNING, __func__, fmt, ##__VA_ARGS__)
-#define ERROR(fmt, ...)      pg_logf(PEREGRINE_ERROR, __func__, fmt, ##__VA_ARGS__)
+#define LOG(level, fmt, ...)	pg_logf(level, __func__, fmt, ##__VA_ARGS__)
+#define DEBUG(fmt, ...)		pg_logf(PEREGRINE_DEBUG, __func__, fmt, ##__VA_ARGS__)
+#define INFO(fmt, ...)		pg_logf(PEREGRINE_INFO, __func__, fmt, ##__VA_ARGS__)
+#define WARN(fmt, ...)		pg_logf(PEREGRINE_WARNING, __func__, fmt, ##__VA_ARGS__)
+#define ERROR(fmt, ...)		pg_logf(PEREGRINE_ERROR, __func__, fmt, ##__VA_ARGS__)
 #else
 #define LOG(level, fmt, ...)
 #define DEBUG(fmt, ...)
@@ -57,5 +58,7 @@ void pg_logf(enum peregrine_log_level level, const char *func, const char *fmt, 
 #define WARN(fmt, ...)
 #define ERROR(fmt, ...)
 #endif
+
+#define PANIC(fmt, ...)		pg_panic(__FILE__, __LINE__, fmt, ##__VA_ARGS__)
 
 #endif /* LIBPEREGRINE_LOG_H */

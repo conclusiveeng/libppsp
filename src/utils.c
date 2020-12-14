@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -128,4 +129,37 @@ pg_parse_sha1(const char *str)
 	}
 
 	return (result);
+}
+
+void *
+xmalloc(size_t length)
+{
+	void *ret;
+
+	ret = malloc(length);
+	assert(ret != NULL);
+
+	return (ret);
+}
+
+void *
+xcalloc(size_t nelems, size_t length)
+{
+	void *ret;
+
+	ret = calloc(nelems, length);
+	assert(ret != NULL);
+
+	return (ret);
+}
+
+void *
+xrealloc(void *ptr, size_t length)
+{
+	void *ret;
+
+	ret = realloc(ptr, length);
+	assert(ret != NULL);
+
+	return (ret);
 }

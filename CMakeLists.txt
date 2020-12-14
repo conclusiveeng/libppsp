@@ -12,9 +12,8 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11")
 add_compile_options(-O0 -Wall -Wextra -g -D_DEFAULT_SOURCE)
 
 message(STATUS "CMake version   : " "${CMAKE_SYSTEM_VERSION}")
-message(STATUS "Compiler        : " "${CMAKE_C_COMPILER}"    )
-message(STATUS "Operating System: " "${CMAKE_SYSTEM}"        )
-message(STATUS "I am building   : " "${PROJECT_NAME}"        )
+message(STATUS "Compiler        : " "${CMAKE_C_COMPILER}")
+message(STATUS "Operating System: " "${CMAKE_SYSTEM_NAME}")
 
 # Setup code check using clang-tidy
 # set(CMAKE_C_CLANG_TIDY clang-tidy)
@@ -39,7 +38,7 @@ endif(DOXYGEN_FOUND)
 get_filename_component(PARENT_DIR .. REALPATH DIRECTORY)
 
 include_directories(include)
-set(SOURCE_FILES
+set(MAIN_SOURCES
         src/internal.h
         src/buffer.c
         src/log.c
@@ -53,7 +52,19 @@ set(SOURCE_FILES
         src/proto.c
         src/bitmap.c)
 
-add_library(libperegrine SHARED ${SOURCE_FILES})
+set(LINUX_SOURCES
+        src/eventloop/epoll.c)
+
+set(BSD_SOURCES
+        src/eventloop/kqueue.c)
+
+if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+    set(EVENTLOOP_SOURCES ${LINUX_SOURCES})
+elseif(${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
+    set(EVENTLOOP_SOURCES ${BSD_SOURCES})
+endif()
+
+add_library(libperegrine SHARED ${MAIN_SOURCES} ${EVENTLOOP_SOURCES})
 
 configure_file(libperegrine.pc.in ${CMAKE_BINARY_DIR}/libperegrine.pc @ONLY)
 install(FILES ${CMAKE_BINARY_DIR}/libperegrine.pc DESTINATION /usr/share/pkgconfig)

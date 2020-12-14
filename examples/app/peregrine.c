@@ -1,3 +1,28 @@
+/*
+ * Copyright (c) 2020 Conclusive Engineering Sp. z o.o.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -8,7 +33,7 @@
 #include <string.h>
 #include <sysexits.h>
 #include <inttypes.h>
-#include <sys/epoll.h>
+#include <sys/poll.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
 #include <sys/param.h>
@@ -43,61 +68,12 @@ static TAILQ_HEAD(, peregrine_file) files;
 static TAILQ_HEAD(, peregrine_directory) directories;
 static TAILQ_HEAD(, peregrine_peer) peers;
 static struct pg_context *context;
-static int epollfd;
 
 static void
 usage(const char *argv0)
 {
 	fprintf(stderr, "Usage: %s -l port [options]\n", argv0);
 	fprintf(stderr, "Options:\n");
-}
-
-static void
-peregrine_add_fd(struct pg_context *ctx, void *arg, int fd, int events)
-{
-	struct epoll_event ev = { 0 };
-
-	(void)ctx;
-	(void)arg;
-
-	if (events & POLLIN)
-		ev.events |= EPOLLIN;
-
-	if (events & POLLOUT)
-		ev.events |= EPOLLOUT;
-
-	if (epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &ev) != 0)
-		err(1, "epoll_ctl(EPOLL_CTL_ADD)");
-}
-
-static void
-peregrine_mod_fd(struct pg_context *ctx, void *arg, int fd, int events)
-{
-	struct epoll_event ev = { 0 };
-
-	(void)ctx;
-	(void)arg;
-
-	if (events & POLLIN)
-		ev.events |= EPOLLIN;
-
-	if (events & POLLOUT)
-		ev.events |= EPOLLOUT;
-
-	if (epoll_ctl(epollfd, EPOLL_CTL_MOD, fd, &ev) != 0)
-		err(1, "epoll_ctl(EPOLL_CTL_MOD)");
-}
-
-static void
-peregrine_del_fd(struct pg_context *ctx, void *arg, int fd)
-{
-	struct epoll_event ev = { 0 };
-
-	(void)ctx;
-	(void)arg;
-
-	if (epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, &ev) != 0)
-		err(1, "epoll_ctl(EPOLL_CTL_DEL)");
 }
 
 static int
@@ -160,7 +136,7 @@ int
 main(int argc, char *const argv[])
 {
 	struct sockaddr_in sin;
-	struct epoll_event events[16];
+	struct pollfd pfd;
 	struct peregrine_file *file;
 	struct peregrine_directory *dir;
 	struct peregrine_peer *peer;
@@ -169,12 +145,7 @@ main(int argc, char *const argv[])
 	int ret;
 	int i;
 
-	struct pg_context_options options = {
-	    .add_fd = peregrine_add_fd,
-	    .mod_fd = peregrine_mod_fd,
-	    .del_fd = peregrine_del_fd,
-	    .arg = NULL,
-	};
+	struct pg_context_options options;
 
 	TAILQ_INIT(&files);
 	TAILQ_INIT(&directories);
@@ -209,10 +180,6 @@ main(int argc, char *const argv[])
 		exit(EX_USAGE);
 	}
 
-	epollfd = epoll_create(1);
-	if (epollfd < 0)
-		err(1, "epoll_create");
-
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = INADDR_ANY;
 	sin.sin_port = htons(local_port);
@@ -245,8 +212,12 @@ main(int argc, char *const argv[])
 	pg_file_generate_sha1(context);
 	pg_file_list_sha1(context);
 
+	pfd.fd = pg_context_get_fd(context);
+	pfd.events = POLLIN;
+	pfd.revents = 0;
+
 	for (;;) {
-		ret = epoll_wait(epollfd, events, sizeof(events) / sizeof(events[0]), -1);
+		ret = poll(&pfd, 1, 0);
 		if (ret < 0) {
 			if (errno == EINTR)
 				continue;
@@ -254,12 +225,9 @@ main(int argc, char *const argv[])
 			err(1, "epoll_wait");
 		}
 
-		for (i = 0; i < ret; i++) {
-			if (events[i].events & EPOLLIN)
-				pg_handle_fd_read(context, events[i].data.fd);
-
-			if (events[i].events & EPOLLOUT)
-				pg_handle_fd_write(context, events[i].data.fd);
+		if (pfd.revents & POLLIN) {
+			if (pg_context_step(context) != 0)
+				break;
 		}
 	}
 

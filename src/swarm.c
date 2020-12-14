@@ -101,8 +101,8 @@ pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
 {
 	struct pg_peer_swarm *ps;
 
-	DEBUG("peer=%s, swarm=%s, dst_channel_id=%d", pg_peer_to_str(peer),
-	      pg_swarm_to_str(swarm), dst_channel_id);
+	DEBUG("peer=%s, swarm=%s, dst_channel_id=0x%08x", pg_peer_to_str(peer),
+	    pg_swarm_to_str(swarm), dst_channel_id);
 
 	ps = calloc(1, sizeof(struct pg_peer_swarm));
 	ps->peer = peer;

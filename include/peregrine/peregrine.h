@@ -23,20 +23,16 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _PEREGRINE_SOCKET_H_
-#define _PEREGRINE_SOCKET_H_
+#ifndef LIBPEREGRINE_PEREGRINE_H
+#define LIBPEREGRINE_PEREGRINE_H
 
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <sys/queue.h>
-#include <sys/socket.h>
+/**
+ * @file peregrine.h
+ */
 
-#define BUFSIZE       1500
-#define CHUNK_SIZE    1024
-
-struct pg_context;
-
+/**
+ *
+ */
 enum pg_content_protection_method
 {
 	CONTENT_PROTECTION_NONE = 0,
@@ -72,15 +68,10 @@ struct pg_context_options
 	enum pg_content_protection_method content_protection_method;
 	enum pg_merkle_hash_func merkle_hash_func;
 	enum pg_chunk_addressing_method chunk_addressing_method;
+	void (*add_fd)(struct pg_context *ctx, void *arg, int fd, int events);
+	void (*mod_fd)(struct pg_context *ctx, void *arg, int fd, int events);
+	void (*del_fd)(struct pg_context *ctx, void *arg, int fd);
+	void *arg;
 };
 
-int pg_context_create(struct pg_context_options *options, struct pg_context **ctxp);
-int pg_context_get_fd(struct pg_context *ctx);
-int pg_context_step(struct pg_context *ctx);
-int pg_context_run(struct pg_context *ctx);
-int pg_context_add_directory(struct pg_context *ctx, const char *directory);
-struct pg_file *pg_context_add_file(struct pg_context *ctx, const char *path);
-int pg_context_destroy(struct pg_context *ctx);
-int pg_add_peer(struct pg_context *ctx, struct sockaddr *sa);
-
-#endif
+#endif /* LIBPEREGRINE_PEREGRINE_H */
