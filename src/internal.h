@@ -61,15 +61,6 @@ struct pg_bitmap
 	uint8_t *data;
 };
 
-struct pg_block
-{
-	struct pg_file *file;
-	struct pg_peer_swarm *ps;
-	uint32_t chunk_num;
-
-	TAILQ_ENTRY(pg_block) entry;
-};
-
 struct pg_buffer
 {
 	struct pg_peer *peer;
@@ -102,6 +93,7 @@ struct pg_file
 	char hash[41];    /* textual representation of sha1 for a file */
 	uint8_t sha[20];
 	uint64_t file_size;
+	size_t chunk_size;
 	uint32_t nl;             /* number of leaves */
 	uint32_t nc;             /* number of chunks */
 	struct chunk *tab_chunk; /* array of chunks for this file */
@@ -109,8 +101,6 @@ struct pg_file
 	struct node *tree_root;  /* pointer to root node of the tree */
 	int fd;
 	void *mmap_handle;
-	uint32_t start_chunk;
-	uint32_t end_chunk;
 
 	SLIST_ENTRY(pg_file) entry;
 };
@@ -123,11 +113,6 @@ struct pg_peer
 {
 	struct pg_context *context;
 	struct sockaddr_storage addr;
-	// Operation status
-	uint8_t to_remove;                              // Peer makrked to remove (send handshake finish)
-	uint8_t handshake_send;                         // Peer under initialization (wainting for second handshake)
-	// Main peer info
-
 	LIST_HEAD(, pg_peer_swarm) swarms;
 	LIST_ENTRY(pg_peer) entry;
 };
@@ -138,6 +123,8 @@ struct pg_swarm
 	struct pg_file *file;
 	struct pg_bitmap *have_bitmap;
 	uint64_t nc;
+	uint64_t fetched_chunks;
+	uint64_t sent_chunks;
 	uint8_t swarm_id[20];
 	uint16_t swarm_id_len;
 
@@ -229,6 +216,7 @@ struct node
 };
 
 struct pg_bitmap *pg_bitmap_create(uint64_t size);
+void pg_bitmap_resize(struct pg_bitmap *bmp, uint64_t new_size);
 void pg_bitmap_free(struct pg_bitmap *bmp);
 void pg_bitmap_set(struct pg_bitmap *bmp, uint64_t position);
 void pg_bitmap_set_range(struct pg_bitmap *bmp, uint64_t start, uint64_t end, bool value);
@@ -243,10 +231,12 @@ int pg_send_have(struct pg_peer_swarm *ps);
 int pg_send_handshake(struct pg_peer_swarm *ps);
 
 struct pg_peer_swarm *pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
-    struct pg_protocol_options *options, uint32_t dst_channel_id);
+    struct pg_protocol_options *options, uint32_t src_channel_id, uint32_t dst_channel_id);
 void pg_peerswarm_destroy(struct pg_peer_swarm *ps);
 void pg_peerswarm_request(struct pg_peer_swarm *ps);
 struct pg_swarm *pg_swarm_create(struct pg_context *ctx, struct pg_file *file);
+struct pg_peer_swarm *pg_find_peerswarm_by_id(struct pg_peer *peer, uint8_t *swarm_id, size_t id_len);
+struct pg_peer_swarm *pg_find_peerswarm_by_channel(struct pg_peer *peer, uint32_t channel_id);
 
 int mt_order2(uint32_t /*val*/);
 struct node *mt_build_tree(int /*num_chunks*/, struct node ** /*ret*/);
@@ -278,5 +268,8 @@ void *pg_buffer_ptr(struct pg_buffer *buffer);
 size_t pg_buffer_size_left(struct pg_buffer *buffer);
 size_t pg_buffer_enqueue(struct pg_buffer *buffer);
 void pg_buffer_reset(struct pg_buffer *buffer);
+
+int pg_file_read_chunks(struct pg_file *file, uint64_t chunk, uint64_t count, void *buf);
+int pg_file_write_chunks(struct pg_file *file, uint64_t chunk, uint64_t count, void *buf);
 
 #endif //PEREGRINE_INTERNAL_H

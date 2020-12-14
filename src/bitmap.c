@@ -43,6 +43,15 @@ pg_bitmap_create(uint64_t size)
 }
 
 void
+pg_bitmap_resize(struct pg_bitmap *bmp, uint64_t new_size)
+{
+	uint64_t new_data_size = new_size % 8 ? (new_size / 8) + 1 : new_size / 8;
+
+	bmp->size = new_size;
+	bmp->data = realloc(bmp->data, new_data_size);
+}
+
+void
 pg_bitmap_free(struct pg_bitmap *bmp)
 {
 

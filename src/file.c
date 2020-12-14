@@ -78,9 +78,6 @@ peregrine_file_process_file(struct pg_file *file)
 	//   PEREGRINE_DEBUG("number of leaves %lu", nl);
 	file->nl = nl;
 
-	file->start_chunk = 0;
-	file->end_chunk = number_chunks - 1;
-
 	/* allocate array of chunks which will be linked to leaves later */
 	file->tab_chunk = malloc(nl * sizeof(struct chunk));
 	memset(file->tab_chunk, 0, nl * sizeof(struct chunk));
@@ -171,11 +168,12 @@ pg_file_add_file(struct pg_context *context, const uint8_t *sha1, const char *pa
 	file->fd = fd;
 	file->path = strdup(path);
 	file->file_size = stat.st_size;
-	file->nc = 8;
+	file->nc = 1; /* We assume the file has at least one chunk */
 	SLIST_INSERT_HEAD(&context->files, file, entry);
 
 	if (sha1 != NULL) {
 		/* SHA1 is provided, so this is a file to be downloaded. Create a swarm for it */
+		memcpy(file->sha, sha1, sizeof(file->sha));
 		pg_swarm_create(context, file);
 	}
 
@@ -195,7 +193,7 @@ pg_file_add_directory(struct pg_context *context, const char *dname,
 	if (dir == NULL)
 		return (-1);
 
-	while (1) {
+	for (;;) {
 		struct dirent *dirent = readdir(dir);
 		if (dirent == NULL)
 			break;
@@ -215,6 +213,32 @@ pg_file_add_directory(struct pg_context *context, const char *dname,
 	}
 
 	closedir(dir);
+	return (0);
+}
+
+int
+pg_file_read_chunks(struct pg_file *file, uint64_t chunk, uint64_t count, void *buf)
+{
+	ssize_t ret;
+	ssize_t total = file->chunk_size * count;
+
+	ret = pread(file->fd, buf, total, file->chunk_size * chunk);
+	if (ret != total)
+		return (-1);
+
+	return (0);
+}
+
+int
+pg_file_write_chunks(struct pg_file *file, uint64_t chunk, uint64_t count, void *buf)
+{
+	ssize_t ret;
+	ssize_t total = file->chunk_size * count;
+
+	ret = pwrite(file->fd, buf, total, file->chunk_size * chunk);
+	if (ret != total)
+		return (-1);
+
 	return (0);
 }
 

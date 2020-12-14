@@ -119,11 +119,6 @@ pg_context_destroy(struct pg_context *ctx)
 		free(file);
 	}
 
-	TAILQ_FOREACH(block, &ctx->io, entry) {
-		TAILQ_REMOVE(&ctx->io, block, entry);
-		free(block);
-	}
-
 	TAILQ_FOREACH(buffer, &ctx->tx_queue, entry) {
 		TAILQ_REMOVE(&ctx->tx_queue, buffer, entry);
 		pg_buffer_free(buffer);
@@ -172,7 +167,7 @@ int
 pg_handle_fd_read(struct pg_context *ctx, int fd)
 {
 	struct sockaddr_storage client_addr;
-	socklen_t client_addr_len;
+	socklen_t client_addr_len = sizeof(struct sockaddr_storage);
 	uint8_t frame[BUFSIZE];
 	ssize_t ret;
 	ssize_t pos = 0;
@@ -226,9 +221,7 @@ pg_add_peer(struct pg_context *ctx, struct sockaddr *sa)
 	struct pg_peer *peer;
 	struct pg_swarm *swarm;
 	struct pg_peer_swarm *ps;
-	struct pg_protocol_options options;
-
-	options.chunk_size = 1024;
+	struct pg_protocol_options options = { .chunk_size = 1024 };
 
 	DEBUG("add peer %s into context %p", pg_sockaddr_to_str(sa), ctx);
 
@@ -238,7 +231,8 @@ pg_add_peer(struct pg_context *ctx, struct sockaddr *sa)
 
 	/* Try to connect to all known swarms? */
 	LIST_FOREACH(swarm, &ctx->swarms, entry) {
-		pg_peerswarm_create(peer, swarm, &options, 0);
+		if (!pg_find_peerswarm_by_id(peer, swarm->swarm_id, swarm->swarm_id_len))
+			pg_peerswarm_create(peer, swarm, &options, pg_new_channel_id(), 0);
 	}
 
 	return (0);

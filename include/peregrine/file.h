@@ -27,6 +27,7 @@
 #define _PEER_H_
 #include "socket.h"
 
+typedef uint8_t sha1_t[20];
 typedef void (*pg_file_dir_add_func_t)(struct pg_file *file, const char *dname);
 
 void pg_file_generate_sha1(struct pg_context *context);

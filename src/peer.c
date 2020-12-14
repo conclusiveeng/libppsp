@@ -102,32 +102,6 @@ pg_find_swarm_by_id(struct pg_context *ctx, const uint8_t *swarm_id, size_t id_l
 	return (s);
 }
 
-static struct pg_peer_swarm *
-pg_find_peerswarm_by_id(struct pg_peer *peer, uint8_t *swarm_id, size_t id_len)
-{
-	struct pg_peer_swarm *ps;
-
-	LIST_FOREACH(ps, &peer->swarms, peer_entry) {
-		if (memcmp(ps->swarm->swarm_id, swarm_id, id_len) == 0)
-			return (ps);
-	}
-
-	return (NULL);
-}
-
-static struct pg_peer_swarm *
-pg_find_peerswarm_by_channel(struct pg_peer *peer, uint32_t channel_id)
-{
-	struct pg_peer_swarm *ps;
-
-	LIST_FOREACH(ps, &peer->swarms, peer_entry) {
-		if (ps->src_channel_id == channel_id)
-			return (ps);
-	}
-
-	return (NULL);
-}
-
 static bool
 pg_send_have_scan_fn(uint64_t start, uint64_t end, bool value, void *arg)
 {
@@ -152,7 +126,9 @@ pg_send_have(struct pg_peer_swarm *ps)
 static int
 pg_ack_range(struct pg_peer_swarm *ps, uint64_t start, uint64_t end)
 {
+
 	pack_ack(ps->buffer, start, end, 0);
+	pg_buffer_enqueue(ps->buffer);
 	return (MSG_LENGTH(msg_ack));
 }
 
@@ -217,14 +193,30 @@ int
 pg_send_handshake(struct pg_peer_swarm *ps)
 {
 	struct pg_buffer *buf = ps->buffer;
+	struct {
+		uint16_t length;
+		uint8_t swarm_id[20];
+	} swarm_id_opt;
 
 	pack_handshake(buf, ps->src_channel_id);
 	pack_handshake_opt_u8(buf, HANDSHAKE_OPT_VERSION, 1);
 	pack_handshake_opt_u8(buf, HANDSHAKE_OPT_MIN_VERSION, 1);
+
+	if (ps->dst_channel_id == 0) {
+		swarm_id_opt.length = htobe16(ps->swarm->swarm_id_len);
+		memcpy(&swarm_id_opt.swarm_id, ps->swarm->swarm_id, sizeof(swarm_id_opt.swarm_id));
+		pack_handshake_opt(buf, HANDSHAKE_OPT_SWARM_ID, &swarm_id_opt,
+		     sizeof(swarm_id_opt));
+	}
+
 	pack_handshake_opt_u8(buf, HANDSHAKE_OPT_CONTENT_INTEGRITY, 1);
 	pack_handshake_opt_u8(buf, HANDSHAKE_OPT_MERKLE_HASH_FUNC, 0);
 	pack_handshake_opt_u8(buf, HANDSHAKE_OPT_CHUNK_ADDRESSING_METHOD, 2);
-	//pack_handshake_opt_u32(buf, HANDSHAKE_OPT_CHUNK_SIZE, ps->options.chunk_size);
+
+	/* Send chunk size if we're initiating the handshake */
+	//if (ps->dst_channel_id == 0)
+	//	pack_handshake_opt_u32(buf, HANDSHAKE_OPT_CHUNK_SIZE, ps->options.chunk_size);
+
 	pack_handshake_opt_end(buf);
 	return (0);
 }
@@ -236,7 +228,7 @@ pg_handle_handshake(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	struct pg_swarm *swarm;
 	struct msg_handshake_opt *opt;
 	struct pg_protocol_options options;
-	uint16_t swarm_id_len;
+	uint16_t swarm_id_len = 20;
 	uint8_t swarm_id[20];
 	uint8_t response[sizeof(struct msg_handshake) + 1024];
 	int pos = 0;
@@ -329,6 +321,7 @@ pg_handle_handshake(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 			break;
 
 		case HANDSHAKE_OPT_END:
+			pos += sizeof(*opt);
 			goto done;
 
 		default:
@@ -347,6 +340,21 @@ done:
 		return (-1);
 	}
 
+	if (chid != 0) {
+		/* This is a handshake response */
+		ps = pg_find_peerswarm_by_channel(peer, chid);
+		if (ps == NULL) {
+
+		}
+
+		ps->state = PEERSWARM_WAIT_HAVE;
+		ps->dst_channel_id = be32toh(msg->handshake.src_channel_id);
+		ps->buffer->channel_id = ps->dst_channel_id;
+		pg_buffer_reset(ps->buffer);
+
+		return (MSG_LENGTH(msg_handshake) + pos);
+	}
+
 	swarm = pg_find_swarm_by_id(peer->context, swarm_id, swarm_id_len);
 	if (swarm == NULL) {
 		/* Error! Cannot find or create swarm */
@@ -362,7 +370,8 @@ done:
 	}
 
 	/* Opening handshake, create peer-swarm relationship */
-	pg_peerswarm_create(peer, swarm, &options, msg->handshake.src_channel_id);
+	pg_peerswarm_create(peer, swarm, &options, pg_new_channel_id(),
+	    msg->handshake.src_channel_id);
 
 	return (MSG_LENGTH(msg_handshake) + pos);
 }
@@ -371,9 +380,9 @@ static ssize_t
 pg_handle_data(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 {
 	struct pg_peer_swarm *ps;
-	uint64_t start_offset;
-	uint64_t end_offset;
-	uint64_t len;
+	uint32_t start_chunk = be32toh(msg->data.start_chunk);
+	uint32_t end_chunk = be32toh(msg->data.end_chunk);
+	uint32_t len = end_chunk - start_chunk + 1;
 
 	ps = pg_find_peerswarm_by_channel(peer, chid);
 	if (ps == NULL) {
@@ -382,14 +391,12 @@ pg_handle_data(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	}
 
 	DEBUG("data: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
+	DEBUG("data: received %d chunks @ %d", len, start_chunk);
 
-	start_offset = ps->options.chunk_size * msg->data.start_chunk;
-	end_offset = ps->options.chunk_size * msg->data.end_chunk;
-	len = end_offset - start_offset;
-
-	DEBUG("data: received %" PRIu64 " bytes @ %" PRIu64, len, start_offset);
-
-	memcpy(ps->swarm->file->mmap_handle + start_offset, msg->data.data, len);
+	pg_file_write_chunks(ps->swarm->file, start_chunk, len, msg->data.data);
+	pg_bitmap_set_range(ps->swarm->have_bitmap, start_chunk, end_chunk, true);
+	pg_ack_range(ps, start_chunk, end_chunk);
+	pg_peerswarm_request(ps);
 
 	return (MSG_LENGTH(msg_data) + len);
 }
@@ -413,6 +420,8 @@ static ssize_t
 pg_handle_have(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 {
 	struct pg_peer_swarm *ps;
+	uint32_t start = be32toh(msg->have.start_chunk);
+	uint32_t end = be32toh(msg->have.end_chunk);
 
 	ps = pg_find_peerswarm_by_channel(peer, chid);
 	if (ps == NULL) {
@@ -422,9 +431,15 @@ pg_handle_have(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 
 	DEBUG("have: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
 
-	pg_bitmap_set_range(ps->have_bitmap, be32toh(msg->have.start_chunk),
-	    be32toh(msg->have.end_chunk), true);
+	if (end > ps->swarm->nc) {
+		ps->swarm->nc = end + 1;
+		ps->swarm->file->nc = end + 1;
+		pg_bitmap_resize(ps->swarm->have_bitmap, end + 1);
+		pg_bitmap_resize(ps->have_bitmap, end + 1);
+		pg_bitmap_resize(ps->request_bitmap, end + 1);
+	}
 
+	pg_bitmap_set_range(ps->have_bitmap, start, end, true);
 	pg_peerswarm_request(ps);
 	return (MSG_LENGTH(msg_have));
 }
@@ -443,8 +458,13 @@ pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	DEBUG("integrity: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
 
 	if (ps->swarm->file->tree == NULL) {
-		uint64_t order = be32toh(msg->integrity.end_chunk) - be32toh(msg->integrity.end_chunk);
+		uint64_t order = mt_order2(
+		    be32toh(msg->integrity.end_chunk) -
+		    be32toh(msg->integrity.start_chunk)) + 1;
+
 		DEBUG("integrity: creating merkle tree with order %d", order);
+
+		ps->swarm->file->tree_root = mt_build_tree(1 << order, &ps->swarm->file->tree);
 	}
 
 	return (MSG_LENGTH(msg_integrity));

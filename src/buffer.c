@@ -77,7 +77,6 @@ pg_buffer_enqueue(struct pg_buffer *buffer)
 	*buffer_copy = *buffer;
 
 	buffer->storage = malloc(MAX_FRAME_SIZE);
-	*buffer_copy = *buffer;
 	pg_buffer_reset(buffer);
 
 	pg_socket_enqueue_tx(buffer->peer->context, buffer_copy);

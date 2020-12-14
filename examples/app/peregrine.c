@@ -10,19 +10,55 @@
 #include <inttypes.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <sys/queue.h>
+#include <sys/param.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "peregrine/socket.h"
 #include "peregrine/file.h"
 #include "peregrine/utils.h"
 
+#define SHA1STR_MAX	41
+
+struct peregrine_file
+{
+	const char *path;
+	const uint8_t *sha1;
+	TAILQ_ENTRY(peregrine_file) entry;
+};
+
+struct peregrine_directory
+{
+	const char *path;
+	TAILQ_ENTRY(peregrine_directory) entry;
+};
+
+struct peregrine_peer
+{
+	struct sockaddr_storage sa;
+	TAILQ_ENTRY(peregrine_peer) entry;
+};
+
+static TAILQ_HEAD(, peregrine_file) files;
+static TAILQ_HEAD(, peregrine_directory) directories;
+static TAILQ_HEAD(, peregrine_peer) peers;
 static struct pg_context *context;
 static int epollfd;
 
-void
+static void
+usage(const char *argv0)
+{
+	fprintf(stderr, "Usage: %s -l port [options]\n", argv0);
+	fprintf(stderr, "Options:\n");
+}
+
+static void
 peregrine_add_fd(struct pg_context *ctx, void *arg, int fd, int events)
 {
 	struct epoll_event ev = { 0 };
+
+	(void)ctx;
+	(void)arg;
 
 	if (events & POLLIN)
 		ev.events |= EPOLLIN;
@@ -34,10 +70,13 @@ peregrine_add_fd(struct pg_context *ctx, void *arg, int fd, int events)
 		err(1, "epoll_ctl(EPOLL_CTL_ADD)");
 }
 
-void
+static void
 peregrine_mod_fd(struct pg_context *ctx, void *arg, int fd, int events)
 {
 	struct epoll_event ev = { 0 };
+
+	(void)ctx;
+	(void)arg;
 
 	if (events & POLLIN)
 		ev.events |= EPOLLIN;
@@ -49,24 +88,46 @@ peregrine_mod_fd(struct pg_context *ctx, void *arg, int fd, int events)
 		err(1, "epoll_ctl(EPOLL_CTL_MOD)");
 }
 
-void
+static void
 peregrine_del_fd(struct pg_context *ctx, void *arg, int fd)
 {
 	struct epoll_event ev = { 0 };
+
+	(void)ctx;
+	(void)arg;
 
 	if (epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, &ev) != 0)
 		err(1, "epoll_ctl(EPOLL_CTL_DEL)");
 }
 
 static int
-add_file(const char *sha1str)
+add_file(const char *filespec)
 {
-	uint8_t *sha1;
+	struct peregrine_file *file;
+	char path[PATH_MAX];
+	char shastr[SHA1STR_MAX];
 
-	sha1 = pg_parse_sha1(sha1str);
+	if (sscanf(filespec, "%[^:]:%[^:]", path, shastr) < 2) {
+		fprintf(stderr, "Cannot parse file spec: %s\n", filespec);
+		return (-1);
+	}
 
-	if (pg_file_add_file(context, sha1, NULL) == NULL)
-		err(1, "pg_file_add_file");
+	file = calloc(1, sizeof(*file));
+	file->path = strdup(path);
+	file->sha1 = pg_parse_sha1(shastr);
+	TAILQ_INSERT_TAIL(&files, file, entry);
+
+	return (0);
+}
+
+static int
+add_directory(const char *dirspec)
+{
+	struct peregrine_directory *dir;
+
+	dir = calloc(1, sizeof(*dir));
+	dir->path = strdup(dirspec);
+	TAILQ_INSERT_TAIL(&directories, dir, entry);
 
 	return (0);
 }
@@ -74,33 +135,25 @@ add_file(const char *sha1str)
 static int
 add_peer(const char *peerspec)
 {
-	struct sockaddr_in sin;
+	struct peregrine_peer *peer;
+	struct sockaddr_in *sin;
 	char addr[32];
 	uint16_t port;
 
+	peer = calloc(1, sizeof(*peer));
+	sin = (struct sockaddr_in *)&peer->sa;
+
 	if (sscanf(peerspec, "%[^:]:%hd", addr, &port) < 2) {
-		errno = EINVAL;
+		fprintf(stderr, "Cannot parse peer spec: %s", peerspec);
 		return (-1);
 	}
 
-	sin.sin_family = AF_INET;
-	sin.sin_port = htons(port);
-	inet_aton(addr, &sin.sin_addr);
+	sin->sin_family = AF_INET;
+	sin->sin_port = htons(port);
+	inet_aton(addr, &sin->sin_addr);
 
-	if (pg_add_peer(context, (struct sockaddr *)&sin) != 0) {
-		fprintf(stderr, "Cannot add peer: %s\n", strerror(errno));
-		return (-1);
-	}
-
-	printf("Added peer %s:%d\n", addr, port);
+	TAILQ_INSERT_TAIL(&peers, peer, entry);
 	return (0);
-}
-
-void
-peregrine_print_new_file(struct pg_file *file, const char *dname)
-{
-	printf("Added new file: %s, parent dir: %s",
-	    pg_file_get_path(file), dname);
 }
 
 int
@@ -108,9 +161,9 @@ main(int argc, char *const argv[])
 {
 	struct sockaddr_in sin;
 	struct epoll_event events[16];
-	const char *directory = NULL;
-	const char *sha1 = NULL;
-	const char *peer = NULL;
+	struct peregrine_file *file;
+	struct peregrine_directory *dir;
+	struct peregrine_peer *peer;
 	int local_port = 0;
 	int ch;
 	int ret;
@@ -123,40 +176,42 @@ main(int argc, char *const argv[])
 	    .arg = NULL,
 	};
 
-	while ((ch = getopt(argc, argv, "l:p:s:d:h")) != -1) {
+	TAILQ_INIT(&files);
+	TAILQ_INIT(&directories);
+	TAILQ_INIT(&peers);
+
+	while ((ch = getopt(argc, argv, "hl:p:f:d:h")) != -1) {
 		switch (ch) {
-		case 'p':
-			peer = optarg;
-			break;
+		case 'h':
+			usage(argv[0]);
+			exit(EX_USAGE);
 
 		case 'l':
 			local_port = strtol(optarg, NULL, 10);
 			break;
 
-		case 's':
-			sha1 = optarg;
+		case 'p':
+			add_peer(optarg);
+			break;
+
+		case 'f':
+			add_file(optarg);
 			break;
 
 		case 'd':
-			directory = optarg;
+			add_directory(optarg);
 			break;
 		}
 	}
 
 	if (local_port == 0) {
-		fprintf(stderr, "port not specified\n");
-		exit(EX_USAGE);
-	}
-
-	if (directory == NULL) {
-		fprintf(stderr, "directory not specified\n");
+		fprintf(stderr, "Local port not specified\n");
 		exit(EX_USAGE);
 	}
 
 	epollfd = epoll_create(1);
-	if (epollfd < 0) {
+	if (epollfd < 0)
 		err(1, "epoll_create");
-	}
 
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = INADDR_ANY;
@@ -169,15 +224,22 @@ main(int argc, char *const argv[])
 		exit(EX_OSERR);
 	}
 
-	if (sha1 != NULL)
-		add_file(sha1);
+	TAILQ_FOREACH(peer, &peers, entry) {
+		if (pg_add_peer(context, (struct sockaddr *)&peer->sa) != 0) {
 
-	if (peer != NULL)
-		add_peer(peer);
+		}
+	}
 
-	if (pg_file_add_directory(context, directory, peregrine_print_new_file) != 0) {
-		fprintf(stderr, "cannot add directory to context: %s\n", strerror(errno));
-		exit(EX_OSERR);
+	TAILQ_FOREACH(file, &files, entry) {
+		if (pg_file_add_file(context, file->sha1, file->path) != 0) {
+
+		}
+	}
+
+	TAILQ_FOREACH(dir, &directories, entry) {
+		if (pg_file_add_directory(context, dir->path, NULL) != 0) {
+
+		}
 	}
 
 	pg_file_generate_sha1(context);
