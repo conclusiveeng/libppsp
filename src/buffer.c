@@ -24,6 +24,8 @@
  */
 
 #include <sys/types.h>
+#include <sys/param.h>
+#include <sys/endian.h>
 #include <stdlib.h>
 #include "internal.h"
 

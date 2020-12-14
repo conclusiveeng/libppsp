@@ -1,10 +1,12 @@
+#include <sys/param.h>
+#include <sys/types.h>
+#include <sys/endian.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
 #include <inttypes.h>
-#include <sys/types.h>
 #include <sys/queue.h>
 #include "internal.h"
 #include "log.h"

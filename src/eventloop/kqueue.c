@@ -1,13 +1,37 @@
-//
-// Created by jakub on 14.12.2020.
-//
+/*
+ * Copyright (c) 2020 Conclusive Engineering Sp. z o.o.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/event.h>
+#include <errno.h>
+#include <string.h>
 #include <signal.h>
-#include "internal.h"
-#include "eventloop.h"
+#include "../internal.h"
+#include "../log.h"
+#include "../eventloop.h"
 
 #define EVENTLOOP_MAXEVENTS	16
 
@@ -49,8 +73,10 @@ pg_eventloop_create(void)
 	loop = xcalloc(1, sizeof(*loop));
 
 	loop->kqueue_fd = kqueue();
-	if (loop->kqueue_fd < 0)
-		PANIC_ERRNO("kqueue");
+	if (loop->kqueue_fd < 0) {
+		free(loop);
+		return (NULL);
+	}
 
 	return (loop);
 }
@@ -61,11 +87,17 @@ pg_eventloop_destroy(struct pg_eventloop *loop)
 
 }
 
+int
+pg_eventloop_get_fd(struct pg_eventloop *loop)
+{
+	return (loop->kqueue_fd);
+}
+
 void *
 pg_eventloop_add_fd(struct pg_eventloop *loop, int fd, pg_eventloop_callback_t fn,
     enum pg_eventloop_fd_filter filter, void *arg)
 {
-	struct eventloop_event *ev;
+	struct pg_eventloop_event *ev;
 	int evfilt;
 
 	ev = calloc(1, sizeof(*ev));
@@ -88,8 +120,10 @@ pg_eventloop_add_fd(struct pg_eventloop *loop, int fd, pg_eventloop_callback_t f
 	}
 
 	EV_SET(&ev->kev, fd, evfilt, EV_ADD | EV_ENABLE, 0, 0, ev);
-	if (kevent(loop->kqueue_fd, &ev->kev, 1, NULL, 0, NULL) != 0)
-		PANIC_ERRNO("kevent");
+	if (kevent(loop->kqueue_fd, &ev->kev, 1, NULL, 0, NULL) != 0) {
+		free(ev);
+		return (NULL);
+	}
 
 	return (ev);
 }
@@ -98,7 +132,7 @@ void *
 pg_eventloop_add_timer(struct pg_eventloop *loop, int timeout_ms,
     pg_eventloop_callback_t fn, void *arg)
 {
-	struct eventloop_event *ev;
+	struct pg_eventloop_event *ev;
 
 	ev = xcalloc(1, sizeof(*ev));
 	ev->type = EVENT_TIMER;
@@ -106,12 +140,14 @@ pg_eventloop_add_timer(struct pg_eventloop *loop, int timeout_ms,
 	ev->fn = fn;
 	ev->fn_arg = arg;
 
-	EV_SET(&ev->kev, ++eventloop_timer_id,
-	       EVFILT_TIMER, EV_ADD | EV_ENABLE, 0,
-	       timeout_ms, ev);
+	EV_SET(&ev->kev, ++pg_eventloop_timer_id,
+	    EVFILT_TIMER, EV_ADD | EV_ENABLE, 0,
+	    timeout_ms, ev);
 
-	if (kevent(loop->kqueue_fd, &ev->kev, 1, NULL, 0, NULL) != 0)
-		PANIC_ERRNO("kevent");
+	if (kevent(loop->kqueue_fd, &ev->kev, 1, NULL, 0, NULL) != 0) {
+		free(ev);
+		return (NULL);
+	}
 
 	return (ev);
 }
@@ -129,17 +165,21 @@ pg_eventloop_add_callback(struct pg_eventloop *loop, pg_eventloop_callback_t fn,
 	ev->fn_arg = arg;
 	ev->loop = loop;
 
-	EV_SET(&ev->kev, ++eventloop_user_id, EVFILT_USER,
+	EV_SET(&ev->kev, ++pg_eventloop_user_id, EVFILT_USER,
 	    EV_ADD | EV_ENABLE, 0, 0, ev);
 
-	EV_SET(&trigger, eventloop_user_id, EVFILT_USER, 0, NOTE_TRIGGER,
+	EV_SET(&trigger, pg_eventloop_user_id, EVFILT_USER, 0, NOTE_TRIGGER,
 	    0, ev);
 
-	if (kevent(loop->kqueue_fd, &ev->kev, 1, NULL, 0, NULL) != 0)
-		PANIC_ERRNO("kevent");
+	if (kevent(loop->kqueue_fd, &ev->kev, 1, NULL, 0, NULL) != 0) {
+		free(ev);
+		return (NULL);
+	}
 
-	if (kevent(loop->kqueue_fd, &trigger, 1, NULL, 0, NULL) != 0)
-		PANIC_ERRNO("kevent");
+	if (kevent(loop->kqueue_fd, &trigger, 1, NULL, 0, NULL) != 0) {
+		free(ev);
+		return (NULL);
+	}
 
 	return (ev);
 }
@@ -156,11 +196,13 @@ pg_eventloop_add_signal(struct pg_eventloop *loop, int signo,
 	ev->fn_arg = arg;
 	ev->loop = loop;
 
-	EV_SET(&ev->kev, ++eventloop_user_id, EVFILT_SIGNAL,
+	EV_SET(&ev->kev, ++pg_eventloop_user_id, EVFILT_SIGNAL,
 	    EV_ADD | EV_ENABLE, 0, 0, ev);
 
-	if (kevent(loop->kqueue_fd, &ev->kev, 1, NULL, 0, NULL) != 0)
-		PANIC_ERRNO("kevent");
+	if (kevent(loop->kqueue_fd, &ev->kev, 1, NULL, 0, NULL) != 0) {
+		free(ev);
+		return (NULL);
+	}
 
 	return (ev);
 }
@@ -173,31 +215,41 @@ pg_eventloop_remove_event(void *event)
 	EV_SET(&ev->kev, ev->kev.ident, ev->kev.filter, EV_DELETE, 0, 0, NULL);
 	if (kevent(ev->loop->kqueue_fd, &ev->kev, 1, NULL, 0, NULL) != 0) {
 		if (errno != EBADF && errno != ENOENT)
-			PANIC_ERRNO("kevent");
+			WARN("kevent error: %s", strerror(errno));
 	}
 }
 
 int
-pg_eventloop_run(struct eventloop *loop)
+pg_eventloop_step(struct pg_eventloop *loop)
 {
 	struct kevent kev[EVENTLOOP_MAXEVENTS];
 	int ret;
 	int i;
 
+	ret = kevent(loop->kqueue_fd, NULL, 0, kev,
+	    EVENTLOOP_MAXEVENTS, NULL);
+	if (ret < 0)
+		return (-1);
+
+	DEBUG("kevent returned %d", ret);
+
+	for (i = 0; i < ret; i++)
+		pg_eventloop_handle_event(&kev[i]);
+
+	return (0);
+}
+
+int
+pg_eventloop_run(struct pg_eventloop *loop)
+{
+
 	while (!loop->quit) {
-		ret = kevent(loop->kqueue_fd, NULL, 0, kev,
-		    EVENTLOOP_MAXEVENTS, NULL);
-		if (ret < 0) {
+		if (pg_eventloop_step(loop) != 0) {
 			if (errno == EINTR)
 				continue;
 
 			return (-1);
 		}
-
-		DEBUG("kevent returned %d", ret);
-
-		for (i = 0; i < ret; i++)
-			pg_eventloop_handle_event(&kev[i]);
 	}
 
 	return (0);
@@ -246,10 +298,10 @@ pg_eventloop_handle_event(struct kevent *kev)
 			pg_eventloop_remove_event(ev);
 		} else {
 			EV_SET(&trigger, ev->kev.ident, EVFILT_USER, 0,
-			       NOTE_TRIGGER, 0, ev);
+			    NOTE_TRIGGER, 0, ev);
 			if (kevent(ev->loop->kqueue_fd, &trigger, 1, NULL, 0,
-				   NULL) != 0)
-				PANIC_ERRNO("kevent");
+			    NULL) != 0) 
+				WARN("kevent error: %s", strerror(errno));
 		}
 		break;
 
@@ -259,10 +311,10 @@ pg_eventloop_handle_event(struct kevent *kev)
 
 		signo = sigtimedwait(&set, &siginfo, &ts);
 		if (signo < 0)
-			PANIC_ERRNO("sigtimedwait");
+			WARN("sigtimedwait error: %s", strerror(errno));
 
-		DEBUG("EVENT_SIGNAL: si_code=%d si_signo=%d si_pid=%d",
-		    siginfo.si_code, siginfo.si_signo, siginfo.si_pid);
+		DEBUG("EVENT_SIGNAL: si_code=%d si_signo=%d", siginfo.si_code,
+		    siginfo.si_signo);
 
 		if (!ev->signal_fn(&siginfo, ev->fn_arg))
 			pg_eventloop_remove_event(ev);

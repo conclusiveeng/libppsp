@@ -86,7 +86,8 @@ pg_eventloop_create(void)
 	return (loop);
 }
 
-int pg_eventloop_get_fd(struct pg_eventloop *loop)
+int
+pg_eventloop_get_fd(struct pg_eventloop *loop)
 {
 	return (loop->epfd);
 }

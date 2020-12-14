@@ -25,6 +25,7 @@
 
 #include <sys/param.h>
 #include <sys/types.h>
+#include <sys/endian.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
