@@ -53,7 +53,6 @@ struct pg_eventloop_event
 	struct pg_eventloop *loop;
 	enum pg_eventloop_event_type type;
 	int fd;
-	int dup_fd;
 	pg_eventloop_callback_t fn;
 	pg_eventloop_signal_callback_t signal_fn;
 	void *fn_arg;
@@ -111,7 +110,6 @@ pg_eventloop_add_fd(struct pg_eventloop *loop, int fd, pg_eventloop_callback_t f
 	ev->type = EVENT_FD;
 	ev->loop = loop;
 	ev->fd = fd;
-	ev->dup_fd = dup(fd);
 	ev->fn = fn;
 	ev->fn_arg = arg;
 
@@ -130,7 +128,7 @@ pg_eventloop_add_fd(struct pg_eventloop *loop, int fd, pg_eventloop_callback_t f
 
 	epev.data.ptr = ev;
 
-	if (epoll_ctl(loop->epfd, EPOLL_CTL_ADD, ev->dup_fd, &epev) != 0) {
+	if (epoll_ctl(loop->epfd, EPOLL_CTL_ADD, ev->fd, &epev) != 0) {
 		free(ev);
 		return (NULL);
 	}
@@ -261,23 +259,9 @@ pg_eventloop_remove_event(void *event)
 
 	DEBUG("remove event %p, fd %d", event, ev->fd);
 
-	switch (ev->type) {
-	case EVENT_FD:
-		if (epoll_ctl(ev->loop->epfd, EPOLL_CTL_DEL, ev->dup_fd, NULL) < 0) {
-			if (errno != EBADF)
-				PANIC("epoll_ctl error: %s", strerror(errno));
-		}
-
-		close(ev->dup_fd);
-		break;
-
-	default:
-		if (epoll_ctl(ev->loop->epfd, EPOLL_CTL_DEL, ev->fd, NULL) < 0) {
-			if (errno != EBADF)
-				PANIC("epoll_ctl error: %s", strerror(errno));
-		}
-
-		break;
+	if (epoll_ctl(ev->loop->epfd, EPOLL_CTL_DEL, ev->fd, NULL) < 0) {
+		if (errno != EBADF)
+			PANIC("epoll_ctl error: %s", strerror(errno));
 	}
 }
 

@@ -144,12 +144,12 @@ print_event(struct pg_event *ev, void *arg)
 		break;
 
 	case EVENT_PEER_JOINED_SWARM:
-		printf("Peer %s joined swarm %s", pg_peer_to_str(ev->peer),
+		printf("Peer %s joined swarm %s\n", pg_peer_to_str(ev->peer),
 	 	    pg_swarm_to_str(ev->swarm));
 		break;
 
 	case EVENT_PEER_LEFT_SWARM:
-		printf("Peer %s joined swarm %s", pg_peer_to_str(ev->peer),
+		printf("Peer %s joined swarm %s\n", pg_peer_to_str(ev->peer),
 		    pg_swarm_to_str(ev->swarm));
 		break;
 

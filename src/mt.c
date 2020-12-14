@@ -30,6 +30,9 @@
 #include "internal.h"
 #include "log.h"
 
+#undef DEBUG
+#define DEBUG(fmt, ...)
+
 size_t
 pg_tree_calc_height(size_t n_chunks)
 {

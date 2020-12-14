@@ -170,9 +170,11 @@ struct pg_download
 struct pg_context
 {
 	int sock_fd;
+	int sock_fd_write;
 	struct sockaddr_storage addr;
 	struct pg_context_options options;
 	struct pg_eventloop *eventloop;
+	bool tx_active;
 
 	LIST_HEAD(, pg_peer) peers;
 	LIST_HEAD(, pg_swarm) swarms;

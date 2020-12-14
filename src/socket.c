@@ -104,6 +104,8 @@ pg_context_create(struct pg_context_options *options, struct pg_context **ctxp)
 		return (-1);
 	}
 
+	ctx->sock_fd_write = dup(ctx->sock_fd);
+
 	/* Add the initial socket in read mode */
 	pg_eventloop_add_fd(ctx->eventloop, ctx->sock_fd, pg_handle_fd_read,
 	    EVENTLOOP_FD_READABLE, ctx);
@@ -142,14 +144,18 @@ pg_socket_enqueue_tx(struct pg_context *ctx, struct pg_buffer *buffer)
 	DEBUG("enqueue_tx: peer=%s length=%d", pg_peer_to_str(buffer->peer), buffer->used);
 
 	TAILQ_INSERT_TAIL(&ctx->tx_queue, buffer, entry);
-	pg_eventloop_add_fd(ctx->eventloop, ctx->sock_fd, pg_handle_fd_write,
-	    EVENTLOOP_FD_WRITEABLE, ctx);
+
+	if (!ctx->tx_active) {
+		ctx->tx_active = true;
+		pg_eventloop_add_fd(ctx->eventloop, ctx->sock_fd_write, pg_handle_fd_write,
+		    EVENTLOOP_FD_WRITEABLE, ctx);
+	}
 }
 
 void
 pg_socket_suspend_tx(struct pg_context *ctx)
 {
-
+	ctx->tx_active = false;
 }
 
 int
@@ -258,11 +264,15 @@ pg_handle_fd_write(void *arg)
 			return (false);
 		}
 
-		if (sendto(ctx->sock_fd, buffer->storage, buffer->used, 0,
+		if (sendto(ctx->sock_fd, buffer->storage, buffer->used, MSG_DONTWAIT,
 		    (struct sockaddr *)&buffer->peer->addr, sizeof(struct sockaddr_in)) < 0) {
+			if (errno == EAGAIN)
+				break;
+
+			/* XXX */
 			ERROR("sendto: peer=%s error=%s", pg_peer_to_str(buffer->peer),
 			    strerror(errno));
-			continue;
+			break;
 		}
 
 		DEBUG("sent buffer %p with %d bytes", buffer, buffer->used);
