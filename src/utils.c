@@ -116,8 +116,12 @@ pg_parse_sha1(const char *str)
 {
 	int i;
 	int pos = 0;
-	uint8_t *result = malloc(20);
+	uint8_t *result;
 
+	if (str == NULL || strlen(str) == 0)
+		return (NULL);
+
+	result = malloc(20);
 	for (i = 0; i < 20; i++) {
 		if (sscanf(str + pos, "%02" SCNx8, &result[i]) < 1) {
 			errno = EINVAL;

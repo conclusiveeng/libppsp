@@ -78,10 +78,10 @@ static int
 add_file(const char *filespec)
 {
 	struct peregrine_file *file;
-	char path[PATH_MAX];
-	char shastr[SHA1STR_MAX];
+	char path[PATH_MAX] = "";
+	char shastr[SHA1STR_MAX] = "";
 
-	if (sscanf(filespec, "%[^:]:%[^:]", path, shastr) < 2) {
+	if (sscanf(filespec, "%[^:]:%[^:]", path, shastr) < 1) {
 		fprintf(stderr, "Cannot parse file spec: %s\n", filespec);
 		return (-1);
 	}
