@@ -61,13 +61,12 @@ static int hf_swift_hash_start_chunk = -1;
 static int hf_swift_hash_end_chunk = -1;
 static int hf_swift_hash_value = -1;
 
-/* 05 PEX+ fields */
-static int hf_swift_pexplus_ip = -1;
-static int hf_swift_pexplus_port = -1;
+/* 05 PEX_RESv4 fields */
+static int hf_swift_pex_resv4_ip = -1;
+static int hf_swift_pex_resv4_port = -1;
 
-/* 06 PEX- fields */
-static int hf_swift_pexminus_ip = -1;
-static int hf_swift_pexminus_port = -1;
+/* 06 PEX_REQ fields */
+// PEX_REQ has no fields
 
 /* 07 Signed hash fields */
 static int hf_swift_signed_hash_bin_id = -1;
@@ -107,7 +106,7 @@ proto_register_swift(void)
         {
             &hf_swift_receiving_channel,
             {
-                "Receiving Channel", "swift.receiving.channel",
+                "Receiving Channel (DST)", "swift.receiving.channel",
                 FT_UINT32, BASE_HEX,
                 NULL, 0x0,
                 NULL, HFILL
@@ -127,7 +126,7 @@ proto_register_swift(void)
         {
             &hf_swift_handshake_channel,
             {
-                "Handshake Channel", "swift.handshake.channel",
+                "Handshake Channel (SRC)", "swift.handshake.channel",
                 FT_UINT32, BASE_HEX,
                 NULL, 0x0,
                 NULL, HFILL
@@ -268,45 +267,28 @@ proto_register_swift(void)
             }
         },
 
-        /* 05 PEX+ */
+        /* 05 PEX_RESv4 */
         {
-            &hf_swift_pexplus_ip,
+            &hf_swift_pex_resv4_ip,
             {
-                "PEX_RESv4 IP Address", "swift.pex_plus.ip",
+                "PEX_RESv4 IP Address", "swift.pex_resv4.ip",
                 FT_IPv4, BASE_NONE,
                 NULL, 0x0,
                 NULL, HFILL
             }
         },
         {
-            &hf_swift_pexplus_port,
+            &hf_swift_pex_resv4_port,
             {
-                "PEX_RESv4 Port", "swift.pex_plus.port",
+                "PEX_RESv4 Port", "swift.pex_resv4.port",
                 FT_UINT16, BASE_DEC,
                 NULL, 0x0,
                 NULL, HFILL
             }
         },
 
-        /* 06 PEX- */
-        {
-            &hf_swift_pexminus_ip,
-            {
-                "PEX_REQ IP Address", "swift.pex_minus.ip",
-                FT_IPv4, BASE_NONE,
-                NULL, 0x0,
-                NULL, HFILL
-            }
-        },
-        {
-            &hf_swift_pexminus_port,
-            {
-                "PEX_REQ Port", "swift.pex_minus.port",
-                FT_UINT16, BASE_DEC,
-                NULL, 0x0,
-                NULL, HFILL
-            }
-        },
+        /* 06 PEX_REQ */
+        // PEX_REQ doesn't have any fields
 
         /* 07 Signed Hash */
         {
@@ -415,7 +397,7 @@ dissect_swift(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *arg)
     gint offset = 0;
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "swift");
     /* Clear out stuff in the info column */
-    col_clear(pinfo->cinfo,COL_INFO);
+    //col_clear(pinfo->cinfo,COL_INFO);
 
     (void)arg;
 
@@ -456,8 +438,8 @@ dissect_swift(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *arg)
 
 		for (;;) {
                     guint8 opt_code;
-                    guint16 swarm_id_len;                  
-    
+                    guint16 swarm_id_len;
+
 		    proto_tree_add_item(swift_tree, hf_swift_handshake_option_code, tvb, offset, 1, FALSE);
 		    opt_code = tvb_get_guint8(tvb, offset);
 		    offset += 1;
@@ -521,17 +503,13 @@ dissect_swift(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *arg)
                 proto_tree_add_item(swift_tree, hf_swift_hash_value, tvb, offset, 20, FALSE);
                 offset += 20;
                 break;
-            case 5: /* PEX+ */
-                proto_tree_add_item(swift_tree, hf_swift_pexplus_ip, tvb, offset, 4, FALSE);
+            case 5: /* PEX_RESv4 */
+                proto_tree_add_item(swift_tree, hf_swift_pex_resv4_ip, tvb, offset, 4, FALSE);
                 offset += 4;
-                proto_tree_add_item(swift_tree, hf_swift_pexplus_port, tvb, offset, 2, FALSE);
+                proto_tree_add_item(swift_tree, hf_swift_pex_resv4_port, tvb, offset, 2, FALSE);
                 offset += 2;
                 break;
-            case 6: /* PEX- */
-                proto_tree_add_item(swift_tree, hf_swift_pexminus_ip, tvb, offset, 4, FALSE);
-                offset += 4;
-                proto_tree_add_item(swift_tree, hf_swift_pexminus_port, tvb, offset, 2, FALSE);
-                offset += 2;
+            case 6: /* PEX_REQ */
                 break;
             case 7: /* Signed Hash */
                 proto_tree_add_item(swift_tree, hf_swift_signed_hash_bin_id, tvb, offset, 4, FALSE);
