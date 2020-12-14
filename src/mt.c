@@ -60,7 +60,7 @@ pg_tree_link_nodes(struct node *node_array, size_t height)
 	uint32_t parent;
 	size_t node_count = (1u << height) - 1;
 
-	for (level = 0; level <= height; level++) {
+	for (level = 0; level < height - 1; level++) {
 		/* DEBUG("building level %d", l); */
 		uint32_t first_idx = (1u << level) - 1;
 		for (si = first_idx; si < node_count; si += (2u << (level + 1))) {
@@ -129,12 +129,13 @@ pg_tree_get_node_height(struct node *node)
 size_t
 pg_tree_get_chunk_count(struct node *tree)
 {
-	size_t leaves_count = pg_tree_get_leaves_count(tree);
+	struct node *root = pg_tree_get_root(tree);
+	struct node *first_node = pg_tree_get_first_node(root);
+	size_t leaves_count = pg_tree_get_leaves_count(root);
 	size_t idx = leaves_count - 1;
-	struct node *first_node = pg_tree_get_first_node(tree);
 	struct node *node = &first_node[2 * idx];
 
-	while (node->chunk == NULL) {
+	while (node->chunk && node->chunk->state == CH_EMPTY) {
 		if (idx == 0)
 			return (0);
 
@@ -181,12 +182,18 @@ pg_tree_gen_uncle_nodes(struct node *node, struct node ***retp)
 	size_t node_height = pg_tree_get_node_height(node);
 	size_t root_height = pg_tree_get_node_height(root);
 	size_t uncle_nodes_size = root_height - node_height;
+	size_t chunk_count = pg_tree_get_chunk_count(root);
+	struct node *last_chunk = pg_tree_get_chunk_node(root, chunk_count - 1);
 	size_t i;
 
 	uncle_nodes = calloc(uncle_nodes_size, sizeof(struct node **));
 
 	for (i = 0; i < uncle_nodes_size; i++) {
 		cur_node = pg_tree_find_sibling_node(cur_node);
+		if (cur_node->number > last_chunk->number) {
+			*retp = uncle_nodes;
+			return (i);
+		}
 		uncle_nodes[i] = cur_node;
 		cur_node = cur_node->parent;
 	}
@@ -208,7 +215,7 @@ pg_tree_gen_uncle_peak_nodes(struct node *node, struct node ***retp)
 	size_t result_idx;
 
 	for (uncle_idx = 0; uncle_idx < uncle_size; uncle_idx++) {
-		if (pg_tree_is_part_of_set(uncle_nodes[uncle_idx], peak_nodes, peak_size))
+		if (pg_tree_is_within_node(uncle_nodes[uncle_idx], peak_nodes, peak_size))
 			break;
 	}
 
@@ -229,12 +236,21 @@ pg_tree_gen_uncle_peak_nodes(struct node *node, struct node ***retp)
 }
 
 bool
-pg_tree_is_part_of_set(struct node *node, struct node **set, size_t set_size)
+pg_tree_is_within_node(struct node *node, struct node **set, size_t set_size)
 {
 	size_t i;
+	struct node *min_node;
+	struct node *max_node;
+	int start;
+	int end;
+
+	pg_tree_node_interval(node, &min_node, &max_node);
+	start = min_node->number;
+	end = max_node->number;
 
 	for (i = 0; i < set_size; i++) {
-		if (node == set[i])
+		pg_tree_node_interval(set[i], &min_node, &max_node);
+		if (min_node->number >= start && max_node->number <= end)
 			return (true);
 	}
 
@@ -253,7 +269,7 @@ struct node *
 pg_tree_get_first_node(struct node *tree)
 {
 
-	return (tree - tree->number * sizeof(struct node));
+	return (&tree[-tree->number]);
 }
 
 struct node *
@@ -414,7 +430,7 @@ pg_tree_update_sha(struct node *tree)
 	height = pg_tree_get_height(node);
 	node_count = (1u << height) - 1;
 
-	for (level = 0; level < height; level++) {
+	for (level = 0; level < height - 1; level++) {
 		uint32_t first_idx = (1u << level) - 1;
 		for (si = first_idx; si < node_count; si += (2u << (level + 1))) {
 			left = si;

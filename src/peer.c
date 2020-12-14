@@ -157,21 +157,21 @@ pg_send_integrity(struct pg_peer_swarm *ps, uint32_t block)
 	struct node **uncles;
 	struct node *uncle;
 	size_t uncle_size;
-	size_t i;
 	size_t to_send = 0;
+	int i;
 
 	/* Start with the leaf node */
 	node = pg_tree_get_chunk_node(ps->swarm->file->tree, block);
 	uncle_size = pg_tree_gen_uncle_peak_nodes(node, &uncles);
 
-	for (i = uncle_size; i > 0; i--) {
+	for (i = uncle_size - 1; i >= 0; i--) {
 		uncle = uncles[i];
 		if (uncle->state == SENT)
 			continue;
 
-		pg_tree_node_interval(uncles[i], &n_min, &n_max);
-		pack_integrity(ps->buffer, n_min->number / 2, n_max->number / 2, node->sha);
-		node->state = SENT;
+		pg_tree_node_interval(uncle, &n_min, &n_max);
+		pack_integrity(ps->buffer, n_min->number / 2, n_max->number / 2, uncle->sha);
+		uncle->state = SENT;
 		to_send++;
 	}
 
