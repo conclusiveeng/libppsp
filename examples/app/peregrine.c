@@ -31,6 +31,7 @@
 #include <getopt.h>
 #include <poll.h>
 #include <string.h>
+#include <inttypes.h>
 #include <sysexits.h>
 #include <inttypes.h>
 #include <sys/poll.h>
@@ -130,6 +131,67 @@ add_peer(const char *peerspec)
 	return (0);
 }
 
+static void
+print_event(struct pg_event *ev, void *arg)
+{
+	switch (ev->type) {
+	case EVENT_PEER_ADDED:
+		printf("Peer %s added\n", pg_peer_to_str(ev->peer));
+		break;
+
+	case EVENT_PEER_REMOVED:
+		printf("Peer %s removed\n", pg_peer_to_str(ev->peer));
+		break;
+
+	case EVENT_PEER_JOINED_SWARM:
+		printf("Peer %s joined swarm %s", pg_peer_to_str(ev->peer),
+	 	    pg_swarm_to_str(ev->swarm));
+		break;
+
+	case EVENT_PEER_LEFT_SWARM:
+		printf("Peer %s joined swarm %s", pg_peer_to_str(ev->peer),
+		    pg_swarm_to_str(ev->swarm));
+		break;
+
+	case EVENT_UNKNOWN:
+		break;
+	}
+}
+
+static bool
+print_peer(struct pg_peer *peer, void *arg)
+{
+	(void)arg;
+
+	printf("  %s\n", pg_peer_to_str(peer));
+	return (true);
+}
+
+static bool
+print_swarm(struct pg_swarm *swarm, void *arg)
+{
+	uint64_t received = pg_swarm_get_received_chunks(swarm);
+	uint64_t total = pg_swarm_get_total_chunks(swarm);
+	double percentage = (double)received / (double)total * 100;
+
+	(void)arg;
+
+	printf("  [%s] %" PRIu64 " of %" PRIu64 " (%3.2f%%)", pg_swarm_to_str(swarm),
+	    received, total, percentage);
+
+	return (true);
+}
+
+static void
+print_summary(struct pg_context *ctx)
+{
+	printf("Peers:\n");
+	pg_peer_iterate(ctx, print_peer, NULL);
+
+	printf("Swarms:\n");
+	pg_swarm_iterate(ctx, print_swarm, NULL);
+}
+
 int
 main(int argc, char *const argv[])
 {
@@ -139,6 +201,7 @@ main(int argc, char *const argv[])
 	struct peregrine_directory *dir;
 	struct peregrine_peer *peer;
 	int local_port = 0;
+	bool summary = 0;
 	int ch;
 	int ret;
 
@@ -148,7 +211,7 @@ main(int argc, char *const argv[])
 	TAILQ_INIT(&directories);
 	TAILQ_INIT(&peers);
 
-	while ((ch = getopt(argc, argv, "hl:p:f:d:h")) != -1) {
+	while ((ch = getopt(argc, argv, "hl:p:f:d:hs")) != -1) {
 		switch (ch) {
 		case 'h':
 			usage(argv[0]);
@@ -169,6 +232,10 @@ main(int argc, char *const argv[])
 		case 'd':
 			add_directory(optarg);
 			break;
+
+		case 's':
+			summary = true;
+			break;
 		}
 	}
 
@@ -182,7 +249,8 @@ main(int argc, char *const argv[])
 	sin.sin_port = htons(local_port);
 	options.listen_addr = (struct sockaddr *)&sin;
 	options.listen_addr_len = sizeof(struct sockaddr_in);
-	options.event_fn = NULL;
+	options.event_fn = print_event;
+	options.fn_arg = NULL;
 
 	if (pg_context_create(&options, &context) != 0) {
 		fprintf(stderr, "cannot create context: %s\n", strerror(errno));
@@ -197,14 +265,16 @@ main(int argc, char *const argv[])
 	}
 
 	TAILQ_FOREACH(file, &files, entry) {
-		if (pg_file_add_file(context, file->sha1, file->path) != 0) {
-
+		if (pg_file_add_file(context, file->sha1, file->path) == NULL) {
+			fprintf(stderr, "cannot add file %s: %s\n", file->path,strerror(errno));
+			exit(EX_OSERR);
 		}
 	}
 
 	TAILQ_FOREACH(dir, &directories, entry) {
 		if (pg_file_add_directory(context, dir->path, NULL) != 0) {
-
+			fprintf(stderr, "cannot add directory %s: %s\n", dir->path, strerror(errno));
+			exit(EX_OSERR);
 		}
 	}
 
@@ -216,7 +286,7 @@ main(int argc, char *const argv[])
 	pfd.revents = 0;
 
 	for (;;) {
-		ret = poll(&pfd, 1, 0);
+		ret = poll(&pfd, 1, summary ? 500 : -1);
 		if (ret < 0) {
 			if (errno == EINTR)
 				continue;
@@ -227,6 +297,11 @@ main(int argc, char *const argv[])
 		if (pfd.revents & POLLIN) {
 			if (pg_context_step(context) != 0)
 				break;
+		}
+
+		if (summary) {
+			printf("\033[2J\033[H");
+			print_summary(context);
 		}
 	}
 

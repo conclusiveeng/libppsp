@@ -15,6 +15,8 @@
 struct pg_swarm_scan_state
 {
 	struct pg_peer_swarm *ps;
+	uint64_t min;
+	uint64_t max;
 	uint64_t collected;
 	uint64_t budget;
 };
@@ -46,12 +48,10 @@ pg_find_peerswarm_by_channel(struct pg_peer *peer, uint32_t channel_id)
 }
 
 static bool
-pg_peerswarm_request_find_fn(uint64_t start, uint64_t end, bool value, void *arg)
+pg_peerswarm_request_find_fn(uint64_t start, uint64_t end, bool value __unused, void *arg)
 {
 	struct pg_swarm_scan_state *state = arg;
 	uint64_t count = MIN(end - start + 1, state->budget);
-
-	(void)value;
 
 	DEBUG("requesting %d blocks @ %d", count, start);
 
@@ -138,7 +138,13 @@ pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
 void
 pg_peerswarm_destroy(struct pg_peer_swarm *ps)
 {
+	struct pg_event ev;
 
+	ev.ctx = ps->peer->context;
+	ev.peer = ps->peer;
+	ev.swarm = ps->swarm;
+	ev.type = EVENT_PEER_LEFT_SWARM;
+	pg_emit_event(&ev);
 }
 
 struct pg_swarm *

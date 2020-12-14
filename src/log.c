@@ -48,13 +48,12 @@ pg_logf(enum peregrine_log_level level, const char *func, const char *fmt, ...)
 
 	if (stream == NULL) {
 		dest = getenv("LIBPEREGRINE_LOGGING");
-		if (dest == NULL) {
-			stream = stdout;
-		} else if (!strcmp(dest, "stderr")) {
-			stream = stderr;
-		} else {
-			stream = fopen(dest, "a");
-		}
+		if (dest == NULL)
+			return;
+
+		stream = strcmp(dest, "stderr") == 0 ? stderr : fopen(dest, "a");
+		if (stream == NULL)
+			return;
 	}
 
 	va_start(ap, fmt);
@@ -71,7 +70,7 @@ pg_panic(const char *file, int line, const char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	fprintf(stderr, "Panic at %s: %d: ", file, line);
+	fprintf(stderr, "Panic at %s:%d: ", file, line);
 	vfprintf(stderr, fmt, ap);
 	fprintf(stderr, "\n");
 	va_end(ap);

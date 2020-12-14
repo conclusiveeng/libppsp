@@ -185,11 +185,13 @@ static int
 pg_send_data(struct pg_peer_swarm *ps, uint64_t chunk)
 {
 	void *ptr;
+	size_t len;
 
 	pack_data(ps->buffer, chunk, chunk, 0);
 	ptr = pg_buffer_advance(ps->buffer, ps->options.chunk_size);
 
-	pg_file_read_chunks(ps->swarm->file, chunk, 1, ptr);
+	len = pg_file_read_chunks(ps->swarm->file, chunk, 1, ptr);
+	ps->buffer->used -= ps->options.chunk_size + len;
 	pg_buffer_enqueue(ps->buffer);
 	return (0);
 }
@@ -458,6 +460,10 @@ static ssize_t
 pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 {
 	struct pg_peer_swarm *ps;
+	struct node *node;
+	uint32_t start = msg->integrity.start_chunk;
+	uint32_t end = msg->integrity.end_chunk;
+	uint32_t chunk;
 
 	ps = pg_find_peerswarm_by_channel(peer, chid);
 	if (ps == NULL) {
@@ -478,6 +484,13 @@ pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 		ps->swarm->file->tree_root = pg_tree_get_root(ps->swarm->file->tree);
 	}
 
+	for (chunk = start; chunk <= end; chunk++) {
+		node = pg_tree_get_chunk_node(ps->swarm->file->tree, chunk);
+		memcpy(node->sha, msg->integrity.hash, sizeof(node->sha));
+		DEBUG("integrity: updated sha1 for chunk %s to %s", chunk,
+		    pg_hexdump(node->sha, sizeof(node->sha)));
+	}
+
 	return (MSG_LENGTH(msg_integrity));
 }
 
@@ -492,9 +505,8 @@ pg_handle_pex_resv4(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	sin.sin_addr.s_addr = msg->pex_resv4.ip_address;
 	sin.sin_port = msg->pex_resv4.port;
 
-	if (pg_add_peer(peer->context, (struct sockaddr *)&sin, NULL) != 0) {
-
-	}
+	if (pg_add_peer(peer->context, (struct sockaddr *)&sin, NULL) != 0)
+		WARN("cannot add peer: %s", strerror(errno));
 
 	return (MSG_LENGTH(msg_pex_resv4));
 }
@@ -590,6 +602,8 @@ pg_handle_choke(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	}
 
 	DEBUG("choke: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
+
+	ps->choked = true;
 	return (MSG_LENGTH(msg_choke));
 }
 
@@ -605,5 +619,7 @@ pg_handle_unchoke(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	}
 
 	DEBUG("unchoke: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
+
+	ps->choked = false;
 	return (MSG_LENGTH(msg_unchoke));
 }

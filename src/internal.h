@@ -32,6 +32,10 @@
 #include <peregrine/peregrine.h>
 #include "eventloop.h"
 
+#ifndef __unused
+#define __unused __attribute__((unused))
+#endif
+
 struct msg;
 struct pg_context;
 struct pg_swarm;
