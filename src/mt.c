@@ -227,16 +227,14 @@ mt_interval_min_max(struct node *i, struct node *min, struct node *max)
 		abort();
 	}
 	c = i;
-	while (c->left != NULL) {
+	while (c->left != NULL)
 		c = c->left;
-	}
 
 	memcpy(min, c, sizeof(struct node));
 
 	c = i;
-	while (c->right != NULL) {
+	while (c->right != NULL)
 		c = c->right;
-	}
 
 	memcpy(max, c, sizeof(struct node));
 

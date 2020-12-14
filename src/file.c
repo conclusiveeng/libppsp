@@ -168,6 +168,7 @@ pg_file_add_file(struct pg_context *context, const uint8_t *sha1, const char *pa
 	file->fd = fd;
 	file->path = strdup(path);
 	file->file_size = stat.st_size;
+	file->chunk_size = 1024;
 	file->nc = 1; /* We assume the file has at least one chunk */
 	SLIST_INSERT_HEAD(&context->files, file, entry);
 

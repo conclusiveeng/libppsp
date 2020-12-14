@@ -90,7 +90,8 @@ pack_ack(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk, uint64
 }
 
 void
-pack_integrity(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk, uint8_t *hash)
+pack_integrity(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk,
+    const uint8_t *hash)
 {
 	struct msg *msg = pg_buffer_advance(buf, MSG_LENGTH(msg_integrity));
 

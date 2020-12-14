@@ -153,7 +153,8 @@ void pack_handshake_opt_end(struct pg_buffer *buf);
 void pack_have(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk);
 void pack_data(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk, uint64_t timestamp);
 void pack_ack(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk, uint64_t sample);
-void pack_integrity(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk, uint8_t *hash);
+void pack_integrity(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk,
+    const uint8_t *hash);
 void pack_signed_integrity(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk,
     int64_t timestamp, uint8_t *signature, size_t siglen);
 void pack_request(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk);

@@ -139,9 +139,10 @@ struct pg_peer_swarm
 	struct pg_protocol_options options;
 	struct pg_bitmap *have_bitmap;
 	struct pg_bitmap *request_bitmap;
-	struct pg_bitmap *integrity_bitmap;
+	struct pg_bitmap *sent_bitmap;
 	struct pg_buffer *buffer;
 	enum pg_peer_swarm_state state;
+	bool choked;
 	uint32_t dst_channel_id;
 	uint32_t src_channel_id;
 

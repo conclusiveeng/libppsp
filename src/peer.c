@@ -145,15 +145,23 @@ pg_send_integrity(struct pg_peer_swarm *ps, uint32_t block)
 	node = &ps->swarm->file->tree[block * 2];
 
 	while (node != NULL) {
-		if (node->state != SENT) {
+		mt_interval_min_max(node, &n_min, &n_max);
+
+		if (n_max.number / 2 > ps->swarm->nc)
+			break;
+
+		if (node->state != SENT)
 			LIST_INSERT_HEAD(&nodes, node, entry);
-			node->state = SENT;
-		}
 
 		sibling = mt_find_sibling(node);
 		if (sibling != NULL && sibling->state != SENT) {
+			mt_interval_min_max(sibling, &n_min, &n_max);
+			if (n_max.number / 2 > ps->swarm->nc) {
+				node = node->parent;
+				continue;
+			}
+
 			LIST_INSERT_HEAD(&nodes, sibling, entry);
-			sibling->state = SENT;
 		}
 
 		node = node->parent;
@@ -163,6 +171,7 @@ pg_send_integrity(struct pg_peer_swarm *ps, uint32_t block)
 		LIST_FOREACH(node, &nodes, entry) {
 			mt_interval_min_max(node, &n_min, &n_max);
 			pack_integrity(ps->buffer, n_min.number / 2, n_max.number / 2, node->sha);
+			node->state = SENT;
 		}
 
 		pg_buffer_enqueue(ps->buffer);
@@ -179,12 +188,7 @@ pg_send_data(struct pg_peer_swarm *ps, uint64_t chunk)
 	pack_data(ps->buffer, chunk, chunk, 0);
 	ptr = pg_buffer_advance(ps->buffer, ps->options.chunk_size);
 
-	if (pread(ps->swarm->file->fd, ptr, ps->options.chunk_size, offset) < 0) {
-		ERROR("pread: peer=%s, swarm=%s, chunk=%" PRIu64 " error=%s",
-		    pg_peer_to_str(ps->peer), pg_swarm_to_str(ps->swarm), chunk,
-		    strerror(errno));
-	}
-
+	pg_file_read_chunks(ps->swarm->file, chunk, 1, ptr);
 	pg_buffer_enqueue(ps->buffer);
 	return (0);
 }
@@ -213,9 +217,15 @@ pg_send_handshake(struct pg_peer_swarm *ps)
 	pack_handshake_opt_u8(buf, HANDSHAKE_OPT_MERKLE_HASH_FUNC, 0);
 	pack_handshake_opt_u8(buf, HANDSHAKE_OPT_CHUNK_ADDRESSING_METHOD, 2);
 
-	/* Send chunk size if we're initiating the handshake */
-	//if (ps->dst_channel_id == 0)
-	//	pack_handshake_opt_u32(buf, HANDSHAKE_OPT_CHUNK_SIZE, ps->options.chunk_size);
+#if 0
+	/*
+	 * Send chunk size if we're initiating the handshake.
+	 *
+	 * Apparently libswift doesn't like it.
+	 * */
+	if (ps->dst_channel_id == 0)
+		pack_handshake_opt_u32(buf, HANDSHAKE_OPT_CHUNK_SIZE, ps->options.chunk_size);
+#endif
 
 	pack_handshake_opt_end(buf);
 	return (0);
@@ -230,9 +240,7 @@ pg_handle_handshake(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	struct pg_protocol_options options;
 	uint16_t swarm_id_len = 20;
 	uint8_t swarm_id[20];
-	uint8_t response[sizeof(struct msg_handshake) + 1024];
 	int pos = 0;
-	size_t len;
 
 	DEBUG("handshake: peer=%p", peer);
 
@@ -371,7 +379,7 @@ done:
 
 	/* Opening handshake, create peer-swarm relationship */
 	pg_peerswarm_create(peer, swarm, &options, pg_new_channel_id(),
-	    msg->handshake.src_channel_id);
+	    be32toh(msg->handshake.src_channel_id));
 
 	return (MSG_LENGTH(msg_handshake) + pos);
 }
@@ -408,7 +416,7 @@ pg_handle_ack(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 
 	ps = pg_find_peerswarm_by_channel(peer, chid);
 	if (ps == NULL) {
-		WARN("ack: cannot find channel id %d for peer %p", chid, peer);
+		WARN("ack: cannot find channel id 0x%08x for peer %p", chid, peer);
 		return (-1);
 	}
 
@@ -425,13 +433,14 @@ pg_handle_have(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 
 	ps = pg_find_peerswarm_by_channel(peer, chid);
 	if (ps == NULL) {
-		WARN("have: cannot find channel id %d for peer %p", chid, peer);
+		WARN("have: cannot find channel id 0x%08x for peer %p", chid, peer);
 		return (-1);
 	}
 
 	DEBUG("have: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
 
 	if (end > ps->swarm->nc) {
+		DEBUG("have: updating swarm size to %u blocks", end + 1);
 		ps->swarm->nc = end + 1;
 		ps->swarm->file->nc = end + 1;
 		pg_bitmap_resize(ps->swarm->have_bitmap, end + 1);
@@ -451,7 +460,7 @@ pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 
 	ps = pg_find_peerswarm_by_channel(peer, chid);
 	if (ps == NULL) {
-		WARN("integrity: cannot find channel id %d for peer %p", chid, peer);
+		WARN("integrity: cannot find channel id 0x%08x for peer %p", chid, peer);
 		return (-1);
 	}
 
@@ -497,7 +506,7 @@ pg_handle_pex_req(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 
 	ps = pg_find_peerswarm_by_channel(peer, chid);
 	if (ps == NULL) {
-		WARN("data: cannot find channel id %d for peer %p", chid, peer);
+		WARN("data: cannot find channel id 0x%08x for peer %p", chid, peer);
 		return (-1);
 	}
 
@@ -536,7 +545,7 @@ pg_handle_request(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 
 	ps = pg_find_peerswarm_by_channel(peer, chid);
 	if (ps == NULL) {
-		WARN("request: cannot find channel id %d for peer %p", chid, peer);
+		WARN("request: cannot find channel id 0x%08x for peer %p", chid, peer);
 		return (-1);
 	}
 
@@ -559,11 +568,12 @@ pg_handle_cancel(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 
 	ps = pg_find_peerswarm_by_channel(peer, chid);
 	if (ps == NULL) {
-		WARN("cancel: cannot find channel id %d for peer %p", chid, peer);
+		WARN("cancel: cannot find channel id 0x%08x for peer %p", chid, peer);
 		return (-1);
 	}
 
 	DEBUG("cancel: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
+	return (MSG_LENGTH(msg_cancel));
 }
 
 static ssize_t
@@ -573,7 +583,7 @@ pg_handle_choke(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 
 	ps = pg_find_peerswarm_by_channel(peer, chid);
 	if (ps == NULL) {
-		WARN("choke: cannot find channel id %d for peer %p", chid, peer);
+		WARN("choke: cannot find channel id 0x%08x for peer %p", chid, peer);
 		return (-1);
 	}
 
@@ -588,7 +598,7 @@ pg_handle_unchoke(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 
 	ps = pg_find_peerswarm_by_channel(peer, chid);
 	if (ps == NULL) {
-		WARN("unchoke: cannot find channel id %d for peer %p", chid, peer);
+		WARN("unchoke: cannot find channel id 0x%08x for peer %p", chid, peer);
 		return (-1);
 	}
 
