@@ -182,6 +182,7 @@ main(int argc, char *const argv[])
 	sin.sin_port = htons(local_port);
 	options.listen_addr = (struct sockaddr *)&sin;
 	options.listen_addr_len = sizeof(struct sockaddr_in);
+	options.event_fn = NULL;
 
 	if (pg_context_create(&options, &context) != 0) {
 		fprintf(stderr, "cannot create context: %s\n", strerror(errno));
