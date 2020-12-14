@@ -96,8 +96,8 @@ pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
     pg_bitmap_scan_func_t fn, void *arg)
 {
 	uint64_t start = 0;
-	bool old_val = pg_bitmap_get(bmp, start);
-	bool new_val;
+	bool old_val;
+	bool new_val = pg_bitmap_get(bmp, start);
 
 	for (uint64_t i = 0; i < bmp->size; i++) {
 		old_val = new_val;
