@@ -56,10 +56,10 @@ static int hf_swift_ack_timestamp = -1;
 static int hf_swift_have_start_chunk = -1;
 static int hf_swift_have_end_chunk = -1;
 
-/* 04 Hash fields */
-static int hf_swift_hash_start_chunk = -1;
-static int hf_swift_hash_end_chunk = -1;
-static int hf_swift_hash_value = -1;
+/* 04 Integrity fields */
+static int hf_swift_integrity_start_chunk = -1;
+static int hf_swift_integrity_end_chunk = -1;
+static int hf_swift_integrity_hash = -1;
 
 /* 05 PEX_RESv4 fields */
 static int hf_swift_pex_resv4_ip = -1;
@@ -68,10 +68,11 @@ static int hf_swift_pex_resv4_port = -1;
 /* 06 PEX_REQ fields */
 // PEX_REQ has no fields
 
-/* 07 Signed hash fields */
-static int hf_swift_signed_hash_bin_id = -1;
-static int hf_swift_signed_hash_value = -1;
-static int hf_swift_signed_hash_signature = -1;
+/* 07 Signed integrity fields */
+static int hf_swift_signed_integrity_start_chunk = -1;
+static int hf_swift_signed_integrity_end_chunk = -1;
+static int hf_swift_signed_integrity_timestamp = -1;
+static int hf_swift_signed_integrity_signature = -1;
 
 /* 08 Request fields */
 static int hf_swift_request_start_chunk = -1;
@@ -173,7 +174,7 @@ proto_register_swift(void)
         {
             &hf_swift_data_timestamp,
             {
-                "Data End Chunk", "swift.data.timestamp",
+                "Data Timestamp", "swift.data.timestamp",
                 FT_UINT64, BASE_HEX,
                 NULL, 0x0,
                 NULL, HFILL
@@ -227,8 +228,8 @@ proto_register_swift(void)
                 NULL, 0x0,
                 NULL, HFILL
             },
-	},
-	{
+	    },
+	    {
             &hf_swift_have_end_chunk,
             {
                 "Have End Chunk", "swift.have.end_chunk",
@@ -238,29 +239,29 @@ proto_register_swift(void)
             }
         },
 
-        /* 04 Hash */
+        /* 04 Integrity */
         {
-            &hf_swift_hash_start_chunk,
+            &hf_swift_integrity_start_chunk,
             {
-                "Hash Start Chunk", "swift.hash.start_chunk",
+                "Integrity Start Chunk", "swift.integrity.start_chunk",
                 FT_UINT32, BASE_HEX,
                 NULL, 0x0,
                 NULL, HFILL
             }
         },
         {
-            &hf_swift_hash_end_chunk,
+            &hf_swift_integrity_end_chunk,
             {
-                "Hash End Chunk", "swift.hash.end_chunk",
+                "Integrity End Chunk", "swift.integrity.end_chunk",
                 FT_UINT32, BASE_HEX,
                 NULL, 0x0,
                 NULL, HFILL
             }
         },
         {
-            &hf_swift_hash_value,
+            &hf_swift_integrity_hash,
             {
-                "Hash Value", "swift.hash.value",
+                "Integrity Hash", "swift.integrity.hash",
                 FT_BYTES, BASE_NONE,
                 NULL, 0x0,
                 NULL, HFILL
@@ -290,29 +291,38 @@ proto_register_swift(void)
         /* 06 PEX_REQ */
         // PEX_REQ doesn't have any fields
 
-        /* 07 Signed Hash */
+        /* 07 Signed integrity */
         {
-            &hf_swift_signed_hash_bin_id,
+            &hf_swift_signed_integrity_start_chunk,
             {
-                "Signed Hash Bin ID", "swift.signed_hash.bin_id",
+                "Signed Integrity Start Chunk", "swift.signed_integrity.signed_integrity",
                 FT_UINT32, BASE_HEX,
                 NULL, 0x0,
                 NULL, HFILL
             }
         },
         {
-            &hf_swift_signed_hash_value,
+            &hf_swift_signed_integrity_end_chunk,
             {
-                "Signed Hash Value", "swift.signed_hash.value",
-                FT_BYTES, BASE_NONE,
+                "igned Integrity End Chunk", "swift.signed_integrity.end_integrity",
+                FT_UINT32, BASE_HEX,
                 NULL, 0x0,
                 NULL, HFILL
             }
         },
         {
-            &hf_swift_signed_hash_signature,
+            &hf_swift_signed_integrity_timestamp,
             {
-                "Signed Hash Signature", "swift.signed_hash.signature",
+                "Integrity Timestamp", "swift.signed_integrity.timestamp",
+                FT_UINT64, BASE_HEX,
+                NULL, 0x0,
+                NULL, HFILL
+            }
+        },
+        {
+            &hf_swift_signed_integrity_signature,
+            {
+                "Signed Integrity Value", "swift.signed_integrity.signature",
                 FT_BYTES, BASE_NONE,
                 NULL, 0x0,
                 NULL, HFILL
@@ -495,12 +505,12 @@ dissect_swift(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *arg)
                 proto_tree_add_item(swift_tree, hf_swift_have_end_chunk, tvb, offset, 4, FALSE);
                 offset += 4;
                 break;
-            case 4: /* Hash */
-                proto_tree_add_item(swift_tree, hf_swift_hash_start_chunk, tvb, offset, 4, FALSE);
+            case 4: /* Integrity */
+                proto_tree_add_item(swift_tree, hf_swift_integrity_start_chunk, tvb, offset, 4, FALSE);
                 offset += 4;
-                proto_tree_add_item(swift_tree, hf_swift_hash_end_chunk, tvb, offset, 4, FALSE);
+                proto_tree_add_item(swift_tree, hf_swift_integrity_end_chunk, tvb, offset, 4, FALSE);
                 offset += 4;
-                proto_tree_add_item(swift_tree, hf_swift_hash_value, tvb, offset, 20, FALSE);
+                proto_tree_add_item(swift_tree, hf_swift_integrity_hash, tvb, offset, 20, FALSE);
                 offset += 20;
                 break;
             case 5: /* PEX_RESv4 */
@@ -511,15 +521,17 @@ dissect_swift(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *arg)
                 break;
             case 6: /* PEX_REQ */
                 break;
-            case 7: /* Signed Hash */
-                proto_tree_add_item(swift_tree, hf_swift_signed_hash_bin_id, tvb, offset, 4, FALSE);
+            case 7: /* Signed Integrity */
+                proto_tree_add_item(swift_tree, hf_swift_signed_integrity_start_chunk, tvb, offset, 4, FALSE);
                 offset += 4;
-                proto_tree_add_item(swift_tree, hf_swift_signed_hash_value, tvb, offset, 20, FALSE);
-                offset += 20;
+                proto_tree_add_item(swift_tree, hf_swift_signed_integrity_end_chunk, tvb, offset, 4, FALSE);
+                offset += 4;
+                proto_tree_add_item(swift_tree, hf_swift_signed_integrity_timestamp, tvb, offset, 8, FALSE);
+                offset += 8;
                 /* It is not entirely clear what size the public key will be, so we allow any size
                    For this to work, we must assume there aren't any more messages in the packet */
                 dat_len = tvb_captured_length(tvb) - offset;
-                proto_tree_add_item(swift_tree, hf_swift_signed_hash_signature, tvb, offset, dat_len, FALSE);
+                proto_tree_add_item(swift_tree, hf_swift_signed_integrity_signature, tvb, offset, dat_len, FALSE);
                 offset += dat_len;
                 break;
             case 8: /* Request */
@@ -545,4 +557,3 @@ dissect_swift(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *arg)
 
     return 0;
 }
-
