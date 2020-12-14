@@ -23,6 +23,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/param.h>
+#include <sys/types.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>

@@ -143,7 +143,6 @@ main(int argc, char *const argv[])
 	int local_port = 0;
 	int ch;
 	int ret;
-	int i;
 
 	struct pg_context_options options;
 
