@@ -65,6 +65,7 @@ elseif(${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
 endif()
 
 add_library(libperegrine SHARED ${MAIN_SOURCES} ${EVENTLOOP_SOURCES})
+target_link_libraries(libperegrine m)
 
 configure_file(libperegrine.pc.in ${CMAKE_BINARY_DIR}/libperegrine.pc @ONLY)
 install(FILES ${CMAKE_BINARY_DIR}/libperegrine.pc DESTINATION /usr/share/pkgconfig)

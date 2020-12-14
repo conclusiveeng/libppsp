@@ -152,47 +152,32 @@ pg_ack_range(struct pg_peer_swarm *ps, uint64_t start, uint64_t end)
 static int
 pg_send_integrity(struct pg_peer_swarm *ps, uint32_t block)
 {
-	struct node *node, *sibling;
-	struct node n_min, n_max;
-	LIST_HEAD(, node) nodes;
-
-	LIST_INIT(&nodes);
+	struct node *node;
+	struct node *n_min, *n_max;
+	struct node **uncles;
+	struct node *uncle;
+	size_t uncle_size;
+	size_t i;
+	size_t to_send = 0;
 
 	/* Start with the leaf node */
-	node = &ps->swarm->file->tree[block * 2];
+	node = pg_tree_get_chunk_node(ps->swarm->file->tree, block);
+	uncle_size = pg_tree_gen_uncle_peak_nodes(node, &uncles);
 
-	while (node != NULL) {
-		mt_interval_min_max(node, &n_min, &n_max);
+	for (i = uncle_size; i > 0; i--) {
+		uncle = uncles[i];
+		if (uncle->state == SENT)
+			continue;
 
-		if (n_max.number / 2 > ps->swarm->nc)
-			break;
-
-		if (node->state != SENT)
-			LIST_INSERT_HEAD(&nodes, node, entry);
-
-		sibling = mt_find_sibling(node);
-		if (sibling != NULL && sibling->state != SENT) {
-			mt_interval_min_max(sibling, &n_min, &n_max);
-			if (n_max.number / 2 > ps->swarm->nc) {
-				node = node->parent;
-				continue;
-			}
-
-			LIST_INSERT_HEAD(&nodes, sibling, entry);
-		}
-
-		node = node->parent;
+		pg_tree_node_interval(uncles[i], &n_min, &n_max);
+		pack_integrity(ps->buffer, n_min->number / 2, n_max->number / 2, node->sha);
+		node->state = SENT;
+		to_send++;
 	}
 
-	if (!LIST_EMPTY(&nodes)) {
-		LIST_FOREACH(node, &nodes, entry) {
-			mt_interval_min_max(node, &n_min, &n_max);
-			pack_integrity(ps->buffer, n_min.number / 2, n_max.number / 2, node->sha);
-			node->state = SENT;
-		}
-
+	if (to_send)
 		pg_buffer_enqueue(ps->buffer);
-	}
+
 	return (0);
 }
 
@@ -483,13 +468,14 @@ pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	DEBUG("integrity: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
 
 	if (ps->swarm->file->tree == NULL) {
-		uint64_t order = mt_order2(
+		uint64_t order = pg_tree_calc_height(
 		    be32toh(msg->integrity.end_chunk) -
 		    be32toh(msg->integrity.start_chunk)) + 1;
 
 		DEBUG("integrity: creating merkle tree with order %d", order);
 
-		ps->swarm->file->tree_root = mt_build_tree(1 << order, &ps->swarm->file->tree);
+		ps->swarm->file->tree = pg_tree_create(order);
+		ps->swarm->file->tree_root = pg_tree_get_root(ps->swarm->file->tree);
 	}
 
 	return (MSG_LENGTH(msg_integrity));

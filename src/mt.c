@@ -23,313 +23,411 @@
  * SUCH DAMAGE.
  */
 
-#include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include "sha1.h"
 #include "internal.h"
 #include "log.h"
 
-/**
- * @brief return rounded order of 32-bit variable, similar to log2()
- *
- * @param val 32-bit variable to get order of
- * @return int order of the variable
- */
-int
-mt_order2(uint32_t val)
+size_t
+pg_tree_calc_height(size_t n_chunks)
 {
-	int o;
-	int bits;
-	int32_t b;
 
-	o = -1;
-	bits = 0;
-	for (b = 31; b >= 0; b--) {
-		if (val & (1 << b)) {
-			if (o == -1) {
-				o = b;
-			}
-			bits++;
-		}
-	}
-
-	if (bits > 1) {
-		o++;
-	} /* increase order of the "val" if there are other bits on the right
-	             side of the most important bit */
-
-	return o;
+	return (ceil(log2(n_chunks)) + 1);
 }
 
-/*
- * builds tree with "num_chunks" number of chunks
- * returns:
- * 	pointer to root node of the new created tree
- * 	as "**ret" parameter - pointer to new created tree - 0 index of the leaf
- *
- */
-struct node *
-mt_build_tree(int num_chunks, struct node **ret)
+void
+pg_tree_init_nodes(struct node *array, size_t start_idx, size_t count)
 {
-	int x;
-	int l;
-	int si;
-	int h;
-	int nc;
-	int left;
-	int right;
-	int parent;
-	int root_idx;
-	struct node *root_node;
-	struct node *tree;
+	size_t i;
 
-	//   DEBUG("num_chunks: %d", num_chunks);
-
-	h = mt_order2(num_chunks); // "h" - height of the tree
-	nc = 1 << h;               // if there are for example only 7 chunks - create tree with 8 leaves
-	//   DEBUG("order2(%d): %d", num_chunks, h);
-	//   DEBUG("num_chunks(orig): %d  after_correction: %d", num_chunks, nc);
-
-	/* DEBUG: list the tree */
-	//   for (l = 1; l <= h + 1; l++) {                        /* goes level by level from
-	//   bottom up to highest level */
-	//     first_idx = (1 << (l - 1)) - 1;                     /* first index on the given level
-	//     starting
-	//                                                            from left: 0, 1, 3, 7, 15, etc
-	//                                                            */
-	//     for (si = first_idx; si < 2 * nc; si += (1 << l)) { /* si - sibling index */
-	//       DEBUG("%d ", si);
-	//     }
-	//   }
-
-	/* allocate array of "struct node" */
-	tree = malloc(2 * nc * sizeof(struct node));
-
-	/* initialize array of struct node */
-	for (x = 0; x < 2 * nc; x++) {
-		tree[x].number = x;
-		tree[x].chunk = NULL;
-		tree[x].left = tree[x].right = tree[x].parent = NULL;
-		tree[x].state = INITIALIZED;
+	for (i = start_idx; i < start_idx + count; i++) {
+		array[i].number = i;
+		array[i].chunk = NULL;
+		array[i].left = array[i].right = array[i].parent = NULL;
+		array[i].state = INITIALIZED;
 	}
+}
 
-	/* build the tree by linking nodes */
-	for (l = 1; l <= h; l++) {
+void
+pg_tree_link_nodes(struct node *node_array, size_t height)
+{
+	uint32_t level;
+	uint32_t si;
+	uint32_t left;
+	uint32_t right;
+	uint32_t parent;
+	size_t node_count = (1u << height) - 1;
+
+	for (level = 0; level <= height; level++) {
 		/* DEBUG("building level %d", l); */
-		int first_idx = (1 << (l - 1)) - 1;
-		for (si = first_idx; si < 2 * nc; si += (2 << l)) {
+		uint32_t first_idx = (1u << level) - 1;
+		for (si = first_idx; si < node_count; si += (2u << (level + 1))) {
 			left = si;
-			right = (si | (1 << l));
+			right = (si | (1u << (level + 1)));
 			parent = (left + right) / 2;
 			/* DEBUG("pair %d-%d will have parent: %d", left, right, parent); */
-			tree[left].parent = &tree[parent];  /* parent for left node */
-			tree[right].parent = &tree[parent]; /* parent for right node */
+			node_array[left].parent = &node_array[parent];  /* parent for left node */
+			node_array[right].parent = &node_array[parent]; /* parent for right node */
 
-			tree[parent].left = &tree[left];   /* left child of the parent */
-			tree[parent].right = &tree[right]; /* right child of the parent */
+			node_array[parent].left = &node_array[left];   /* left child of the parent */
+			node_array[parent].right = &node_array[right]; /* right child of the parent */
 		}
 	}
+}
 
-	*ret = tree; /* return just created tree */
+struct node *
+pg_tree_create(int n_chunks)
+{
+	size_t height;
+	size_t node_count;
 
-	root_idx = (1 << h) - 1;
-	//   DEBUG("root node: %d", root_idx);
+	struct node *tree;
 
-	root_node = &tree[root_idx];
-	return root_node;
+	height = pg_tree_calc_height(n_chunks);
+	node_count = (1u << height) - 1;
+
+	tree = malloc(node_count * sizeof(struct node));
+	pg_tree_init_nodes(tree, 0, node_count);
+	pg_tree_link_nodes(tree, height);
+
+	return (tree);
+}
+
+struct node *
+pg_tree_get_root(struct node *tree)
+{
+	struct node *node = tree;
+
+	while (node->parent != NULL)
+		node = node->parent;
+
+	return (node);
+}
+
+size_t
+pg_tree_get_height(struct node *tree)
+{
+	struct node *node = pg_tree_get_root(tree);
+	return (pg_tree_get_node_height(node));
+}
+
+size_t
+pg_tree_get_node_height(struct node *node)
+{
+	size_t height = 1;
+
+	while (node->left != NULL) {
+		node = node->left;
+		height++;
+	}
+
+	return (height);
+}
+
+size_t
+pg_tree_get_chunk_count(struct node *tree)
+{
+	size_t leaves_count = pg_tree_get_leaves_count(tree);
+	size_t idx = leaves_count - 1;
+	struct node *first_node = pg_tree_get_first_node(tree);
+	struct node *node = &first_node[2 * idx];
+
+	while (node->chunk == NULL) {
+		if (idx == 0)
+			return (0);
+
+		idx--;
+		node = &first_node[2 * idx];
+	}
+
+	return (idx + 1);
+}
+
+size_t
+pg_tree_gen_peak_nodes(struct node *tree, struct node ***retp)
+{
+	size_t chunk_count = pg_tree_get_chunk_count(tree);
+	size_t peak_size = __builtin_popcount(chunk_count);
+	size_t idx;
+	size_t result_idx = 0;
+	struct node *node = pg_tree_get_chunk_node(tree, chunk_count - 1);
+	struct node **result;
+
+	result = calloc(peak_size, sizeof(struct node **));
+
+	for (idx = 1; idx <= chunk_count; idx = idx << 1u) {
+		if (!(chunk_count & idx)) {
+			node = node->parent;
+			continue;
+		}
+
+		node = node->parent;
+		result[result_idx] = node->left;
+		result_idx++;
+	}
+
+	*retp = result;
+	return (peak_size);
+}
+
+size_t
+pg_tree_gen_uncle_nodes(struct node *node, struct node ***retp)
+{
+	struct node *root = pg_tree_get_root(node);
+	struct node **uncle_nodes;
+	struct node *cur_node = node;
+	size_t node_height = pg_tree_get_node_height(node);
+	size_t root_height = pg_tree_get_node_height(root);
+	size_t uncle_nodes_size = root_height - node_height;
+	size_t i;
+
+	uncle_nodes = calloc(uncle_nodes_size, sizeof(struct node **));
+
+	for (i = 0; i < uncle_nodes_size; i++) {
+		cur_node = pg_tree_find_sibling_node(cur_node);
+		uncle_nodes[i] = cur_node;
+		cur_node = cur_node->parent;
+	}
+
+	*retp = uncle_nodes;
+	return (uncle_nodes_size);
+}
+
+size_t
+pg_tree_gen_uncle_peak_nodes(struct node *node, struct node ***retp)
+{
+	struct node **peak_nodes;
+	struct node **uncle_nodes;
+	struct node **result;
+	size_t peak_size = pg_tree_gen_peak_nodes(node, &peak_nodes);
+	size_t uncle_size = pg_tree_gen_uncle_nodes(node, &uncle_nodes);
+	size_t result_size;
+	size_t uncle_idx;
+	size_t result_idx;
+
+	for (uncle_idx = 0; uncle_idx < uncle_size; uncle_idx++) {
+		if (pg_tree_is_part_of_set(uncle_nodes[uncle_idx], peak_nodes, peak_size))
+			break;
+	}
+
+	result_size = peak_size + uncle_idx;
+	result = calloc(result_size, sizeof(struct node **));
+
+	for (result_idx = 0; result_idx < result_size; result_idx++) {
+		if (result_idx < uncle_idx)
+			result[result_idx] = uncle_nodes[result_idx];
+		else
+			result[result_idx] = peak_nodes[result_idx - uncle_idx];
+	}
+
+	*retp = result;
+	free(peak_nodes);
+	free(uncle_nodes);
+	return (result_size);
+}
+
+bool
+pg_tree_is_part_of_set(struct node *node, struct node **set, size_t set_size)
+{
+	size_t i;
+
+	for (i = 0; i < set_size; i++) {
+		if (node == set[i])
+			return (true);
+	}
+
+	return (false);
+}
+
+size_t
+pg_tree_get_leaves_count(struct node *tree)
+{
+	size_t height = pg_tree_get_height(tree);
+
+	return (1u << (height - 1));
+}
+
+struct node *
+pg_tree_get_first_node(struct node *tree)
+{
+
+	return (tree - tree->number * sizeof(struct node));
+}
+
+struct node *
+pg_tree_get_chunk_node(struct node *tree, size_t idx)
+{
+	struct node *node = pg_tree_get_first_node(tree);
+
+	return (&node[2 * idx]);
+}
+
+struct node *
+pg_tree_get_node(struct node *tree, size_t idx)
+{
+	struct node *node = pg_tree_get_first_node(tree);
+
+	return (&node[idx]);
+}
+
+struct node *
+pg_tree_grow(struct node *old_tree, size_t n_chunks)
+{
+
+	uint32_t old_height;
+	uint32_t height;
+	uint32_t old_node_count;
+	uint32_t node_count;
+	struct node *tree;
+	size_t cur_chunk_count = pg_tree_get_leaves_count(old_tree);
+
+	if (cur_chunk_count >= n_chunks)
+		return (pg_tree_get_first_node(old_tree));
+
+	old_height = pg_tree_calc_height(cur_chunk_count);
+	old_node_count = (1 << old_height) - 1;
+	height = pg_tree_calc_height(n_chunks);
+	node_count = (1 << height) - 1;
+
+	tree = realloc(old_tree, node_count * sizeof(struct node));
+	pg_tree_init_nodes(&tree[old_node_count], old_node_count,
+	    node_count - old_node_count);
+	pg_tree_link_nodes(tree, height);
+
+	return (tree);
 }
 
 /*
  * print tree - root node at top, leaves at bottom
  */
 void
-mt_show_tree_root_based(struct node *t)
+pg_tree_show(struct node *tree)
 {
-	int l;
+	int level;
 	int si;
-	int nl;
-	int h;
-	int ti;
+	size_t n_leaves;
+	size_t height;
 	int first_idx;
-	int center;
+	size_t center;
 	int sp;
-	struct node min;
-	struct node max;
+	struct node *min;
+	struct node *max;
+	struct node *root;
 
-	DEBUG("print the tree starting from root node: %d", t->number);
+	root = pg_tree_get_root(tree);
+	DEBUG("print the tree starting from root node: %d", root->number);
 
-	ti = t->number;
-	mt_interval_min_max(t, &min, &max);
-	DEBUG("min: %d max: %d", min.number, max.number);
-	nl = (max.number - min.number) / 2 + 1; /* number of leaves in given subtree */
-	h = mt_order2(nl) + 1;
+	pg_tree_node_interval(root, &min, &max);
+	DEBUG("min: %d max: %d", min->number, max->number);
+	n_leaves = (max->number - min->number) / 2 + 1; /* number of leaves in given subtree */
+	height = pg_tree_calc_height(n_leaves) + 1;
 
-	first_idx = ti;
+	first_idx = root->number;
 
 	/* justification */
-#if 1
-	center = (nl * (2 + 2)) / 2;
-	for (l = h; l >= 1; l--) {
-		int is = 1 << l;            /* how many spaces has to be inserted between values on
+	center = (n_leaves * (2 + 2)) / 2;
+	for (level = height; level >= 1; level--) {
+		int is = 1 << level;            /* how many spaces has to be inserted between values on
 		                               given level */
-		int iw = 1 << (h - l);      /* number of nodes to print on given level */
+		int iw = 1 << (height - level);      /* number of nodes to print on given level */
 		int m = iw * (2 + is) - is; /*  */
 		/* d_printf("center: %d  iw: %d  m: %d  is: %d\n", center, iw, m, is); */
 		for (sp = 0; sp < (center - m / 2); sp++) {
 			DEBUG("%s", " "); /* insert (center - m/2) spaces first */
 		}
-		for (si = first_idx; si <= max.number; si += (1 << l)) {
+		for (si = first_idx; si <= max->number; si += (1 << level)) {
 			DEBUG("%2d", si);
 			for (sp = 0; sp < is; sp++) {
 				DEBUG("%s", " "); /* add a few spaces */
 			}
 		}
-		first_idx -= (1 << (l - 2));
+		first_idx -= (1 << (level - 2));
 	}
-#endif
 }
 
 struct node *
-mt_find_sibling(struct node *n)
+pg_tree_find_sibling_node(struct node *node)
 {
-	struct node *p;
-	struct node *s;
+	struct node *parent;
+	struct node *sibling;
 
-	p = n->parent;
-	if (p == NULL) {
+	parent = node->parent;
+	if (parent == NULL)
 		return NULL;
-	}
 
-	if (n == p->left) { /* if node 'n' is left child of parent - then sibling is
-		             right child of parent */
-		s = p->right;
-	}
-	if (n == p->right) { /* if node 'n' is right child of parent - then sibling is
-		              left child of parent */
-		s = p->left;
-	}
+	sibling = node == parent->left ? parent->right : parent->left;
 
-	DEBUG("node: %d   parent: %d  sibling: %d", n->number, p->number, s->number);
+	DEBUG("node: %d, parent: %d, sibling: %d", node->number, parent->number,
+	    sibling->number);
 
-	return s;
+	return (sibling);
 }
 
 /*
  * for given node find min and max child node numbers
  */
 void
-mt_interval_min_max(struct node *i, struct node *min, struct node *max)
+pg_tree_node_interval(struct node *node, struct node **min, struct node **max)
 {
-	struct node *c;
+	struct node *current;
 
-	if (i == NULL) {
+	if (node == NULL)
 		abort();
-	}
-	c = i;
-	while (c->left != NULL)
-		c = c->left;
 
-	memcpy(min, c, sizeof(struct node));
+	current = node;
+	while (current->left != NULL)
+		current = current->left;
 
-	c = i;
-	while (c->right != NULL)
-		c = c->right;
+	*min = current;
 
-	memcpy(max, c, sizeof(struct node));
+	current = node;
+	while (current->right != NULL)
+		current = current->right;
 
-	DEBUG("root: %d  interval  min: %d  max: %d", i->number, min->number, max->number);
-}
+	*max = current;
 
-/*
- * dump array of tree
- * in params:
- * 	t - pointer to array of tree
- * 	l - number of leaves
- */
-void
-mt_dump_tree(struct node *t, int l)
-{
-	char shas[40 + 1];
-	int x;
-	int y;
-	int s;
-
-	memset(shas, 0, sizeof(shas));
-	for (x = 0; x < 2 * l; x++) {
-		s = 0;
-		for (y = 0; y < 20; y++) {
-			s += sprintf(shas + s, "%02x", t[x].sha[y] & 0xff);
-		}
-		DEBUG("[%3d]  %d  %s", t[x].number, t[x].state, shas);
-	}
-}
-
-/*
- * dump array of chunks
- * in params:
- * 	t - pointer to array of tree
- * 	l - number of leaves
- *
- */
-void
-mt_dump_chunk_tab(struct chunk *c, int l)
-{
-	char buf[40 + 1];
-	int x;
-	int y;
-
-	DEBUG("l: %d", l);
-	for (x = 0; x < l; x++) {
-		int s = 0;
-		for (y = 0; y < 20; y++) {
-			s += sprintf(buf + s, "%02x", c[x].sha[y] & 0xff);
-		}
-		buf[40] = '\0';
-		if (c[x].state != CH_EMPTY) {
-			DEBUG("chunk[%3d]  off: %8lu  len: %8u  sha: %s  state: %s", x, c[x].offset, c[x].len, buf,
-			      c[x].state == CH_EMPTY ? "EMPTY" : "ACTIVE");
-		}
-	}
+	DEBUG("root: %d, interval min: %d, max: %d", node->number,
+	    (*min)->number, (*max)->number);
 }
 
 void
-mt_update_sha(struct node *t, int num_chunks)
+pg_tree_update_sha(struct node *tree)
 {
-	char sha_parent[40 + 1];
 	char zero[20];
 	uint8_t concat[80 + 1];
 	unsigned char digest[20 + 1];
-	int h;
-	int nc;
-	int l;
-	int si;
-	int left;
-	int right;
-	int parent;
+	struct node *node;
+	size_t height;
+	size_t node_count;
+	size_t level;
+	size_t si;
+	size_t left;
+	size_t right;
+	size_t parent;
 	SHA1Context context;
 
 	memset(zero, 0, sizeof(zero));
 
-	h = mt_order2(num_chunks); /* "h" - height of the tree */
-	nc = 1 << h;
+	node = pg_tree_get_first_node(tree);
+	height = pg_tree_get_height(node);
+	node_count = (1u << height) - 1;
 
-	for (l = 1; l <= h; l++) {                                  /* go through levels of the tree starting from
-		                                                       bottom of the tree */
-		int first_idx = (1 << (l - 1)) - 1;                 /* first index on given level starting
-		                                                       from left: 0, 1, 3, 7, 15, etc */
-		for (si = first_idx; si < 2 * nc; si += (2 << l)) { /* si - sibling index */
+	for (level = 0; level < height; level++) {
+		uint32_t first_idx = (1u << level) - 1;
+		for (si = first_idx; si < node_count; si += (2u << (level + 1))) {
 			left = si;
-			right = (si | (1 << l));
+			right = (si | (1u << (level + 1)));
 			parent = (left + right) / 2;
 
 			/* check if both children are empty */
-			if ((memcmp(zero, t[left].sha, sizeof(zero)) == 0)
-			    && (memcmp(zero, t[right].sha, sizeof(zero)) == 0)) {
-				memcpy(t[parent].sha, zero, 20);
+			if ((memcmp(zero, node[left].sha, sizeof(zero)) == 0)
+			    && (memcmp(zero, node[right].sha, sizeof(zero)) == 0)) {
+				memcpy(node[parent].sha, zero, 20);
 			} else {
-				memcpy(concat, t[left].sha, 20);
-				memcpy(concat + 20, t[right].sha, 20);
+				memcpy(concat, node[left].sha, 20);
+				memcpy(concat + 20, node[right].sha, 20);
 
 				/* calculate SHA1 for concatenated both SHA (left and right) */
 				SHA1Reset(&context);
@@ -337,18 +435,10 @@ mt_update_sha(struct node *t, int num_chunks)
 				SHA1Result(&context, digest);
 
 				/* copy generated SHA hash to parent node */
-				memcpy(t[parent].sha, digest, 20);
+				memcpy(node[parent].sha, digest, 20);
 			}
-			/* DEBUG: print ASCI SHA for parent node */
-			//       int y;
-			//       int s = 0;
-			//       for (y = 0; y < 20; y++) {
-			// 	s += sprintf(sha_parent + s, "%02x", digest[y] & 0xff);
-			//       }
-			//       sha_parent[40] = '\0';
-			//       DEBUG(" p[%d]: %s", t[parent].number, sha_parent);
 
-			t[parent].state = ACTIVE;
+			node[parent].state = ACTIVE;
 		}
 	}
 }

@@ -52,7 +52,6 @@ peregrine_file_process_file(struct pg_file *file)
 	struct stat stat;
 	SHA1Context context;
 	struct node *ret;
-	struct node *root8;
 	uint32_t chunk_size;
 
 	chunk_size = file->chunk_size;
@@ -73,7 +72,7 @@ peregrine_file_process_file(struct pg_file *file)
 	//   PEREGRINE_DEBUG("number of chunks [%u]: %lu", chunk_size, number_chunks);
 
 	/* compute number of leaves - it is not the same as number of chunks */
-	nl = 1 << (mt_order2(number_chunks));
+	nl = 1 << (pg_tree_calc_height(number_chunks));
 	//   PEREGRINE_DEBUG("number of leaves %lu", nl);
 	file->nl = nl;
 
@@ -85,8 +84,8 @@ peregrine_file_process_file(struct pg_file *file)
 	for (x = 0; x < nl; x++)
 		file->tab_chunk[x].state = CH_EMPTY;
 
-	root8 = mt_build_tree(number_chunks, &ret);
-	file->tree_root = root8;
+	ret = pg_tree_create(number_chunks);
+	file->tree_root = pg_tree_get_root(ret);
 	file->tree = ret;
 
 	/* compute SHA hash for every chunk for given file */
@@ -117,7 +116,7 @@ peregrine_file_process_file(struct pg_file *file)
 	}
 
 	/* update all the SHAs in the tree */
-	mt_update_sha(ret, nl);
+	pg_tree_update_sha(ret);
 
 	free(buf);
 
