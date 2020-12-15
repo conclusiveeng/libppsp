@@ -27,13 +27,14 @@ set(PKGCONFIG_VERSION ${CMAKE_PROJECT_VERSION})
 set(CPACK_GENERATOR "DEB")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Conclusive Engineering")
 include(CPack)
+set(BUILD_DOC "YES")
 
-# Generate documentation
-find_package(Doxygen OPTIONAL_COMPONENTS dot)
-if (DOXYGEN_FOUND)
-#set(DOXYGEN_USE_MDFILE_AS_MAINPAGE "${CMAKE_SOURCE_DIR}/README.md")
-doxygen_add_docs(docs ALL ${CMAKE_SOURCE_DIR})
-endif(DOXYGEN_FOUND)
+if(BUILD_DOC)
+    find_package(Doxygen OPTIONAL_COMPONENTS dot)
+    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doxygen)
+    configure_file(${CMAKE_SOURCE_DIR}/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
+    add_custom_target( doc ALL COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doxygen COMMENT "Generating API documentation with Doxygen" VERBATIM )
+endif()
 
 get_filename_component(PARENT_DIR .. REALPATH DIRECTORY)
 
