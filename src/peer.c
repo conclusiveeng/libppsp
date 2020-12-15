@@ -166,12 +166,12 @@ pg_send_integrity(struct pg_peer_swarm *ps, uint32_t block)
 
 	for (i = uncle_size - 1; i >= 0; i--) {
 		uncle = uncles[i];
-		if (uncle->state == SENT)
+		if (pg_bitmap_get(ps->sent_bitmap, uncle->number))
 			continue;
 
 		pg_tree_node_interval(uncle, &n_min, &n_max);
 		pack_integrity(ps->buffer, n_min->number / 2, n_max->number / 2, uncle->sha);
-		uncle->state = SENT;
+		pg_bitmap_set(ps->sent_bitmap, uncle->number);
 		to_send++;
 	}
 
@@ -194,7 +194,7 @@ pg_send_data(struct pg_peer_swarm *ps, uint64_t chunk)
 	len = pg_file_read_chunks(ps->swarm->file, chunk, 1, ptr);
 	ps->buffer->used = ps->buffer->used - ps->options.chunk_size + len;
 	data_node = pg_tree_get_chunk_node(ps->swarm->file->tree, chunk);
-	data_node->state = SENT;
+	pg_bitmap_set(ps->sent_bitmap, data_node->number);
 	pg_buffer_enqueue(ps->buffer);
 	return (0);
 }
