@@ -500,6 +500,7 @@ pg_handle_have(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 		pg_bitmap_resize(ps->swarm->have_bitmap, end + 1);
 		pg_bitmap_resize(ps->have_bitmap, end + 1);
 		pg_bitmap_resize(ps->request_bitmap, end + 1);
+		pg_bitmap_resize(ps->sent_bitmap, end + 1);
 		if (ps->swarm->file->tree == NULL) {
 			uint64_t height = pg_tree_calc_height(end);
 
