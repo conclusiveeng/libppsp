@@ -1,5 +1,6 @@
 #include <sys/param.h>
 #include <sys/types.h>
+#include <time.h>
 #include <endian.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -19,9 +20,6 @@ struct pg_frame_handler
 	enum peregrine_message_type type;
 	ssize_t (*handler)(struct pg_peer *, uint32_t, struct msg *);
 };
-
-static int pg_send_integrity(struct pg_peer_swarm *ps, uint32_t block);
-static int pg_send_data(struct pg_peer_swarm *ps, uint64_t chunk);
 
 static ssize_t pg_handle_handshake(struct pg_peer *peer, uint32_t chid, struct msg *msg);
 static ssize_t pg_handle_data(struct pg_peer *peer, uint32_t chid, struct msg *msg);
@@ -108,6 +106,7 @@ pg_find_swarm_by_id(struct pg_context *ctx, const uint8_t *swarm_id, size_t id_l
 	s->context = ctx;
 	s->have_bitmap = pg_bitmap_create(file->nc);
 	s->nc = file->nc;
+	s->fetched_chunks = file->nc;
 	pg_bitmap_fill(s->have_bitmap, true);
 	memcpy(s->swarm_id, swarm_id, id_len);
 	LIST_INSERT_HEAD(&ctx->swarms, s, entry);
@@ -141,15 +140,24 @@ pg_send_have(struct pg_peer_swarm *ps)
 }
 
 static int
-pg_ack_range(struct pg_peer_swarm *ps, uint64_t start, uint64_t end)
+pg_ack(struct pg_peer_swarm *ps, uint64_t start, uint64_t end, uint64_t remote_ts)
 {
+	struct timespec ts = { 0, 0 };
+	uint64_t local_ts;
+	uint64_t diff_ts;
 
-	pack_ack(ps->buffer, start, end, 0);
+	if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
+		ERROR("clock_gettime error: %s", strerror(errno));
+
+	local_ts = ts.tv_sec + ts.tv_nsec * 1000;
+	diff_ts = local_ts - remote_ts;
+
+	pack_ack(ps->buffer, start, end, diff_ts);
 	pg_buffer_enqueue(ps->buffer);
 	return (MSG_LENGTH(msg_ack));
 }
 
-static int
+int
 pg_send_integrity(struct pg_peer_swarm *ps, uint32_t block)
 {
 	struct node *node;
@@ -181,21 +189,26 @@ pg_send_integrity(struct pg_peer_swarm *ps, uint32_t block)
 	return (0);
 }
 
-static int
+int
 pg_send_data(struct pg_peer_swarm *ps, uint64_t chunk)
 {
+	struct timespec ts = { 0, 0 };
 	void *ptr;
 	size_t len;
 	struct node *data_node;
 
-	pack_data(ps->buffer, chunk, chunk, 0);
-	ptr = pg_buffer_advance(ps->buffer, ps->options.chunk_size);
+	if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
+		ERROR("clock_gettime error: %s", strerror(errno));
 
+	pack_data(ps->buffer, chunk, chunk, ts.tv_sec + ts.tv_nsec * 1000);
+	ptr = pg_buffer_advance(ps->buffer, ps->options.chunk_size);
 	len = pg_file_read_chunks(ps->swarm->file, chunk, 1, ptr);
 	ps->buffer->used = ps->buffer->used - ps->options.chunk_size + len;
 	data_node = pg_tree_get_chunk_node(ps->swarm->file->tree, chunk);
 	pg_bitmap_set(ps->sent_bitmap, data_node->number);
 	pg_buffer_enqueue(ps->buffer);
+
+	ps->swarm->sent_chunks++;
 	return (0);
 }
 
@@ -235,6 +248,14 @@ pg_send_handshake(struct pg_peer_swarm *ps)
 
 	pack_handshake_opt_end(buf);
 	return (0);
+}
+
+static int
+pg_send_closing_handshake(struct pg_peer_swarm *ps)
+{
+	pack_handshake(ps->buffer, 0);
+	pack_handshake_opt_end(ps->buffer);
+	pg_buffer_enqueue(ps->buffer);
 }
 
 static ssize_t
@@ -394,6 +415,7 @@ static ssize_t
 pg_handle_data(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 {
 	struct pg_peer_swarm *ps;
+	uint64_t ts = be64toh(msg->data.timestamp);
 	uint32_t start_chunk = be32toh(msg->data.start_chunk);
 	uint32_t end_chunk = be32toh(msg->data.end_chunk);
 	uint32_t len = end_chunk - start_chunk + 1;
@@ -407,10 +429,16 @@ pg_handle_data(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	DEBUG("data: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
 	DEBUG("data: received %d chunks @ %d", len, start_chunk);
 
+//	if (!ps->swarm->nc_computed) {
+
+	//}
+
 	pg_file_write_chunks(ps->swarm->file, start_chunk, len, msg->data.data);
 	pg_bitmap_set_range(ps->swarm->have_bitmap, start_chunk, end_chunk, true);
-	pg_ack_range(ps, start_chunk, end_chunk);
+	pg_ack(ps, start_chunk, end_chunk, ts);
 	pg_peerswarm_request(ps);
+
+	ps->swarm->fetched_chunks += len;
 
 	return (MSG_LENGTH(msg_data) + len);
 }
@@ -425,6 +453,8 @@ pg_handle_ack(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 		WARN("ack: cannot find channel id 0x%08x for peer %p", chid, peer);
 		return (-1);
 	}
+
+	peer->context->can_send = true;
 
 	DEBUG("ack: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
 	return (MSG_LENGTH(msg_ack));
@@ -480,8 +510,9 @@ pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 {
 	struct pg_peer_swarm *ps;
 	struct node *node;
-	uint32_t start = msg->integrity.start_chunk;
-	uint32_t end = msg->integrity.end_chunk;
+	uint32_t start = be32toh(msg->integrity.start_chunk);
+	uint32_t end = be32toh(msg->integrity.end_chunk);
+	uint32_t chunk;
 
 	ps = pg_find_peerswarm_by_channel(peer, chid);
 	if (ps == NULL) {
@@ -492,16 +523,14 @@ pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	DEBUG("integrity: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
 
 	if (ps->swarm->file->tree == NULL) {
-		uint64_t height = pg_tree_calc_height(
-		    be32toh(msg->integrity.end_chunk));
+		uint64_t order = pg_tree_calc_height(end);
 
 		DEBUG("integrity: creating merkle tree with height %d", height);
 
 		ps->swarm->file->tree = pg_tree_create(height);
 		ps->swarm->file->tree_root = pg_tree_get_root(ps->swarm->file->tree);
 	} else if (end > pg_tree_get_chunk_count(ps->swarm->file->tree)) {
-		uint64_t height = pg_tree_calc_height(
-		    be32toh(msg->integrity.end_chunk));
+		uint64_t height = pg_tree_calc_height(end);
 
 		DEBUG("integrity: resizing merkle tree to height %d", height);
 		ps->swarm->file->tree = pg_tree_grow(ps->swarm->file->tree, height);
@@ -511,7 +540,7 @@ pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	node = pg_tree_interval_to_node(ps->swarm->file->tree, start, end);
 	memcpy(node->sha, msg->integrity.hash, sizeof(node->sha));
 	DEBUG("integrity: updated sha1 for node %d to %s", node->number,
-	      pg_hexdump(node->sha, sizeof(node->sha)));
+	    pg_hexdump(node->sha, sizeof(node->sha)));
 
 	return (MSG_LENGTH(msg_integrity));
 }
@@ -587,11 +616,6 @@ pg_handle_request(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 
 	DEBUG("request: peer=%p, swarm=%s, start=%u, end=%u", peer, pg_swarm_to_str(ps->swarm),
 	    start_chunk, end_chunk);
-
-	for (i = start_chunk; i <= end_chunk; i++) {
-		pg_send_integrity(ps, i);
-		pg_send_data(ps, i);
-	}
 
 	pg_bitmap_set_range(ps->request_bitmap, start_chunk, end_chunk, true);
 	return (MSG_LENGTH(msg_request));

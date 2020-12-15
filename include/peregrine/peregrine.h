@@ -62,21 +62,21 @@ enum pg_content_protection_method
 
 enum pg_merkle_hash_func
 {
-	MERKLE_HASH_SHA1 = 0,
-	MERKLE_HASH_SHA224 = 1,
-	MERKLE_HASH_SHA256 = 2,
-	MERKLE_HASH_SHA384 = 3,
-	MERKLE_HASH_SHA512 = 4,
+	MERKLE_HASH_SHA1 = 0,		/**< SHA1 hashes */
+	MERKLE_HASH_SHA224 = 1,		/**< SHA224 hashes */
+	MERKLE_HASH_SHA256 = 2,		/**< SHA256 hashes */
+	MERKLE_HASH_SHA384 = 3,		/**< SHA384 hashes */
+	MERKLE_HASH_SHA512 = 4,		/**< SHA512 hashes */
 	MERKLE_HASH_INVALID = 255
 };
 
 enum pg_chunk_addressing_method
 {
-	LIVE_SIGNATURE_32BIT_BIN = 0,
-	LIVE_SIGNATURE_64BIT_BYTE = 1,
-	LIVE_SIGNATURE_32BIT_CHUNK = 2,
-	LIVE_SIGNATURE_64BIT_BIN = 3,
-	LIVE_SIGNATURE_64BIT_CHUNK = 4,
+	LIVE_SIGNATURE_32BIT_BIN = 0,	/**< 32-bit bin addressing */
+	LIVE_SIGNATURE_64BIT_BYTE = 1,	/**< 64-bit byte range addressing */
+	LIVE_SIGNATURE_32BIT_CHUNK = 2,	/**< 32-bit chunk range addressing */
+	LIVE_SIGNATURE_64BIT_BIN = 3,	/**< 64-bit bin addressing */
+	LIVE_SIGNATURE_64BIT_CHUNK = 4,	/**< 64-bit chunk range addressing */
 };
 
 enum pg_event_type
@@ -88,6 +88,12 @@ enum pg_event_type
 	EVENT_PEER_LEFT_SWARM,
 };
 
+/**
+ * Event structure.
+ *
+ * This structure is used by the library to communicate various events
+ * back to the user.
+ */
 struct pg_event
 {
 	struct pg_context *ctx;
@@ -96,6 +102,9 @@ struct pg_event
 	enum pg_event_type type;
 };
 
+/**
+ * Configurable options for peregrine context.
+ */
 struct pg_context_options
 {
 	struct sockaddr *listen_addr;
@@ -108,16 +117,98 @@ struct pg_context_options
 	enum pg_chunk_addressing_method chunk_addressing_method;
 };
 
+/**
+ * Create a new peregrine context.
+ *
+ * @param options Context options
+ * @param ctxp Pointer where returned context handle will be stored
+ * @return 0 on success, -1 on error
+ */
 int pg_context_create(struct pg_context_options *options, struct pg_context **ctxp);
+
+/**
+ * Return file descriptor associated with the context event loop.
+ *
+ * This file descriptor can be used by an external event loop to
+ * determine when @ref pg_context_step needs to be called.
+ *
+ * @param ctx Context handle
+ * @return File descriptor number
+ */
 int pg_context_get_fd(struct pg_context *ctx);
+
+/**
+ * Perform one interation of the internal event loop.
+ *
+ * @param ctx
+ * @return
+ */
 int pg_context_step(struct pg_context *ctx);
+
+/**
+ * Run the internal event loop.
+ *
+ * @param ctx Context handle
+ * @return 0 when shut down gracefully, otherwise -1
+ */
 int pg_context_run(struct pg_context *ctx);
+
+/**
+ * Add new peer.
+ *
+ * @param ctx Context handle
+ * @param sa Peer address
+ * @param peerp Pointer where returned peer handle will be stored
+ * @return 0 on success, -1 on error
+ */
 int pg_add_peer(struct pg_context *ctx, struct sockaddr *sa, struct pg_peer **peerp);
 
+/**
+ * Iterate over known swarms.
+ *
+ * @param ctx Context handle
+ * @param fn
+ * @param arg
+ * @return
+ */
 bool pg_swarm_iterate(struct pg_context *ctx, pg_swarm_iter_fn_t fn, void *arg);
+
+/**
+ * Return swarm ID from the swarm handle.
+ *
+ * This function allocates storage for the hash and returns pointer to it.
+ * Such pointer can be freed with @ref free function.
+ *
+ * @param swarm Swarm handle
+ * @param hash Pointer where hash
+ * @return
+ */
 size_t pg_swarm_get_id(struct pg_swarm *swarm, uint8_t **hash);
+
+/**
+ * Return total number of bytes in a swarm content.
+ *
+ * When this information is not available (eg. not computed yet), returns 0.
+ *
+ * @param swarm Swarm handle
+ * @return
+ */
 uint64_t pg_swarm_get_content_size(struct pg_swarm *swarm);
+
+/**
+ * Return total number of chunks in a swarm content.
+ *
+ * @param swarm Swarm handle
+ * @return
+ */
 uint64_t pg_swarm_get_total_chunks(struct pg_swarm *swarm);
+
+/**
+ * Return number of chunks received in a swarm.
+ *
+ * @param swarm Swarm handle
+ * @return
+ */
 uint64_t pg_swarm_get_received_chunks(struct pg_swarm *swarm);
 uint64_t pg_swarm_get_sent_chunks(struct pg_swarm *swarm);
 const char *pg_swarm_to_str(struct pg_swarm *swarm);

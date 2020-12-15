@@ -98,6 +98,32 @@ pg_peerswarm_request(struct pg_peer_swarm *ps)
 
 }
 
+static bool
+pg_peerswarm_timer_scan_fn(uint64_t start, uint64_t end, bool value __unused, void *arg)
+{
+	struct pg_peer_swarm *ps = arg;
+	uint64_t i;
+
+	end = MIN(end, start + 32);
+
+	for (i = start; i <= end; i++) {
+		pg_send_integrity(ps, i);
+		pg_send_data(ps, i);
+		pg_bitmap_set_range(ps->request_bitmap, start, end, false);
+	}
+
+	return (true);
+}
+
+static bool
+pg_peerswarm_timer(void *arg)
+{
+	struct pg_peer_swarm *ps = arg;
+
+	pg_bitmap_scan(ps->request_bitmap, BITMAP_SCAN_1, pg_peerswarm_timer_scan_fn, ps);
+	return (true);
+}
+
 struct pg_peer_swarm *
 pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
     struct pg_protocol_options *options, uint32_t src_channel_id,
@@ -131,6 +157,8 @@ pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
 	event.swarm = swarm;
 	event.type = EVENT_PEER_JOINED_SWARM;
 	pg_emit_event(&event);
+
+	pg_eventloop_add_timer(ps->peer->context->eventloop, 10, pg_peerswarm_timer, ps);
 
 	return (ps);
 }

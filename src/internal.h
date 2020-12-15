@@ -127,6 +127,7 @@ struct pg_swarm
 	struct pg_context *context;
 	struct pg_file *file;
 	struct pg_bitmap *have_bitmap;
+	uint64_t base_delay;
 	uint64_t nc;
 	uint64_t fetched_chunks;
 	uint64_t sent_chunks;
@@ -175,6 +176,7 @@ struct pg_context
 	struct pg_context_options options;
 	struct pg_eventloop *eventloop;
 	bool tx_active;
+	bool can_send;
 
 	LIST_HEAD(, pg_peer) peers;
 	LIST_HEAD(, pg_swarm) swarms;
@@ -182,6 +184,7 @@ struct pg_context
 	LIST_HEAD(, pg_download) downloads;
 	TAILQ_HEAD(, pg_block) io;
 	TAILQ_HEAD(, pg_buffer) tx_queue;
+	TAILQ_HEAD(, pg_buffer) tx_data_queue;
 };
 
 enum chunk_state
@@ -238,6 +241,8 @@ void pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
 ssize_t pg_handle_message(struct pg_peer *peer, uint32_t chid, struct msg *msg);
 int pg_send_have(struct pg_peer_swarm *ps);
 int pg_send_handshake(struct pg_peer_swarm *ps);
+int pg_send_integrity(struct pg_peer_swarm *ps, uint32_t block);
+int pg_send_data(struct pg_peer_swarm *ps, uint64_t chunk);
 
 struct pg_peer_swarm *pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
     struct pg_protocol_options *options, uint32_t src_channel_id, uint32_t dst_channel_id);
@@ -289,6 +294,7 @@ void *pg_buffer_advance(struct pg_buffer *buffer, size_t len);
 void *pg_buffer_ptr(struct pg_buffer *buffer);
 size_t pg_buffer_size_left(struct pg_buffer *buffer);
 size_t pg_buffer_enqueue(struct pg_buffer *buffer);
+size_t pg_buffer_enqueue_data(struct pg_buffer *buffer);
 void pg_buffer_reset(struct pg_buffer *buffer);
 
 int pg_file_read_chunks(struct pg_file *file, uint64_t chunk, uint64_t count, void *buf);

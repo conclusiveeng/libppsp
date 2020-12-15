@@ -170,14 +170,18 @@ print_peer(struct pg_peer *peer, void *arg)
 static bool
 print_swarm(struct pg_swarm *swarm, void *arg)
 {
+	uint64_t sent = pg_swarm_get_sent_chunks(swarm);
 	uint64_t received = pg_swarm_get_received_chunks(swarm);
 	uint64_t total = pg_swarm_get_total_chunks(swarm);
-	double percentage = (double)received / (double)total * 100;
+	double down_percent = (double)received / (double)total * 100;
+	double up_percent = (double)sent / (double)total * 100;
 
 	(void)arg;
 
-	printf("  [%s] %" PRIu64 " of %" PRIu64 " (%3.2f%%)", pg_swarm_to_str(swarm),
-	    received, total, percentage);
+	printf("  [%s]\n", pg_swarm_to_str(swarm));
+	printf("    Seeded: %" PRIu64 " (%3.2f%%)\n", sent, up_percent);
+	printf("    Downloaded: %" PRIu64 " of %" PRIu64 " (%3.2f%%)\n",
+	    received, total, down_percent);
 
 	return (true);
 }

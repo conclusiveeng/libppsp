@@ -147,9 +147,16 @@ pg_socket_enqueue_tx(struct pg_context *ctx, struct pg_buffer *buffer)
 
 	if (!ctx->tx_active) {
 		ctx->tx_active = true;
+		ctx->can_send = true;
 		pg_eventloop_add_fd(ctx->eventloop, ctx->sock_fd_write, pg_handle_fd_write,
 		    EVENTLOOP_FD_WRITEABLE, ctx);
 	}
+}
+
+void
+pg_socket_enqueue_tx_data(struct pg_context *ctx, struct pg_buffer *buffer)
+{
+	TAILQ_INSERT_TAIL(&ctx->tx_data_queue, buffer, entry);
 }
 
 void
@@ -254,6 +261,7 @@ pg_handle_fd_write(void *arg)
 {
 	struct pg_context *ctx = arg;
 	struct pg_buffer *buffer;
+	int i = 0;
 
 	DEBUG("ctx=%p fd=%d", ctx, ctx->sock_fd);
 

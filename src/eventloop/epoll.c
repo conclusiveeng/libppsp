@@ -151,10 +151,10 @@ pg_eventloop_add_timer(struct pg_eventloop *loop, int timeout_ms,
 	if (fd < 0)
 		return (NULL);
 
-	ts.it_interval.tv_sec = 0;
-	ts.it_interval.tv_nsec = 0;
-	ts.it_value.tv_sec = timeout_ms / 1000;
-	ts.it_value.tv_nsec = (timeout_ms % 1000) * 1000000;
+	ts.it_interval.tv_sec = timeout_ms / 1000;
+	ts.it_interval.tv_nsec = (timeout_ms % 1000) * 1000000;
+	ts.it_value.tv_sec = ts.it_interval.tv_sec;
+	ts.it_value.tv_nsec = ts.it_interval.tv_nsec;
 
 	ev = xcalloc(1, sizeof(*ev));
 	ev->type = EVENT_TIMER;
@@ -324,6 +324,7 @@ pg_eventloop_handle_event(struct pg_eventloop_event *ev)
 	struct itimerspec ts;
 	siginfo_t siginfo;
 	eventfd_t val;
+	uint64_t timeval;
 
 	DEBUG("processing event %p", ev);
 
@@ -336,8 +337,12 @@ pg_eventloop_handle_event(struct pg_eventloop_event *ev)
 
 	case EVENT_TIMER:
 		DEBUG("EVENT_TIMER: fd=%d", ev->fd);
+
+		if (read(ev->fd, &timeval, sizeof(uint64_t)) != sizeof(uint64_t))
+			WARN("read: error: %s", strerror(errno));
+
 		if (timerfd_gettime(ev->fd, &ts) != 0) {
-			WARN("timerfd_gettime: error=%s", strerror(errno));
+			WARN("timerfd_gettime: error: %s", strerror(errno));
 			break;
 		}
 
