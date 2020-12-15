@@ -172,11 +172,8 @@ pg_file_add_file(struct pg_context *context, const uint8_t *sha1, const char *pa
 	file->nc = 1; /* We assume the file has at least one chunk */
 	SLIST_INSERT_HEAD(&context->files, file, entry);
 
-	if (sha1 != NULL) {
-		/* SHA1 is provided, so this is a file to be downloaded. Create a swarm for it */
+	if (sha1 != NULL)
 		memcpy(file->sha, sha1, sizeof(file->sha));
-		pg_swarm_create(context, file);
-	}
 
 	return (file);
 }
