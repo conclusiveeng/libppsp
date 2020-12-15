@@ -186,12 +186,15 @@ pg_send_data(struct pg_peer_swarm *ps, uint64_t chunk)
 {
 	void *ptr;
 	size_t len;
+	struct node *data_node;
 
 	pack_data(ps->buffer, chunk, chunk, 0);
 	ptr = pg_buffer_advance(ps->buffer, ps->options.chunk_size);
 
 	len = pg_file_read_chunks(ps->swarm->file, chunk, 1, ptr);
 	ps->buffer->used = ps->buffer->used - ps->options.chunk_size + len;
+	data_node = pg_tree_get_chunk_node(ps->swarm->file->tree, chunk);
+	data_node->state = SENT;
 	pg_buffer_enqueue(ps->buffer);
 	return (0);
 }
