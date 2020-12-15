@@ -137,13 +137,21 @@ pg_tree_get_chunk_count(struct node *tree)
 	size_t leaves_count = pg_tree_get_leaves_count(root);
 	size_t idx = leaves_count - 1;
 	struct node *node = &first_node[2 * idx];
+	uint8_t zero[20];
 
-	while (node->chunk && node->chunk->state == CH_EMPTY) {
-		if (idx == 0)
-			return (0);
+	while (idx > 0) {
+		if (node->chunk && node->chunk->state == CH_EMPTY) {
+			idx--;
+			node = &first_node[2 * idx];
+			continue;
+		}
 
-		idx--;
-		node = &first_node[2 * idx];
+		if (memcmp(node->sha, zero, 20) == 0) {
+			idx--;
+			node = &first_node[2 * idx];
+			continue;
+		} else
+			break;
 	}
 
 	return (idx + 1);
@@ -413,6 +421,20 @@ pg_tree_node_interval(struct node *node, struct node **min, struct node **max)
 
 	DEBUG("root: %d, interval min: %d, max: %d", node->number,
 	    (*min)->number, (*max)->number);
+}
+
+struct node *
+pg_tree_interval_to_node(struct node *tree, size_t min, size_t max)
+{
+	struct node *min_node = pg_tree_get_chunk_node(tree, min);
+	struct node *max_node = pg_tree_get_chunk_node(tree, max);
+
+	while (min_node != max_node) {
+		min_node = min_node->parent;
+		max_node = max_node->parent;
+	}
+
+	return (min_node);
 }
 
 void

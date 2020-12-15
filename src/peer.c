@@ -452,6 +452,22 @@ pg_handle_have(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 		pg_bitmap_resize(ps->swarm->have_bitmap, end + 1);
 		pg_bitmap_resize(ps->have_bitmap, end + 1);
 		pg_bitmap_resize(ps->request_bitmap, end + 1);
+		if (ps->swarm->file->tree == NULL) {
+			uint64_t height = pg_tree_calc_height(
+			    be32toh(msg->integrity.end_chunk));
+
+			DEBUG("integrity: creating merkle tree with height %d", height);
+
+			ps->swarm->file->tree = pg_tree_create(height);
+			ps->swarm->file->tree_root = pg_tree_get_root(ps->swarm->file->tree);
+		} else if (end > pg_tree_get_chunk_count(ps->swarm->file->tree)) {
+			uint64_t height = pg_tree_calc_height(
+			    be32toh(msg->integrity.end_chunk));
+
+			DEBUG("integrity: resizing merkle tree to height %d", height);
+			ps->swarm->file->tree = pg_tree_grow(ps->swarm->file->tree, height);
+			ps->swarm->file->tree_root = pg_tree_get_root(ps->swarm->file->tree);
+		}
 	}
 
 	pg_bitmap_set_range(ps->have_bitmap, start, end, true);
@@ -466,7 +482,6 @@ pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	struct node *node;
 	uint32_t start = msg->integrity.start_chunk;
 	uint32_t end = msg->integrity.end_chunk;
-	uint32_t chunk;
 
 	ps = pg_find_peerswarm_by_channel(peer, chid);
 	if (ps == NULL) {
@@ -477,22 +492,26 @@ pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	DEBUG("integrity: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
 
 	if (ps->swarm->file->tree == NULL) {
-		uint64_t order = pg_tree_calc_height(
-		    be32toh(msg->integrity.end_chunk) -
-		    be32toh(msg->integrity.start_chunk)) + 1;
+		uint64_t height = pg_tree_calc_height(
+		    be32toh(msg->integrity.end_chunk));
 
-		DEBUG("integrity: creating merkle tree with order %d", order);
+		DEBUG("integrity: creating merkle tree with height %d", height);
 
-		ps->swarm->file->tree = pg_tree_create(order);
+		ps->swarm->file->tree = pg_tree_create(height);
+		ps->swarm->file->tree_root = pg_tree_get_root(ps->swarm->file->tree);
+	} else if (end > pg_tree_get_chunk_count(ps->swarm->file->tree)) {
+		uint64_t height = pg_tree_calc_height(
+		    be32toh(msg->integrity.end_chunk));
+
+		DEBUG("integrity: resizing merkle tree to height %d", height);
+		ps->swarm->file->tree = pg_tree_grow(ps->swarm->file->tree, height);
 		ps->swarm->file->tree_root = pg_tree_get_root(ps->swarm->file->tree);
 	}
 
-	for (chunk = start; chunk <= end; chunk++) {
-		node = pg_tree_get_chunk_node(ps->swarm->file->tree, chunk);
-		memcpy(node->sha, msg->integrity.hash, sizeof(node->sha));
-		DEBUG("integrity: updated sha1 for chunk %s to %s", chunk,
-		    pg_hexdump(node->sha, sizeof(node->sha)));
-	}
+	node = pg_tree_interval_to_node(ps->swarm->file->tree, start, end);
+	memcpy(node->sha, msg->integrity.hash, sizeof(node->sha));
+	DEBUG("integrity: updated sha1 for node %d to %s", node->number,
+	      pg_hexdump(node->sha, sizeof(node->sha)));
 
 	return (MSG_LENGTH(msg_integrity));
 }

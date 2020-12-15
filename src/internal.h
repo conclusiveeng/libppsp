@@ -265,6 +265,7 @@ size_t pg_tree_gen_uncle_peak_nodes(struct node *node, struct node ***retp);
 bool pg_tree_is_within_node(struct node *node, struct node **set, size_t set_size);
 struct node *pg_tree_grow(struct node *old_tree, size_t n_chunks);
 void pg_tree_node_interval(struct node *node, struct node **min, struct node **max);
+struct node *pg_tree_interval_to_node(struct node * tree, size_t min, size_t max);
 struct node *pg_tree_find_sibling_node(struct node *node);
 void pg_tree_show(struct node *tree);
 void pg_tree_update_sha(struct node *tree);
