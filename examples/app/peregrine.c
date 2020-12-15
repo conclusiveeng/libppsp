@@ -132,7 +132,7 @@ add_peer(const char *peerspec)
 }
 
 static void
-print_event(struct pg_event *ev, void *arg)
+print_event(struct pg_event *ev, void *arg __attribute__((unused)))
 {
 	switch (ev->type) {
 	case EVENT_PEER_ADDED:
@@ -163,7 +163,8 @@ print_peer(struct pg_peer *peer, void *arg)
 {
 	(void)arg;
 
-	printf("  %s\n", pg_peer_to_str(peer));
+	printf("  %s (%" PRIu64 " down, %" PRIu64 " up)\n", pg_peer_to_str(peer),
+	    pg_peer_get_received_chunks(peer), pg_peer_get_sent_chunks(peer));
 	return (true);
 }
 

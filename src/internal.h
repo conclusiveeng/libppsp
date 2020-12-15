@@ -118,6 +118,8 @@ struct pg_peer
 {
 	struct pg_context *context;
 	struct sockaddr_storage addr;
+	uint64_t fetched_chunks;
+	uint64_t sent_chunks;
 	LIST_HEAD(, pg_peer_swarm) swarms;
 	LIST_ENTRY(pg_peer) entry;
 };

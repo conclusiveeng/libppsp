@@ -142,7 +142,7 @@ pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
 	ps->dst_channel_id = dst_channel_id;
 	ps->have_bitmap = pg_bitmap_create(swarm->file->nc);
 	ps->request_bitmap = pg_bitmap_create(swarm->file->nc);
-	ps->sent_bitmap = pg_bitmap_create(swarm->file->nc);
+	ps->sent_bitmap = pg_bitmap_create(swarm->file->nl * 2);
 	ps->options = *options;
 	ps->buffer = pg_buffer_create(peer, ps->dst_channel_id);
 	LIST_INSERT_HEAD(&peer->swarms, ps, peer_entry);

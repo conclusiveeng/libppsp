@@ -215,6 +215,8 @@ const char *pg_swarm_to_str(struct pg_swarm *swarm);
 
 bool pg_peer_iterate(struct pg_context *ctx, pg_peer_iter_fn_t fn, void *arg);
 struct sockaddr *pg_peer_get_address(struct pg_peer *peer);
+uint64_t pg_peer_get_received_chunks(struct pg_peer *peer);
+uint64_t pg_peer_get_sent_chunks(struct pg_peer *peer);
 const char *pg_peer_to_str(struct pg_peer *peer);
 
 void pg_file_generate_sha1(struct pg_context *context);

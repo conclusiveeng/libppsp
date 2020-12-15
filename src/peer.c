@@ -63,6 +63,19 @@ pg_peer_iterate(struct pg_context *ctx, pg_peer_iter_fn_t fn, void *arg)
 	return (true);
 }
 
+uint64_t
+pg_peer_get_received_chunks(struct pg_peer *peer)
+{
+	return (peer->fetched_chunks);
+
+}
+
+uint64_t
+pg_peer_get_sent_chunks(struct pg_peer *peer)
+{
+	return (peer->sent_chunks);
+}
+
 ssize_t
 pg_peer_send(struct pg_peer *peer, const void *buf, size_t len)
 {
@@ -208,7 +221,6 @@ pg_send_data(struct pg_peer_swarm *ps, uint64_t chunk)
 	pg_bitmap_set(ps->sent_bitmap, data_node->number);
 	pg_buffer_enqueue(ps->buffer);
 
-	ps->swarm->sent_chunks++;
 	return (0);
 }
 
@@ -439,6 +451,7 @@ pg_handle_data(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	pg_peerswarm_request(ps);
 
 	ps->swarm->fetched_chunks += len;
+	ps->peer->fetched_chunks += len;
 
 	return (MSG_LENGTH(msg_data) + len);
 }
@@ -447,6 +460,9 @@ static ssize_t
 pg_handle_ack(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 {
 	struct pg_peer_swarm *ps;
+	uint32_t start = be32toh(msg->ack.start_chunk);
+	uint32_t end = be32toh(msg->ack.end_chunk);
+	uint32_t len = end - start + 1;
 
 	ps = pg_find_peerswarm_by_channel(peer, chid);
 	if (ps == NULL) {
@@ -455,6 +471,8 @@ pg_handle_ack(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	}
 
 	peer->context->can_send = true;
+	ps->swarm->sent_chunks += len;
+	ps->peer->sent_chunks += len;
 
 	DEBUG("ack: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
 	return (MSG_LENGTH(msg_ack));
