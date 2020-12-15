@@ -98,8 +98,14 @@ static struct pg_context *context;
 static void
 usage(const char *argv0)
 {
-	fprintf(stderr, "Usage: %s -l port [options]\n", argv0);
+	fprintf(stderr, "Usage: %s -lhpfds \n", argv0);
 	fprintf(stderr, "Options:\n");
+	fprintf(stderr, "-h	show this help message \n");
+	fprintf(stderr, "-l	local port 	(eg. -l <port>) \n");
+	fprintf(stderr, "-p	peer address	(eg. -p <host>:<port>) \n");
+	fprintf(stderr, "-f	file, sha1 	(eg. -f <filename> or -f <filename>:<sha1> ) \n");
+	fprintf(stderr, "-d	directory 	(eg. -d <path/to/directory> ) \n");
+	fprintf(stderr, "-s	enable showing summary (if disabled only callbacks will be used ) \n");
 }
 
 static int
@@ -242,6 +248,11 @@ main(int argc, char *const argv[])
 	TAILQ_INIT(&files);
 	TAILQ_INIT(&directories);
 	TAILQ_INIT(&peers);
+
+	if (argc == 1) {
+		usage(argv[0]);
+		exit(EX_USAGE);
+	}
 
 	while ((ch = getopt(argc, argv, "hl:p:f:d:hs")) != -1) {
 		switch (ch) {
