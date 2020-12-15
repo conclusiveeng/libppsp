@@ -167,8 +167,12 @@ pg_tree_gen_peak_nodes(struct node *tree, struct node ***retp)
 			continue;
 		}
 
-		node = node->parent;
-		result[result_idx] = node->left;
+		if (node->parent) {
+			node = node->parent;
+			result[result_idx] = node->left;
+		} else
+			peak_size--;
+
 		result_idx++;
 	}
 
