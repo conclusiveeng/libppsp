@@ -512,7 +512,6 @@ pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	struct node *node;
 	uint32_t start = be32toh(msg->integrity.start_chunk);
 	uint32_t end = be32toh(msg->integrity.end_chunk);
-	uint32_t chunk;
 
 	ps = pg_find_peerswarm_by_channel(peer, chid);
 	if (ps == NULL) {
@@ -523,7 +522,7 @@ pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	DEBUG("integrity: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
 
 	if (ps->swarm->file->tree == NULL) {
-		uint64_t order = pg_tree_calc_height(end);
+		uint64_t height = pg_tree_calc_height(end);
 
 		DEBUG("integrity: creating merkle tree with height %d", height);
 
