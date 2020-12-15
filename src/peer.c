@@ -453,7 +453,7 @@ pg_handle_data(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	ps->swarm->fetched_chunks += len;
 	ps->peer->fetched_chunks += len;
 
-	return (MSG_LENGTH(msg_data) + len);
+	return (MSG_LENGTH(msg_data) + 1500);
 }
 
 static ssize_t
@@ -620,7 +620,6 @@ static ssize_t
 pg_handle_request(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 {
 	struct pg_peer_swarm *ps;
-	uint32_t i;
 	uint32_t start_chunk = be32toh(msg->request.start_chunk);
 	uint32_t end_chunk = be32toh(msg->request.end_chunk);
 
