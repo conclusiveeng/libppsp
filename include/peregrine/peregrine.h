@@ -29,7 +29,7 @@
 /**
  * @file peregrine.h
  * @author Conclusive Engineerg
- * @brief Peregrine Public API header file
+ * @brief libperegrine public API
  * @version 0.4
  * @date 2020-12-15
  * 
@@ -73,19 +73,17 @@ typedef void (*pg_file_dir_add_func_t)(struct pg_file *file, const char *dname);
 
 /**
  * @brief PPSPP Content protection method protocol option.
- * Default value: CONTENT_PROTECTION_MERKLE_HASH
  */
 enum pg_content_protection_method
 {
-	CONTENT_PROTECTION_NONE = 0,
-	CONTENT_PROTECTION_MERKLE_HASH = 1,
-	CONTENT_PROTECTION_SIGN_ALL = 2,
-	CONTENT_PROTECTION_UNIFIED_MERKLE_HASH = 3,
+	CONTENT_PROTECTION_NONE = 0,			/**< No protection method */
+	CONTENT_PROTECTION_MERKLE_HASH = 1,		/**< Merkle hash tree */
+	CONTENT_PROTECTION_SIGN_ALL = 2,		/**< All data transferred are signed with private key and checked with public key  */
+	CONTENT_PROTECTION_UNIFIED_MERKLE_HASH = 3,	/**< Used in live streaming mode when tree has dynamic root hash */
 };
 
 /**
  * @brief PPSPP Merkle tree hash function protocol option
- * Default value: MERKLE_HASH_SHA1
  */
 enum pg_merkle_hash_func
 {
@@ -99,7 +97,6 @@ enum pg_merkle_hash_func
 
 /**
  * @brief PPSPP Chunk addressing method
- *
  */
 enum pg_chunk_addressing_method
 {
@@ -112,7 +109,7 @@ enum pg_chunk_addressing_method
 
 /**
  * @brief Peregrine event handler event type
- * 
+
  */
 enum pg_event_type
 {
@@ -155,7 +152,7 @@ struct pg_context_options
 };
 
 /**
- * @brief Create a new peregrine context.
+ * @brief Create a new peregrine context handle.
  *
  * @param options Peregrine context options
  * @param ctxp Pointer where returned context handle will be stored
@@ -177,7 +174,7 @@ int pg_context_get_fd(struct pg_context *ctx);
 /**
  * @brief Perform one interation of the internal event loop.
  *
- * @param ctx Peregrine context handle
+ * @param ctx Context handle
  * @return int 0 on success, -1 on error
  */
 int pg_context_step(struct pg_context *ctx);
@@ -185,7 +182,7 @@ int pg_context_step(struct pg_context *ctx);
 /**
  *  @brief Run the internal event loop.
  *
- * @param ctx Peregrine context handle
+ * @param ctx Context handle
  * @return 0 when shut down gracefully, otherwise -1
  */
 int pg_context_run(struct pg_context *ctx);
@@ -193,7 +190,7 @@ int pg_context_run(struct pg_context *ctx);
 /**
  * @brief Add new peer.
  *
- * @param ctx Peregrine context handle
+ * @param ctx Context handle
  * @param sa Peer address structure
  * @param peerp Pointer where returned peer handle will be stored
  * @return int 0 on success, -1 on error
@@ -203,7 +200,7 @@ int pg_add_peer(struct pg_context *ctx, struct sockaddr *sa, struct pg_peer **pe
 /**
  * @brief Iterate over known swarms.
  *
- * @param ctx Peregrine context handle
+ * @param ctx Context handle
  * @param fn Callback function called on each swarm
  * @param arg Callback additional arguments
  * @return bool true when all elements are iterated, false is callback function stopped iteration
@@ -259,7 +256,7 @@ uint64_t pg_swarm_get_sent_chunks(struct pg_swarm *swarm);
 /**
  * @brief Return Swarm ID in human readable form
  * 
- * @param swarm swarm handle
+ * @param swarm Swarm handle
  * @return const char* string containing hexadecimal representation of Swarm ID
  */
 const char *pg_swarm_to_str(struct pg_swarm *swarm);
@@ -267,7 +264,7 @@ const char *pg_swarm_to_str(struct pg_swarm *swarm);
 /**
  * @brief Iterate over known peers
  * 
- * @param ctx Peregrine context
+ * @param ctx Context handle
  * @param fn Callback function called on each peer
  * @param arg Additional arguments passed to callback function
  * @return true when function iterated overall elements
@@ -278,7 +275,7 @@ bool pg_peer_iterate(struct pg_context *ctx, pg_peer_iter_fn_t fn, void *arg);
 /**
  * @brief Return peer address structure for selected peer
  * 
- * @param peer peer handle
+ * @param peer Peer handle
  * @return struct sockaddr* structure with peer address
  */
 struct sockaddr *pg_peer_get_address(struct pg_peer *peer);
@@ -286,7 +283,7 @@ struct sockaddr *pg_peer_get_address(struct pg_peer *peer);
 /**
  * @brief Return total number of chunks received from peer
  * 
- * @param peer peer handle
+ * @param peer Peer handle
  * @return uint64_t total number of chunks received 
  */
 uint64_t pg_peer_get_received_chunks(struct pg_peer *peer);
@@ -294,7 +291,7 @@ uint64_t pg_peer_get_received_chunks(struct pg_peer *peer);
 /**
  * @brief Return total number of chunks send by peer
  * 
- * @param peer peer handle
+ * @param peer Peer handle
  * @return uint64_t total number of chunks sent
  */
 uint64_t pg_peer_get_sent_chunks(struct pg_peer *peer);
@@ -303,8 +300,8 @@ uint64_t pg_peer_get_sent_chunks(struct pg_peer *peer);
  * @brief Return human readable representation of peer address
  * Eg. Peer addres 127.0.0.1:47856
  *
- * @param peer 
- * @return const char* 
+ * @param peer Peer handle
+ * @return const char* string peer address
  */
 const char *pg_peer_to_str(struct pg_peer *peer);
 
@@ -312,16 +309,16 @@ const char *pg_peer_to_str(struct pg_peer *peer);
  * @brief Generate SHA1 sums for all files added to peregrine context
  * This is required operation after adding files to peregrine in seeder mode.
  * 
- * @param context peregrine context
+ * @param context Context handle
  */
 void pg_file_generate_sha1(struct pg_context *context);
 
 /**
  * @brief Add single file to peregrine context
  * 
- * @param context peregrine context
- * @param sha1 if sha1 is provided the file will be received by peregrine
- * @param path if path is provided then the file can be sent by peregrine
+ * @param context Context handle
+ * @param sha1 If sha1 is provided the file will be received by peregrine
+ * @param path If path is provided then the file can be sent by peregrine
  * @return struct pg_file* pointer to added file
  */
 struct pg_file *pg_file_add_file(struct pg_context *context, const uint8_t *sha1, const char *path);
@@ -329,9 +326,9 @@ struct pg_file *pg_file_add_file(struct pg_context *context, const uint8_t *sha1
 /**
  * @brief Add files from provided directory to peregrine context
  * 
- * @param context peregrine context
- * @param dname path to directory where the files are stored
- * @param fn - optional - callback function called for each file to store
+ * @param context Context handle
+ * @param dname Path to directory where the files are stored
+ * @param fn Callback function called for each file to store (optional)
  * @return int 0 on success, -1 on error
  */
 int pg_file_add_directory(struct pg_context *context, const char *dname, pg_file_dir_add_func_t fn);
@@ -340,14 +337,14 @@ int pg_file_add_directory(struct pg_context *context, const char *dname, pg_file
  * @brief Prints files stored in the context to debug output
  * Prints file path, sha1 and number of chunks
  * 
- * @param context peregrine context
+ * @param context Context handle
  */
 void pg_file_list_sha1(struct pg_context *context);
 
 /**
  * @brief Returns SHA1 of provided file
  * 
- * @param file peregrine file handle
+ * @param file File handle
  * @return const uint8_t* SHA1 of the file 
  */
 const uint8_t *pg_file_get_sha(struct pg_file *file);
@@ -355,7 +352,7 @@ const uint8_t *pg_file_get_sha(struct pg_file *file);
 /**
  * @brief Returns path to provided file
  * 
- * @param file peregrine file handle
+ * @param file File handle
  * @return const char* string path to the file
  */
 const char *pg_file_get_path(struct pg_file *file);

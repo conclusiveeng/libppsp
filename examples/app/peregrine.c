@@ -23,6 +23,17 @@
  * SUCH DAMAGE.
  */
 
+/**
+ * @file peregrine.c
+ * @author Conclusive Engineerg
+ * @brief Example application using libperegrine
+ * @version 0.4
+ * @date 2020-12-15
+ * 
+ * @copyright Copyright (c) 2020 Conclusive Engineering Sp. z o.o.
+ * 
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -42,25 +53,41 @@
 #include <arpa/inet.h>
 #include <peregrine/peregrine.h>
 
+/**
+ * @brief Maximum length of SHA1 in HEX string
+ * 
+ */
 #define SHA1STR_MAX	41
 
+/**
+ * @brief Example implementation of peregrine file
+ * 
+ */
 struct peregrine_file
 {
-	const char *path;
-	const uint8_t *sha1;
-	TAILQ_ENTRY(peregrine_file) entry;
+	const char *path;			/**< Path to the file */
+	const uint8_t *sha1;			/**< SHA1 of the file */
+	TAILQ_ENTRY(peregrine_file) entry;	/**< Tail queue */
 };
 
+/**
+ * @brief Example implementation of peregrine directory
+ * 
+ */
 struct peregrine_directory
 {
-	const char *path;
-	TAILQ_ENTRY(peregrine_directory) entry;
+	const char *path;			/**< Path to directory */
+	TAILQ_ENTRY(peregrine_directory) entry; /**< Tail queue */
 };
 
+/**
+ * @brief Example implementation of peregrine peer
+ * 
+ */
 struct peregrine_peer
 {
-	struct sockaddr_storage sa;
-	TAILQ_ENTRY(peregrine_peer) entry;
+	struct sockaddr_storage sa;		/**< Peer address */
+	TAILQ_ENTRY(peregrine_peer) entry;	/**< Tail queue */
 };
 
 static TAILQ_HEAD(, peregrine_file) files;
