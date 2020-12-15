@@ -136,6 +136,8 @@ pg_file_generate_sha1(struct pg_context *context)
 			memcpy(f->sha, f->tree_root->sha, sizeof(f->sha));
 			strcpy(f->hash, pg_hexdump(f->sha, sizeof(f->sha)));
 		}
+
+		pg_swarm_create(context, f);
 	}
 }
 
