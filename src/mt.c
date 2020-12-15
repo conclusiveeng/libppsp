@@ -323,8 +323,7 @@ pg_tree_grow(struct node *old_tree, size_t n_chunks)
 	node_count = (1 << height) - 1;
 
 	tree = realloc(old_tree, node_count * sizeof(struct node));
-	pg_tree_init_nodes(&tree[old_node_count], 0,
-	    node_count - old_node_count);
+	pg_tree_init_nodes(tree, old_node_count,node_count - old_node_count);
 	pg_tree_link_nodes(tree, height);
 
 	return (tree);
