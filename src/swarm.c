@@ -56,7 +56,7 @@ pg_peerswarm_request_find_fn(uint64_t start, uint64_t end, bool value __unused, 
 	DEBUG("requesting %d blocks @ %d", count, start);
 
 	state->collected += count;
-	pg_bitmap_set_range(state->ps->request_bitmap, start, start + count, true);
+	pg_bitmap_set_range(state->ps->want_bitmap, start, start + count, true);
 	pack_request(state->ps->buffer, start, start + count);
 	return (state->collected <= state->budget);
 }
@@ -77,6 +77,7 @@ pg_peerswarm_request(struct pg_peer_swarm *ps)
 		DEBUG("requesting first block from peer %s in swarm %s",
 		    pg_peer_to_str(ps->peer), pg_swarm_to_str(ps->swarm));
 
+		pg_bitmap_set(ps->want_bitmap, 0);
 		pack_request(ps->buffer, 0, 0);
 		pg_buffer_enqueue(ps->buffer);
 		ps->state = PEERSWARM_READY;
@@ -90,7 +91,7 @@ pg_peerswarm_request(struct pg_peer_swarm *ps)
 		state.collected = 0;
 		state.budget = 10;
 
-		pg_bitmap_scan(ps->request_bitmap, BITMAP_SCAN_0, pg_peerswarm_request_find_fn, &state);
+		pg_bitmap_scan(ps->want_bitmap, BITMAP_SCAN_0, pg_peerswarm_request_find_fn, &state);
 		pg_buffer_enqueue(ps->buffer);
 		break;
 	}
@@ -142,6 +143,7 @@ pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
 	ps->dst_channel_id = dst_channel_id;
 	ps->have_bitmap = pg_bitmap_create(swarm->file->nc);
 	ps->request_bitmap = pg_bitmap_create(swarm->file->nc);
+	ps->want_bitmap = pg_bitmap_create(swarm->file->nc);
 	ps->sent_bitmap = pg_bitmap_create(swarm->file->nl * 2);
 	ps->options = *options;
 	ps->buffer = pg_buffer_create(peer, ps->dst_channel_id);
