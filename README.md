@@ -1,4 +1,4 @@
-# libppspp
+# libperegrine
 
 ## Building
 
@@ -11,32 +11,43 @@ make
 
 ## Usage
 
+Example application arguments:
+
+```bash
+Usage: examples/app/peregrine -lhpfds 
+Options:
+-h      show this help message 
+-l      local port      (eg. -l <port>) 
+-p      peer address    (eg. -p <host>:<port>) 
+-f      file, sha1      (eg. -f <filename> or -f <filename>:<sha1> ) 
+-d      directory       (eg. -d <path/to/directory> ) 
+-s      enable showing summary (if disabled only callbacks will be used )
 ```
-Peer-to-Peer Streaming Peer Protocol
-usage:
-./ppspp: -acfhpstv
--a ip_address:port:	numeric IP address and udp port of the remote SEEDER, enables LEECHER mode
-			example: -a 192.168.1.1:6778
--c:			chunk size in bytes valid only on the SEEDER side, default: 1024 bytes
-			example: -c 1024
--f dir or filename:	filename of the file or directory name for sharing, enables SEEDER mode
-			example: -f ./filename
-			example: -f /path/to/directory
--h:			this help
--p port:		UDP listening port number, valid only on SEEDER side, default 6778
-			example: -p 7777
--s sha1:		SHA1 of the file for downloading, valid only on LEECHER side
-			example: -s 82da6c1c7ac0de27c3fedf1dd52560323e7b1758
--t:			timeout of network communication in seconds, default: 180 seconds
-			example: -t 10
--v:			enables debugging messages
 
-Invocation examples:
-SEEDER mode:
-./ppspp -f filename -c 1024
-./ppspp -f /tmp/directory -c 1024 -t 5
+Seeder mode (directory):
 
-LEECHER mode:
-./ppspp -a 192.168.1.1:6778 -s 82da6c1c7ac0de27c3fedf1dd52560323e7b1758 -t 10
-
+```bash
+examples/app/peregrine -l 12345 -d ~/directory_to_seed -s
 ```
+
+Seeder mode (file)
+
+```bash
+examples/app/peregrine -l 12345 -f ~/directory_to_seed/picture.png -f ~/directory_to_seed/file2.jpg -s
+```
+
+Leecher mode
+
+```bash
+examples/app/peregrine -l 54321 -f picture.png:b46abe4de7e6825ee8b2627a8d6723e471ace343 -p  127.0.0.1:12345 -s
+```
+
+## Directory structure
+
+- examples/
+  - app/
+    - peregrine.c *- example application using libperegrine*
+- include/
+  - peregrine/
+    - peregrine.h *- Public API header file*
+- src/ *- internal sources directory*

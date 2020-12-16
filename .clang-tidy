@@ -3,6 +3,7 @@ Checks:          'clang-diagnostic-*,clang-analyzer-*,-*,readability-*, -readabi
 WarningsAsErrors: ''
 HeaderFilterRegex: '.*'
 AnalyzeTemporaryDtors: false
+InheritParentConfig: true
 FormatStyle:     file
 User:            marcin
 CheckOptions:

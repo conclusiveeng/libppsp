@@ -1,0 +1,2 @@
+add_executable(peregrine peregrine.c)
+target_link_libraries(peregrine libperegrine)
