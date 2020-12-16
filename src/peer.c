@@ -478,7 +478,7 @@ pg_handle_data(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	ps->swarm->fetched_chunks += len;
 	ps->peer->fetched_chunks += len;
 
-	return (MSG_LENGTH(msg_data) + 1500);
+	return (MSG_LENGTH(msg_data) + ps->swarm->file->chunk_size * len);
 }
 
 static ssize_t
