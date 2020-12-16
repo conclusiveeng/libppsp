@@ -524,23 +524,6 @@ pg_handle_have(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 		ps->swarm->file->nc = end + 1;
 		pg_bitmap_resize(ps->swarm->have_bitmap, end + 1);
 		pg_bitmap_resize(ps->have_bitmap, end + 1);
-		pg_bitmap_resize(ps->request_bitmap, end + 1);
-		pg_bitmap_resize(ps->want_bitmap, end + 1);
-		pg_bitmap_resize(ps->sent_bitmap, end + 1);
-		if (ps->swarm->file->tree == NULL) {
-			uint64_t height = pg_tree_calc_height(end);
-
-			DEBUG("integrity: creating merkle tree with height %d", height);
-
-			ps->swarm->file->tree = pg_tree_create(end);
-			ps->swarm->file->tree_root = pg_tree_get_root(ps->swarm->file->tree);
-		} else if (end > pg_tree_get_chunk_count(ps->swarm->file->tree)) {
-			uint64_t height = pg_tree_calc_height(end);
-
-			DEBUG("integrity: resizing merkle tree to height %d", height);
-			ps->swarm->file->tree = pg_tree_grow(ps->swarm->file->tree, end);
-			ps->swarm->file->tree_root = pg_tree_get_root(ps->swarm->file->tree);
-		}
 	}
 
 	pg_bitmap_set_range(ps->have_bitmap, start, end, true);
@@ -563,6 +546,11 @@ pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	}
 
 	DEBUG("integrity: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
+
+	/* In INTEGRITY message we will get the size of the tree */
+	pg_bitmap_resize(ps->request_bitmap, end + 1);
+	pg_bitmap_resize(ps->want_bitmap, end + 1);
+	pg_bitmap_resize(ps->sent_bitmap, end + 1);
 
 	if (ps->swarm->file->tree == NULL) {
 		uint64_t height = pg_tree_calc_height(end);
