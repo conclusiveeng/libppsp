@@ -114,7 +114,7 @@ pack_ack(struct pg_buffer *buf, uint32_t start_chunk, uint32_t end_chunk, uint64
 	msg->message_type = MSG_ACK;
 	msg->ack.start_chunk = htobe32(start_chunk);
 	msg->ack.end_chunk = htobe32(end_chunk);
-	msg->ack.sample = sample;
+	msg->ack.sample = htobe64(sample);
 }
 
 void
