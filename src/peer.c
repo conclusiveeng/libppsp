@@ -522,8 +522,8 @@ pg_handle_have(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 		DEBUG("have: updating swarm size to %u blocks", end + 1);
 		ps->swarm->nc = end + 1;
 		ps->swarm->file->nc = end + 1;
-		pg_bitmap_resize(ps->swarm->have_bitmap, end + 1);
-		pg_bitmap_resize(ps->have_bitmap, end + 1);
+		pg_bitmap_grow(ps->swarm->have_bitmap, end + 1);
+		pg_bitmap_grow(ps->have_bitmap, end + 1);
 	}
 
 	pg_bitmap_set_range(ps->have_bitmap, start, end, true);
@@ -548,9 +548,9 @@ pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	DEBUG("integrity: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
 
 	/* In INTEGRITY message we will get the size of the tree */
-	pg_bitmap_resize(ps->request_bitmap, end + 1);
-	pg_bitmap_resize(ps->want_bitmap, end + 1);
-	pg_bitmap_resize(ps->sent_bitmap, end + 1);
+	pg_bitmap_grow(ps->request_bitmap, end + 1);
+	pg_bitmap_grow(ps->want_bitmap, end + 1);
+	pg_bitmap_grow(ps->sent_bitmap, end + 1);
 
 	if (ps->swarm->file->tree == NULL) {
 		uint64_t height = pg_tree_calc_height(end);

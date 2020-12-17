@@ -231,7 +231,7 @@ struct node
 };
 
 struct pg_bitmap *pg_bitmap_create(uint64_t size);
-void pg_bitmap_resize(struct pg_bitmap *bmp, uint64_t new_size);
+void pg_bitmap_grow(struct pg_bitmap *bmp, uint64_t new_size);
 void pg_bitmap_free(struct pg_bitmap *bmp);
 void pg_bitmap_set(struct pg_bitmap *bmp, uint64_t position);
 void pg_bitmap_set_range(struct pg_bitmap *bmp, uint64_t start, uint64_t end, bool value);
