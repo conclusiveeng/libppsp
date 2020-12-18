@@ -36,6 +36,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <err.h>
 #include <errno.h>
@@ -55,13 +56,13 @@
 
 /**
  * @brief Maximum length of SHA1 in HEX string
- * 
+ *
  */
 #define SHA1STR_MAX	41
 
 /**
- * @brief Example implementation of peregrine file
- * 
+ * @brief File specification parsed from the command line.
+ *
  */
 struct peregrine_file
 {
@@ -71,8 +72,7 @@ struct peregrine_file
 };
 
 /**
- * @brief Example implementation of peregrine directory
- * 
+ * @brief Directory specification parsed from the command line.
  */
 struct peregrine_directory
 {
@@ -81,8 +81,7 @@ struct peregrine_directory
 };
 
 /**
- * @brief Example implementation of peregrine peer
- * 
+ * @brief Peer specification parsed from the command line.
  */
 struct peregrine_peer
 {
@@ -94,6 +93,8 @@ static TAILQ_HEAD(, peregrine_file) files;
 static TAILQ_HEAD(, peregrine_directory) directories;
 static TAILQ_HEAD(, peregrine_peer) peers;
 static struct pg_context *context;
+static bool finished = false;
+static bool print_events = false;
 
 static void
 usage(const char *argv0)
@@ -106,6 +107,24 @@ usage(const char *argv0)
 	fprintf(stderr, "-f	file, sha1 	(eg. -f <filename> or -f <filename>:<sha1> ) \n");
 	fprintf(stderr, "-d	directory 	(eg. -d <path/to/directory> ) \n");
 	fprintf(stderr, "-s	enable showing summary (if disabled only callbacks will be used ) \n");
+}
+
+static void
+event_printf(const char *fmt, ...)
+{
+	va_list ap;
+
+	if (print_events) {
+		va_start(ap, fmt);
+		vprintf(fmt, ap);
+		va_end(ap);
+	}
+}
+
+static void
+check_signals(void)
+{
+
 }
 
 static int
@@ -145,7 +164,7 @@ add_peer(const char *peerspec)
 {
 	struct peregrine_peer *peer;
 	struct sockaddr_in *sin;
-	char addr[32];
+	char addr[NAME_MAX];
 	uint16_t port;
 
 	peer = calloc(1, sizeof(*peer));
@@ -169,21 +188,31 @@ print_event(struct pg_event *ev, void *arg __attribute__((unused)))
 {
 	switch (ev->type) {
 	case EVENT_PEER_ADDED:
-		printf("Peer %s added\n", pg_peer_to_str(ev->peer));
+		event_printf("Peer %s added\n", pg_peer_to_str(ev->peer));
 		break;
 
 	case EVENT_PEER_REMOVED:
-		printf("Peer %s removed\n", pg_peer_to_str(ev->peer));
+		event_printf("Peer %s removed\n", pg_peer_to_str(ev->peer));
 		break;
 
 	case EVENT_PEER_JOINED_SWARM:
-		printf("Peer %s joined swarm %s\n", pg_peer_to_str(ev->peer),
+		event_printf("Peer %s joined swarm %s\n", pg_peer_to_str(ev->peer),
 	 	    pg_swarm_to_str(ev->swarm));
 		break;
 
 	case EVENT_PEER_LEFT_SWARM:
-		printf("Peer %s joined swarm %s\n", pg_peer_to_str(ev->peer),
+		event_printf("Peer %s joined swarm %s\n", pg_peer_to_str(ev->peer),
 		    pg_swarm_to_str(ev->swarm));
+		break;
+
+	case EVENT_SWARM_FINISHED:
+		event_printf("Finished downloading %s\n", pg_swarm_to_str(ev->swarm));
+		break;
+
+	case EVENT_SWARM_FINISHED_ALL:
+		event_printf("Finished all downloads\n");
+		finished = true;
+		exit(0);
 		break;
 
 	case EVENT_UNKNOWN:
@@ -239,6 +268,7 @@ main(int argc, char *const argv[])
 	struct peregrine_directory *dir;
 	struct peregrine_peer *peer;
 	int local_port = 0;
+	int remain = 0;
 	bool summary = 0;
 	int ch;
 	int ret;
@@ -274,6 +304,10 @@ main(int argc, char *const argv[])
 
 		case 'd':
 			add_directory(optarg);
+			break;
+
+		case 'r':
+			remain = strtol(optarg, NULL, 10);
 			break;
 
 		case 's':
@@ -331,8 +365,10 @@ main(int argc, char *const argv[])
 	for (;;) {
 		ret = poll(&pfd, 1, summary ? 500 : -1);
 		if (ret < 0) {
-			if (errno == EINTR)
+			if (errno == EINTR) {
+				check_signals();
 				continue;
+			}
 
 			err(1, "epoll_wait");
 		}
