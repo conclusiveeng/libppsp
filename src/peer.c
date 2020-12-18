@@ -189,7 +189,7 @@ pg_ack(struct pg_peer_swarm *ps, uint64_t start, uint64_t end, uint64_t remote_t
 	if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
 		ERROR("clock_gettime error: %s", strerror(errno));
 
-	local_ts = ts.tv_sec + ts.tv_nsec * 1000;
+	local_ts = ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
 	diff_ts = local_ts - remote_ts;
 
 	ps->swarm->fetched_chunks += count;
@@ -247,7 +247,7 @@ pg_send_data(struct pg_peer_swarm *ps, uint64_t chunk)
 	if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
 		ERROR("clock_gettime error: %s", strerror(errno));
 
-	pack_data(ps->buffer, chunk, chunk, ts.tv_sec + ts.tv_nsec * 1000);
+	pack_data(ps->buffer, chunk, chunk, ts.tv_sec * 1000000 + ts.tv_nsec / 1000);
 	ptr = pg_buffer_advance(ps->buffer, ps->options.chunk_size);
 	len = pg_file_read_chunks(ps->swarm->file, chunk, 1, ptr);
 	ps->buffer->used = ps->buffer->used - ps->options.chunk_size + len;
