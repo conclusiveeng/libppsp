@@ -217,7 +217,7 @@ peregrine_handle_frame(struct pg_context *ctx, const struct sockaddr *client,
 
 	for (pos = 4; pos < len;) {
 		msg = (struct msg *)&frame[pos];
-		ret = pg_handle_message(peer, channel_id, msg);
+		ret = pg_handle_message(peer, channel_id, msg, len - pos);
 		if (ret < 0)
 			break;
 

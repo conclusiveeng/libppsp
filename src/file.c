@@ -232,13 +232,12 @@ pg_file_read_chunks(struct pg_file *file, uint64_t chunk, uint64_t count, void *
 }
 
 int
-pg_file_write_chunks(struct pg_file *file, uint64_t chunk, uint64_t count, void *buf)
+pg_file_write_chunks(struct pg_file *file, uint64_t chunk, size_t len, void *buf)
 {
 	ssize_t ret;
-	ssize_t total = file->chunk_size * count;
 
-	ret = pwrite(file->fd, buf, total, file->chunk_size * chunk);
-	if (ret != total)
+	ret = pwrite(file->fd, buf, len, file->chunk_size * chunk);
+	if (ret != len)
 		return (-1);
 
 	return (0);

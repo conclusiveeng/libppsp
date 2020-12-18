@@ -43,21 +43,21 @@
 struct pg_frame_handler
 {
 	enum peregrine_message_type type;
-	ssize_t (*handler)(struct pg_peer *, uint32_t, struct msg *);
+	ssize_t (*handler)(struct pg_peer *, uint32_t, struct msg *, size_t);
 };
 
-static ssize_t pg_handle_handshake(struct pg_peer *peer, uint32_t chid, struct msg *msg);
-static ssize_t pg_handle_data(struct pg_peer *peer, uint32_t chid, struct msg *msg);
-static ssize_t pg_handle_ack(struct pg_peer *peer, uint32_t chid, struct msg *msg);
-static ssize_t pg_handle_have(struct pg_peer *peer, uint32_t chid, struct msg *msg);
-static ssize_t pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg);
-static ssize_t pg_handle_pex_resv4(struct pg_peer *peer, uint32_t chid, struct msg *msg);
-static ssize_t pg_handle_pex_req(struct pg_peer *peer, uint32_t chid, struct msg *msg);
-static ssize_t pg_handle_signed_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg);
-static ssize_t pg_handle_request(struct pg_peer *peer, uint32_t chid, struct msg *msg);
-static ssize_t pg_handle_cancel(struct pg_peer *peer, uint32_t chid, struct msg *msg);
-static ssize_t pg_handle_choke(struct pg_peer *peer, uint32_t chid, struct msg *msg);
-static ssize_t pg_handle_unchoke(struct pg_peer *peer, uint32_t chid, struct msg *msg);
+static ssize_t pg_handle_handshake(struct pg_peer *peer, uint32_t chid, struct msg *msg, size_t datagram_left);
+static ssize_t pg_handle_data(struct pg_peer *peer, uint32_t chid, struct msg *msg, size_t datagram_left);
+static ssize_t pg_handle_ack(struct pg_peer *peer, uint32_t chid, struct msg *msg, size_t datagram_left);
+static ssize_t pg_handle_have(struct pg_peer *peer, uint32_t chid, struct msg *msg, size_t datagram_left);
+static ssize_t pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg, size_t datagram_left);
+static ssize_t pg_handle_pex_resv4(struct pg_peer *peer, uint32_t chid, struct msg *msg, size_t datagram_left);
+static ssize_t pg_handle_pex_req(struct pg_peer *peer, uint32_t chid, struct msg *msg, size_t datagram_left);
+static ssize_t pg_handle_signed_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg, size_t datagram_left);
+static ssize_t pg_handle_request(struct pg_peer *peer, uint32_t chid, struct msg *msg, size_t datagram_left);
+static ssize_t pg_handle_cancel(struct pg_peer *peer, uint32_t chid, struct msg *msg, size_t datagram_left);
+static ssize_t pg_handle_choke(struct pg_peer *peer, uint32_t chid, struct msg *msg, size_t datagram_left);
+static ssize_t pg_handle_unchoke(struct pg_peer *peer, uint32_t chid, struct msg *msg, size_t datagram_left);
 
 static const struct pg_frame_handler frame_handlers[] = {
 	{ MSG_HANDSHAKE, pg_handle_handshake },
@@ -111,13 +111,14 @@ pg_peer_send(struct pg_peer *peer, const void *buf, size_t len)
 }
 
 ssize_t
-pg_handle_message(struct pg_peer *peer, uint32_t chid, struct msg *msg)
+pg_handle_message(struct pg_peer *peer, uint32_t chid, struct msg *msg,
+    size_t datagram_left)
 {
 	const struct pg_frame_handler *handler;
 
 	for (handler = &frame_handlers[0]; handler->handler != NULL; handler++) {
 		if (handler->type == msg->message_type)
-			return (handler->handler(peer, chid, msg));
+			return (handler->handler(peer, chid, msg, datagram_left));
 	}
 
 	return (-1);
@@ -296,7 +297,8 @@ pg_send_closing_handshake(struct pg_peer_swarm *ps)
 }
 
 static ssize_t
-pg_handle_handshake(struct pg_peer *peer, uint32_t chid, struct msg *msg)
+pg_handle_handshake(struct pg_peer *peer, uint32_t chid, struct msg *msg,
+    size_t datagram_left)
 {
 	struct pg_peer_swarm *ps;
 	struct pg_swarm *swarm;
@@ -449,13 +451,15 @@ done:
 }
 
 static ssize_t
-pg_handle_data(struct pg_peer *peer, uint32_t chid, struct msg *msg)
+pg_handle_data(struct pg_peer *peer, uint32_t chid, struct msg *msg,
+    size_t datagram_left)
 {
 	struct pg_peer_swarm *ps;
 	uint64_t ts = be64toh(msg->data.timestamp);
 	uint32_t start_chunk = be32toh(msg->data.start_chunk);
 	uint32_t end_chunk = be32toh(msg->data.end_chunk);
-	uint32_t len = end_chunk - start_chunk + 1;
+	uint32_t len_chunks = end_chunk - start_chunk + 1;
+	size_t len_bytes;
 
 	ps = pg_find_peerswarm_by_channel(peer, chid);
 	if (ps == NULL) {
@@ -464,28 +468,30 @@ pg_handle_data(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	}
 
 	DEBUG("data: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
-	DEBUG("data: received %d chunks @ %d", len, start_chunk);
+	DEBUG("data: received %d chunks @ %d", len_chunks, start_chunk);
 
 	if (ps->state == PEERSWARM_WAIT_FIRST_DATA)
 		ps->state = PEERSWARM_READY;
 
-//	if (!ps->swarm->nc_computed) {
+	if (ps->swarm->file->chunk_size * len_chunks > datagram_left)
+		len_bytes = datagram_left - MSG_LENGTH(msg_data);
+	else
+		len_bytes = ps->swarm->file->chunk_size * len_chunks;
 
-	//}
-
-	pg_file_write_chunks(ps->swarm->file, start_chunk, len, msg->data.data);
+	pg_file_write_chunks(ps->swarm->file, start_chunk, len_bytes, msg->data.data);
 	pg_bitmap_set_range(ps->swarm->have_bitmap, start_chunk, end_chunk, true);
 	pg_ack(ps, start_chunk, end_chunk, ts);
 	pg_peerswarm_request(ps);
 
-	ps->swarm->fetched_chunks += len;
-	ps->peer->fetched_chunks += len;
+	ps->swarm->fetched_chunks += len_chunks;
+	ps->peer->fetched_chunks += len_chunks;
 
-	return (MSG_LENGTH(msg_data) + ps->swarm->file->chunk_size * len);
+	return (MSG_LENGTH(msg_data) + len_bytes);
 }
 
 static ssize_t
-pg_handle_ack(struct pg_peer *peer, uint32_t chid, struct msg *msg)
+pg_handle_ack(struct pg_peer *peer, uint32_t chid, struct msg *msg,
+    size_t datagram_left)
 {
 	struct pg_peer_swarm *ps;
 	uint32_t start = be32toh(msg->ack.start_chunk);
@@ -507,7 +513,8 @@ pg_handle_ack(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 }
 
 static ssize_t
-pg_handle_have(struct pg_peer *peer, uint32_t chid, struct msg *msg)
+pg_handle_have(struct pg_peer *peer, uint32_t chid, struct msg *msg,
+    size_t datagram_left)
 {
 	struct pg_peer_swarm *ps;
 	uint32_t start = be32toh(msg->have.start_chunk);
@@ -535,7 +542,8 @@ pg_handle_have(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 }
 
 static ssize_t
-pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
+pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg,
+    size_t datagram_left)
 {
 	struct pg_peer_swarm *ps;
 	struct node *node;
@@ -579,7 +587,8 @@ pg_handle_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 }
 
 static ssize_t
-pg_handle_pex_resv4(struct pg_peer *peer, uint32_t chid, struct msg *msg)
+pg_handle_pex_resv4(struct pg_peer *peer, uint32_t chid, struct msg *msg,
+    size_t datagram_left)
 {
 	struct sockaddr_in sin;
 
@@ -596,7 +605,8 @@ pg_handle_pex_resv4(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 }
 
 static ssize_t
-pg_handle_pex_req(struct pg_peer *peer, uint32_t chid, struct msg *msg)
+pg_handle_pex_req(struct pg_peer *peer, uint32_t chid, struct msg *msg,
+    size_t datagram_left)
 {
 	struct pg_peer_swarm *otherps;
 	struct pg_peer_swarm *ps;
@@ -628,13 +638,15 @@ pg_handle_pex_req(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 }
 
 static ssize_t
-pg_handle_signed_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg)
+pg_handle_signed_integrity(struct pg_peer *peer, uint32_t chid, struct msg *msg,
+    size_t datagram_left)
 {
 	return (-1);
 }
 
 static ssize_t
-pg_handle_request(struct pg_peer *peer, uint32_t chid, struct msg *msg)
+pg_handle_request(struct pg_peer *peer, uint32_t chid, struct msg *msg,
+    size_t datagram_left)
 {
 	struct pg_peer_swarm *ps;
 	uint32_t start_chunk = be32toh(msg->request.start_chunk);
@@ -654,7 +666,8 @@ pg_handle_request(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 }
 
 static ssize_t
-pg_handle_cancel(struct pg_peer *peer, uint32_t chid, struct msg *msg)
+pg_handle_cancel(struct pg_peer *peer, uint32_t chid, struct msg *msg,
+    size_t datagram_left)
 {
 	struct pg_peer_swarm *ps;
 
@@ -669,7 +682,8 @@ pg_handle_cancel(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 }
 
 static ssize_t
-pg_handle_choke(struct pg_peer *peer, uint32_t chid, struct msg *msg)
+pg_handle_choke(struct pg_peer *peer, uint32_t chid, struct msg *msg,
+    size_t datagram_left)
 {
 	struct pg_peer_swarm *ps;
 
@@ -686,7 +700,8 @@ pg_handle_choke(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 }
 
 static ssize_t
-pg_handle_unchoke(struct pg_peer *peer, uint32_t chid, struct msg *msg)
+pg_handle_unchoke(struct pg_peer *peer, uint32_t chid, struct msg *msg,
+    size_t datagram_left)
 {
 	struct pg_peer_swarm *ps;
 

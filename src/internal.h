@@ -241,7 +241,8 @@ bool pg_bitmap_get(struct pg_bitmap *bmp, uint64_t position);
 void pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
     pg_bitmap_scan_func_t fn, void *arg);
 
-ssize_t pg_handle_message(struct pg_peer *peer, uint32_t chid, struct msg *msg);
+ssize_t pg_handle_message(struct pg_peer *peer, uint32_t chid, struct msg *msg,
+    size_t datagram_left);
 int pg_send_have(struct pg_peer_swarm *ps);
 int pg_send_handshake(struct pg_peer_swarm *ps);
 int pg_send_integrity(struct pg_peer_swarm *ps, uint32_t block);
@@ -301,7 +302,7 @@ size_t pg_buffer_enqueue_data(struct pg_buffer *buffer);
 void pg_buffer_reset(struct pg_buffer *buffer);
 
 int pg_file_read_chunks(struct pg_file *file, uint64_t chunk, uint64_t count, void *buf);
-int pg_file_write_chunks(struct pg_file *file, uint64_t chunk, uint64_t count, void *buf);
+int pg_file_write_chunks(struct pg_file *file, uint64_t chunk, size_t len, void *buf);
 
 void pg_emit_event(struct pg_event *event);
 
