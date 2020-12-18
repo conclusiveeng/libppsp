@@ -9,4 +9,4 @@ Name: libperegrine
 Description: Peregrine - Peer-to-Peer Streaming Peer Protocol library
 Version: @PKGCONFIG_VERSION@
 Cflags: -I${includedir} ${cflags}
-Libs: -L${libdir} -Wl,-rpath -Wl,${libdir} -libperegrine
+Libs: -L${libdir} -Wl,-rpath -Wl,${libdir} -lm -libperegrine

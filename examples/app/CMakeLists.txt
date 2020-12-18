@@ -1,2 +1,5 @@
-add_executable(peregrine peregrine.c)
-target_link_libraries(peregrine libperegrine)
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+add_executable(peregrine_exe peregrine.c)
+set_target_properties(peregrine_exe PROPERTIES OUTPUT_NAME "peregrine")
+target_link_libraries(peregrine_exe peregrine)
+install(TARGETS peregrine_exe DESTINATION ${CMAKE_INSTALL_BINDIR})

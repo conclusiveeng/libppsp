@@ -1,11 +1,15 @@
 cmake_minimum_required(VERSION 3.2)
 
-project(libperegrine
+project(peregrine
         VERSION 0.4
         LANGUAGES C
         DESCRIPTION "Peregrine - a Peer-to-Peer Streaming Peer Protocol client-server")
 
 option(BUILD_EXAMPLES "Build and install example programs" ON)
+option(PACKAGE_DEB "Generate DEB package" OFF)
+option(BUILD_DOCS "Generate docs using Doxygen" OFF)
+option(BUILD_STATIC "Build static libary and example app" OFF)
+
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11")
@@ -14,6 +18,7 @@ add_compile_options(-O0 -Wall -Wextra -g -D_DEFAULT_SOURCE)
 message(STATUS "CMake version   : " "${CMAKE_SYSTEM_VERSION}")
 message(STATUS "Compiler        : " "${CMAKE_C_COMPILER}")
 message(STATUS "Operating System: " "${CMAKE_SYSTEM_NAME}")
+message(STATUS "Build type      : " "${CMAKE_BUILD_TYPE}")
 
 # Setup code check using clang-tidy
 # set(CMAKE_C_CLANG_TIDY clang-tidy)
@@ -75,19 +80,22 @@ endif()
 
 # Build dynamic libary by default, provide option for static
 if (BUILD_STATIC)
-    add_library(libperegrine STATIC ${MAIN_SOURCES} ${EVENTLOOP_SOURCES})
+    add_library(peregrine STATIC ${MAIN_SOURCES} ${EVENTLOOP_SOURCES})
 else()
-    add_library(libperegrine SHARED ${MAIN_SOURCES} ${EVENTLOOP_SOURCES})
+    add_library(peregrine SHARED ${MAIN_SOURCES} ${EVENTLOOP_SOURCES})
 endif()
-target_link_libraries(libperegrine m)
+target_link_libraries(peregrine m)
 
+# Prepare library
 configure_file(libperegrine.pc.in ${CMAKE_BINARY_DIR}/libperegrine.pc @ONLY)
-install(FILES ${CMAKE_BINARY_DIR}/libperegrine.pc DESTINATION /usr/share/pkgconfig)
-
-install(TARGETS libperegrine DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS peregrine DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
-#install(DIRECTORY ${CMAKE_BINARY_DIR}/include/ DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libperegrine.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/share/pkgconfig)
+# Handle build for Linux/FreeBSD
+if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libperegrine.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/share/pkgconfig)
+elseif(${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libperegrine.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/libdata/pkgconfig)
+endif()
 
 if(BUILD_EXAMPLES)
     add_subdirectory(examples/app)
