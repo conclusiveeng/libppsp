@@ -2,10 +2,33 @@
 
 ## Building
 
+Minimal build
 ```shell script
 mkdir build
 cd build
 cmake ..
+make
+```
+
+Build Debian package
+```bash
+cd build
+cmake -DPACKAGE_DEB=YES ..
+make
+cpack
+```
+
+Build doxygen documentation
+```bash
+cd build
+cmake -DBUILD_DOCS=YES ..
+make
+```
+
+Build static library & static example app
+```bash
+cd build
+cmake -DBUILD_STATIC=YES ..
 make
 ```
 
