@@ -46,12 +46,14 @@ void
 pg_bitmap_grow(struct pg_bitmap *bmp, uint64_t new_size)
 {
 	uint64_t new_data_size = new_size % 8 ? (new_size / 8) + 1 : new_size / 8;
+	uint64_t old_data_size = bmp->size % 8 ? (bmp->size / 8) + 1 : bmp->size / 8;
 
 	/* Bitmap cannot shrink */
 	if (new_data_size < bmp->size)
 		return;
 	bmp->size = new_size;
 	bmp->data = realloc(bmp->data, new_data_size);
+	memset(bmp->data + old_data_size, 0, new_data_size - old_data_size);
 }
 
 void
@@ -65,7 +67,6 @@ pg_bitmap_free(struct pg_bitmap *bmp)
 void
 pg_bitmap_set(struct pg_bitmap *bmp, uint64_t position)
 {
-
 	bmp->data[position / 8] |= (1 << (position % 8));
 }
 
