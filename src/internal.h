@@ -237,6 +237,7 @@ void pg_bitmap_set(struct pg_bitmap *bmp, uint64_t position);
 void pg_bitmap_set_range(struct pg_bitmap *bmp, uint64_t start, uint64_t end, bool value);
 void pg_bitmap_clear(struct pg_bitmap *bmp, uint64_t position);
 void pg_bitmap_fill(struct pg_bitmap *bmp, bool value);
+bool pg_bitmap_is_filled(struct pg_bitmap *bmp, bool value);
 bool pg_bitmap_get(struct pg_bitmap *bmp, uint64_t position);
 void pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
     pg_bitmap_scan_func_t fn, void *arg);

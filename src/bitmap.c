@@ -99,6 +99,17 @@ pg_bitmap_fill(struct pg_bitmap *bmp, bool value)
 }
 
 bool
+pg_bitmap_is_filled(struct pg_bitmap *bmp, bool value)
+{
+
+	for (uint64_t i = 0; i < bmp->size; i++) {
+		if (pg_bitmap_get(bmp, i) != value)
+			return (false);
+	}
+	return (true);
+}
+
+bool
 pg_bitmap_get(struct pg_bitmap *bmp, uint64_t position)
 {
 
