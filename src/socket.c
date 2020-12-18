@@ -178,11 +178,6 @@ pg_context_destroy(struct pg_context *ctx)
 		free(peer);
 	}
 
-	LIST_FOREACH(download, &ctx->downloads, entry) {
-		LIST_REMOVE(download, entry);
-		free(download);
-	}
-
 	while (!SLIST_EMPTY(&ctx->files)) {
 		file = SLIST_FIRST(&ctx->files);
 		SLIST_REMOVE_HEAD(&ctx->files, entry);

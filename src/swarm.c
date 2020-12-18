@@ -77,8 +77,8 @@ pg_peerswarm_request_find_fn(uint64_t start, uint64_t end, bool value __unused, 
 	DEBUG("requesting %d blocks @ %d", count, start);
 
 	state->collected += count;
-	pg_bitmap_set_range(state->ps->want_bitmap, start, start + count, true);
-	pack_request(state->ps->buffer, start, start + count);
+	pg_bitmap_set_range(state->ps->want_bitmap, start, start + count - 1, true);
+	pack_request(state->ps->buffer, start, start + count - 1);
 	return (state->collected <= state->budget);
 }
 
@@ -116,7 +116,7 @@ pg_peerswarm_request(struct pg_peer_swarm *ps)
 
 		state.ps = ps;
 		state.collected = 0;
-		state.budget = 10;
+		state.budget = 1;
 
 		pg_bitmap_scan(ps->want_bitmap, BITMAP_SCAN_0, pg_peerswarm_request_find_fn, &state);
 		pg_buffer_enqueue(ps->buffer);
@@ -198,7 +198,6 @@ pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
 	return (ps);
 }
 
-
 void
 pg_peerswarm_destroy(struct pg_peer_swarm *ps)
 {
@@ -209,6 +208,41 @@ pg_peerswarm_destroy(struct pg_peer_swarm *ps)
 	ev.swarm = ps->swarm;
 	ev.type = EVENT_PEER_LEFT_SWARM;
 	pg_emit_event(&ev);
+}
+
+void
+pg_swarm_finished(struct pg_swarm *swarm)
+{
+	struct pg_context *ctx = swarm->context;
+	struct pg_peer_swarm *ps;
+	struct pg_swarm *other_swarm;
+	struct pg_event ev;
+	bool finished_all = true;
+
+	swarm->finished = true;
+
+	INFO("finished downloading of swarm %s", pg_swarm_to_str(swarm));
+
+	LIST_FOREACH(ps, &swarm->peers, swarm_entry)
+	    pg_send_closing_handshake(ps);
+
+	ev.ctx = ctx;
+	ev.type = EVENT_SWARM_FINISHED;
+	ev.swarm = swarm;
+	ev.peer = NULL;
+	pg_emit_event(&ev);
+
+	LIST_FOREACH(other_swarm, &ctx->swarms, entry) {
+		if (!other_swarm->finished)
+			finished_all = false;
+	}
+
+	if (finished_all) {
+		ev.type = EVENT_SWARM_FINISHED_ALL;
+		ev.swarm = NULL;
+		ev.peer = NULL;
+		pg_emit_event(&ev);
+	}
 }
 
 struct pg_swarm *

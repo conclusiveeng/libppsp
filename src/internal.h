@@ -135,6 +135,7 @@ struct pg_swarm
 	uint64_t sent_chunks;
 	uint8_t swarm_id[20];
 	uint16_t swarm_id_len;
+	bool finished;
 
 	LIST_HEAD(, pg_peer_swarm) peers;
 	LIST_ENTRY(pg_swarm) entry;
@@ -157,17 +158,6 @@ struct pg_peer_swarm
 
 	LIST_ENTRY(pg_peer_swarm) peer_entry;
 	LIST_ENTRY(pg_peer_swarm) swarm_entry;
-};
-
-/* file being downloaded */
-struct pg_download
-{
-	struct pg_context *context;
-	char hash[256];
-	int out_fd;
-	LIST_HEAD(, pg_peer) peers; // peers we download from
-	/* other download state: downloaded chunks, known chunks, etc */
-	LIST_ENTRY(pg_download) entry;
 };
 
 /* instance */
@@ -248,12 +238,14 @@ int pg_send_have(struct pg_peer_swarm *ps);
 int pg_send_handshake(struct pg_peer_swarm *ps);
 int pg_send_integrity(struct pg_peer_swarm *ps, uint32_t block);
 int pg_send_data(struct pg_peer_swarm *ps, uint64_t chunk);
+int pg_send_closing_handshake(struct pg_peer_swarm *ps);
 
 struct pg_peer_swarm *pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
     struct pg_protocol_options *options, uint32_t src_channel_id, uint32_t dst_channel_id);
 void pg_peerswarm_destroy(struct pg_peer_swarm *ps);
 void pg_peerswarm_request(struct pg_peer_swarm *ps);
 struct pg_swarm *pg_swarm_create(struct pg_context *ctx, struct pg_file *file);
+void pg_swarm_finished(struct pg_swarm *swarm);
 struct pg_peer_swarm *pg_find_peerswarm_by_id(struct pg_peer *peer, uint8_t *swarm_id, size_t id_len);
 struct pg_peer_swarm *pg_find_peerswarm_by_channel(struct pg_peer *peer, uint32_t channel_id);
 
