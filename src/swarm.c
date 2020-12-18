@@ -100,8 +100,14 @@ pg_peerswarm_request(struct pg_peer_swarm *ps)
 
 		pg_bitmap_set(ps->want_bitmap, 0);
 		pack_request(ps->buffer, 0, 0);
+		/* Here we could send PEX_Req */
 		pg_buffer_enqueue(ps->buffer);
-		ps->state = PEERSWARM_READY;
+		ps->state = PEERSWARM_WAIT_FIRST_DATA;
+		break;
+
+	case PEERSWARM_WAIT_FIRST_DATA:
+		DEBUG("waiting for first block from peer %s in swarm %s",
+		      pg_peer_to_str(ps->peer), pg_swarm_to_str(ps->swarm));
 		break;
 
 	case PEERSWARM_READY:
@@ -172,7 +178,13 @@ pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
 	LIST_INSERT_HEAD(&swarm->peers, ps, swarm_entry);
 
 	pg_send_handshake(ps);
-	pg_send_have(ps);
+	/* If we are leecher we can't send any HAVE in the HANDSHAKE, otherwise libswift will stop responding */
+	if (dst_channel_id != 0) {
+		pg_send_have(ps);
+	} else {
+		/* Normally pg_send_have would do that, but we don't send it */
+		pg_buffer_enqueue(ps->buffer);
+	}
 	pg_peerswarm_request(ps);
 
 	event.ctx = peer->context;

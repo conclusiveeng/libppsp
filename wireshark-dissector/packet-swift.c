@@ -596,8 +596,6 @@ dissect_swift(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *arg)
                         break;
                     case 0x09:
                         /* 'Chunk Size' */
-                        proto_tree_add_item(swift_tree, hf_swift_handshake_option_value, tvb, offset, 1, FALSE);
-                        offset += 1;
                         proto_tree_add_item(swift_tree, hf_swift_handshake_option_value, tvb, offset, 4, FALSE);
                         offset += 4;
                         break;
