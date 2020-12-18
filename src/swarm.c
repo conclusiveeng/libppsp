@@ -102,7 +102,12 @@ pg_peerswarm_request(struct pg_peer_swarm *ps)
 		pack_request(ps->buffer, 0, 0);
 		/* Here we could send PEX_Req */
 		pg_buffer_enqueue(ps->buffer);
-		ps->state = PEERSWARM_READY;
+		ps->state = PEERSWARM_WAIT_FIRST_DATA;
+		break;
+
+	case PEERSWARM_WAIT_FIRST_DATA:
+		DEBUG("waiting for first block from peer %s in swarm %s",
+		      pg_peer_to_str(ps->peer), pg_swarm_to_str(ps->swarm));
 		break;
 
 	case PEERSWARM_READY:

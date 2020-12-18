@@ -466,6 +466,9 @@ pg_handle_data(struct pg_peer *peer, uint32_t chid, struct msg *msg)
 	DEBUG("data: peer=%p, swarm=%s", peer, pg_swarm_to_str(ps->swarm));
 	DEBUG("data: received %d chunks @ %d", len, start_chunk);
 
+	if (ps->state == PEERSWARM_WAIT_FIRST_DATA)
+		ps->state = PEERSWARM_READY;
+
 //	if (!ps->swarm->nc_computed) {
 
 	//}
