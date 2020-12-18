@@ -101,8 +101,17 @@ pg_bitmap_fill(struct pg_bitmap *bmp, bool value)
 bool
 pg_bitmap_is_filled(struct pg_bitmap *bmp, bool value)
 {
+	uint64_t data_size = bmp->size % 8 ? (bmp->size / 8) + 1 : bmp->size / 8;
 
-	for (uint64_t i = 0; i < bmp->size; i++) {
+	if (data_size > 2) {
+		if ((value && (bmp->data[0] != 0xff)) || (!value && (bmp->data[0] != 0x00)))
+			return (false);
+
+		if (memcmp(bmp->data, bmp->data + 1, data_size - 2) != 0)
+			return (false);
+	}
+
+	for (uint64_t i = ((data_size - 1) * 8); i < bmp->size; i++) {
 		if (pg_bitmap_get(bmp, i) != value)
 			return (false);
 	}
