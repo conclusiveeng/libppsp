@@ -260,9 +260,11 @@ pg_swarm_create(struct pg_context *ctx, struct pg_file *file)
 	swarm->fetched_chunks = swarm->nc;
 	swarm->swarm_id_len = sizeof(file->sha);
 	memcpy(swarm->swarm_id, file->sha, sizeof(file->sha));
-	pg_bitmap_fill(swarm->have_bitmap, true);
 	LIST_INSERT_HEAD(&ctx->swarms, swarm, entry);
 	DEBUG("created swarm %s", pg_swarm_to_str(swarm));
+
+	if (file->file_size != 0)
+		pg_bitmap_fill(swarm->have_bitmap, true);
 
 	/* Poke all known peers for this swarm */
 	LIST_FOREACH(peer, &ctx->peers, entry) {
