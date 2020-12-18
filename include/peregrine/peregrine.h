@@ -118,6 +118,8 @@ enum pg_event_type
 	EVENT_PEER_REMOVED,		/**< Peer was removed  */
 	EVENT_PEER_JOINED_SWARM, 	/**< Peer joined swarm  */
 	EVENT_PEER_LEFT_SWARM,		/**< Peer left the swarm  */
+	EVENT_SWARM_FINISHED,		/**< Finished swarm download activities */
+	EVENT_SWARM_FINISHED_ALL	/**< Finished all download activities */
 };
 
 /**
