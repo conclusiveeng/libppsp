@@ -79,7 +79,7 @@ pg_peerswarm_request_find_fn(uint64_t start, uint64_t end, bool value __unused, 
 
 	state->collected += count;
 	pg_bitmap_set_range(state->ps->want_bitmap, start, start + count - 1, true);
-	pack_request(state->ps->buffer, start, start + count);
+	pack_request(state->ps->buffer, start, start + count - 1);
 
 	for (i = start; i < end; i++) {
 		struct pg_requested_chunk *prc = xcalloc(1, sizeof(*prc));
