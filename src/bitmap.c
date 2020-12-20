@@ -164,18 +164,21 @@ pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
 			start = i;
 	}
 
+	if (start == bmp->size - 1 && old_val == new_val)
+		return;
+
 	switch (mode) {
 	case BITMAP_SCAN_0:
-		if (!old_val)
-			fn(start, bmp->size - 1, old_val, arg);
+		if (!new_val)
+			fn(start, bmp->size - 1, new_val, arg);
 		break;
 	case BITMAP_SCAN_1:
-		if (old_val)
-			fn(start, bmp->size - 1, old_val, arg);
+		if (new_val)
+			fn(start, bmp->size - 1, new_val, arg);
 		break;
 	case BITMAP_SCAN_BOTH:
 	default:
-		fn(start, bmp->size - 1, old_val, arg);
+		fn(start, bmp->size - 1, new_val, arg);
 		break;
 	}
 }
