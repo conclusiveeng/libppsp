@@ -20,8 +20,7 @@ message(STATUS "Compiler        : " "${CMAKE_C_COMPILER}")
 message(STATUS "Operating System: " "${CMAKE_SYSTEM_NAME}")
 message(STATUS "Build type      : " "${CMAKE_BUILD_TYPE}")
 
-# Setup code check using clang-tidy
-# set(CMAKE_C_CLANG_TIDY clang-tidy)
+find_package (Threads)
 
 # Create compile_comands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS, 1)
@@ -43,7 +42,8 @@ set(MAIN_SOURCES
         src/mt.c
         src/utils.c
         src/proto.c
-        src/bitmap.c)
+        src/bitmap.c
+        src/hashtable.c)
 
 set(LINUX_SOURCES
         src/eventloop/epoll.c)
@@ -65,6 +65,9 @@ if (PACKAGE_DEB)
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.3.1)")
     include(CPack)
 endif()
+
+add_library(libperegrine SHARED ${MAIN_SOURCES} ${EVENTLOOP_SOURCES})
+target_link_libraries(libperegrine m ${CMAKE_THREAD_LIBS_INIT})
 
 # Generate Doxygen docs
 if(BUILD_DOCS)

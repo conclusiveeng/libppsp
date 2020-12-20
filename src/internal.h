@@ -31,6 +31,7 @@
 #include <sys/queue.h>
 #include <peregrine/peregrine.h>
 #include "eventloop.h"
+#include "hashtable.h"
 
 #ifndef __unused
 #define __unused __attribute__((unused))
@@ -151,6 +152,7 @@ struct pg_peer_swarm
 	struct pg_bitmap *want_bitmap;
 	struct pg_bitmap *sent_bitmap;
 	struct pg_buffer *buffer;
+	struct ht *requests;
 	enum pg_peer_swarm_state state;
 	bool choked;
 	uint32_t dst_channel_id;
