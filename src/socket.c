@@ -145,6 +145,9 @@ pg_socket_enqueue_tx(struct pg_context *ctx, struct pg_buffer *buffer)
 
 	TAILQ_INSERT_TAIL(&ctx->tx_queue, buffer, entry);
 
+	pg_handle_fd_write(ctx);
+	return;
+
 	if (!ctx->tx_active) {
 		ctx->tx_active = true;
 		ctx->can_send = true;

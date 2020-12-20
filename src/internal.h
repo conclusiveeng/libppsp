@@ -160,6 +160,7 @@ struct pg_peer_swarm
 	bool choked;
 	uint32_t dst_channel_id;
 	uint32_t src_channel_id;
+	int acked;
 
 	LIST_ENTRY(pg_peer_swarm) peer_entry;
 	LIST_ENTRY(pg_peer_swarm) swarm_entry;

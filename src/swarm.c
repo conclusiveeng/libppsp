@@ -26,6 +26,7 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #include <endian.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -81,7 +82,7 @@ pg_peerswarm_request_find_fn(uint64_t start, uint64_t end, bool value __unused, 
 	pg_bitmap_set_range(state->ps->want_bitmap, start, start + count - 1, true);
 	pack_request(state->ps->buffer, start, start + count - 1);
 
-	for (i = start; i < end; i++) {
+	for (i = start; i < start + count; i++) {
 		struct pg_requested_chunk *prc = xcalloc(1, sizeof(*prc));
 		prc->timestamp = pg_get_timestamp();
 		prc->ps = state->ps;
@@ -113,6 +114,7 @@ pg_peerswarm_request(struct pg_peer_swarm *ps)
 		/* Here we could send PEX_Req */
 		pg_buffer_enqueue(ps->buffer);
 		ps->state = PEERSWARM_WAIT_FIRST_DATA;
+		ps->acked = 4;
 		break;
 
 	case PEERSWARM_WAIT_FIRST_DATA:
@@ -126,10 +128,14 @@ pg_peerswarm_request(struct pg_peer_swarm *ps)
 
 		state.ps = ps;
 		state.collected = 0;
-		state.budget = 1;
+		state.budget = 4;
 
-		pg_bitmap_scan(ps->want_bitmap, BITMAP_SCAN_0, pg_peerswarm_request_find_fn, &state);
-		pg_buffer_enqueue(ps->buffer);
+		if (ps->acked >= 4) {
+			pg_bitmap_scan(ps->want_bitmap, BITMAP_SCAN_0, pg_peerswarm_request_find_fn,
+				       &state);
+			pg_buffer_enqueue(ps->buffer);
+			ps->acked = 0;
+		}
 		break;
 	}
 
@@ -156,7 +162,26 @@ pg_peerswarm_timer_scan_fn(uint64_t start, uint64_t end, bool value __unused, vo
 static bool
 pg_peerswarm_timer(void *arg)
 {
+	struct pg_requested_chunk *prc;
 	struct pg_peer_swarm *ps = arg;
+	struct ht_iter iter;
+	uint64_t now = pg_get_timestamp();
+	int nrequests = 0;
+
+#if 0
+	/* If leeching, go through outstanding request to see if we need retransmission */
+	ht_iter(&ps->requests, &iter);
+	while ((prc = ht_next(&iter)) != NULL) {
+		if (prc->timestamp + 500000 < now) {
+			INFO("request for chunk %" PRIu64 " timed out, retrying", prc->chunk);
+			pack_request(ps->buffer, prc->chunk, prc->chunk);
+			nrequests++;
+		}
+	}
+
+	if (nrequests)
+		pg_buffer_enqueue(ps->buffer);
+#endif
 
 	pg_bitmap_scan(ps->request_bitmap, BITMAP_SCAN_1, pg_peerswarm_timer_scan_fn, ps);
 	return (true);
