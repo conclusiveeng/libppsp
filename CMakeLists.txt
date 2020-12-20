@@ -66,9 +66,6 @@ if (PACKAGE_DEB)
     include(CPack)
 endif()
 
-add_library(libperegrine SHARED ${MAIN_SOURCES} ${EVENTLOOP_SOURCES})
-target_link_libraries(libperegrine m ${CMAKE_THREAD_LIBS_INIT})
-
 # Generate Doxygen docs
 if(BUILD_DOCS)
     find_package(Doxygen OPTIONAL_COMPONENTS dot)
@@ -87,7 +84,7 @@ if (BUILD_STATIC)
 else()
     add_library(peregrine SHARED ${MAIN_SOURCES} ${EVENTLOOP_SOURCES})
 endif()
-target_link_libraries(peregrine m)
+target_link_libraries(peregrine m ${CMAKE_THREAD_LIBS_INIT})
 
 # Prepare library
 configure_file(libperegrine.pc.in ${CMAKE_BINARY_DIR}/libperegrine.pc @ONLY)

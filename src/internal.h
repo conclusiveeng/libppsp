@@ -78,6 +78,13 @@ struct pg_buffer
 	TAILQ_ENTRY(pg_buffer) entry;
 };
 
+struct pg_requested_chunk
+{
+	struct pg_peer_swarm *ps;
+	uint32_t chunk;
+	uint64_t timestamp;
+};
+
 struct pg_protocol_options
 {
 	uint8_t version;
@@ -111,10 +118,6 @@ struct pg_file
 	SLIST_ENTRY(pg_file) entry;
 };
 
-/**
- * @brief peregrine peer structure - main communication object
- *
- */
 struct pg_peer
 {
 	struct pg_context *context;
@@ -152,7 +155,7 @@ struct pg_peer_swarm
 	struct pg_bitmap *want_bitmap;
 	struct pg_bitmap *sent_bitmap;
 	struct pg_buffer *buffer;
-	struct ht *requests;
+	struct ht requests;
 	enum pg_peer_swarm_state state;
 	bool choked;
 	uint32_t dst_channel_id;
@@ -301,6 +304,7 @@ int pg_file_write_chunks(struct pg_file *file, uint64_t chunk, size_t len, void 
 
 void pg_emit_event(struct pg_event *event);
 
+uint64_t pg_get_timestamp(void);
 void *xmalloc(size_t length);
 void *xcalloc(size_t nelems, size_t length);
 void *xrealloc(void *ptr, size_t length);

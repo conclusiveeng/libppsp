@@ -181,15 +181,11 @@ pg_send_have(struct pg_peer_swarm *ps)
 static int
 pg_ack(struct pg_peer_swarm *ps, uint64_t start, uint64_t end, uint64_t remote_ts)
 {
-	struct timespec ts = { 0, 0 };
 	uint64_t count = end - start + 1;
 	uint64_t local_ts;
 	uint64_t diff_ts;
 
-	if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
-		ERROR("clock_gettime error: %s", strerror(errno));
-
-	local_ts = ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+	local_ts = pg_get_timestamp();
 	diff_ts = local_ts - remote_ts;
 
 	ps->swarm->fetched_chunks += count;
@@ -239,15 +235,11 @@ pg_send_integrity(struct pg_peer_swarm *ps, uint32_t block)
 int
 pg_send_data(struct pg_peer_swarm *ps, uint64_t chunk)
 {
-	struct timespec ts = { 0, 0 };
 	void *ptr;
 	size_t len;
 	struct node *data_node;
 
-	if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
-		ERROR("clock_gettime error: %s", strerror(errno));
-
-	pack_data(ps->buffer, chunk, chunk, ts.tv_sec * 1000000 + ts.tv_nsec / 1000);
+	pack_data(ps->buffer, chunk, chunk, pg_get_timestamp());
 	ptr = pg_buffer_advance(ps->buffer, ps->options.chunk_size);
 	len = pg_file_read_chunks(ps->swarm->file, chunk, 1, ptr);
 	ps->buffer->used = ps->buffer->used - ps->options.chunk_size + len;

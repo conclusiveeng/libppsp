@@ -34,6 +34,7 @@
 #include <arpa/inet.h>
 #include <peregrine/peregrine.h>
 #include "internal.h"
+#include "log.h"
 
 int
 pg_sockaddr_cmp(const struct sockaddr *s1, const struct sockaddr *s2)
@@ -158,6 +159,17 @@ pg_parse_sha1(const char *str)
 	}
 
 	return (result);
+}
+
+uint64_t
+pg_get_timestamp(void)
+{
+	struct timespec ts;
+
+	if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
+		PANIC("clock_gettime error: %s", strerror(errno));
+
+	return (ts.tv_sec * 1000000 + ts.tv_nsec / 1000);
 }
 
 void *

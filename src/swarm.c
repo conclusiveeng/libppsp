@@ -73,12 +73,22 @@ pg_peerswarm_request_find_fn(uint64_t start, uint64_t end, bool value __unused, 
 {
 	struct pg_swarm_scan_state *state = arg;
 	uint64_t count = MIN(end - start + 1, state->budget);
+	uint64_t i;
 
 	DEBUG("requesting %d blocks @ %d", count, start);
 
 	state->collected += count;
 	pg_bitmap_set_range(state->ps->want_bitmap, start, start + count - 1, true);
 	pack_request(state->ps->buffer, start, start + count);
+
+	for (i = start; i < end; i++) {
+		struct pg_requested_chunk *prc = xcalloc(1, sizeof(*prc));
+		prc->timestamp = pg_get_timestamp();
+		prc->ps = state->ps;
+		prc->chunk = (uint32_t)i;
+		ht_add(&prc->ps->requests, i, prc);
+	}
+
 	return (state->collected <= state->budget);
 }
 
@@ -174,6 +184,7 @@ pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
 	ps->sent_bitmap = pg_bitmap_create(swarm->file->nl * 2);
 	ps->options = *options;
 	ps->buffer = pg_buffer_create(peer, ps->dst_channel_id);
+	ht_init(&ps->requests, 128);
 	LIST_INSERT_HEAD(&peer->swarms, ps, peer_entry);
 	LIST_INSERT_HEAD(&swarm->peers, ps, swarm_entry);
 
