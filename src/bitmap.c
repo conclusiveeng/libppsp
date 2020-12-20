@@ -25,7 +25,9 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 #include "internal.h"
+#include "log.h"
 
 struct pg_bitmap *
 pg_bitmap_create(uint64_t size)
@@ -136,6 +138,7 @@ pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
 	for (uint64_t i = 0; i < bmp->size; i++) {
 		old_val = new_val;
 		new_val = pg_bitmap_get(bmp, i);
+
 		if (new_val == old_val)
 			continue;
 
@@ -181,4 +184,17 @@ pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
 		fn(start, bmp->size - 1, new_val, arg);
 		break;
 	}
+}
+
+static bool
+pg_bitmap_dump_scan_fn(uint64_t start, uint64_t end, bool value, void *arg)
+{
+	DEBUG("%p: %" PRIu64 "-%" PRIu64, arg, start, end);
+	return (true);
+}
+
+void
+pg_bitmap_dump(struct pg_bitmap *bmp)
+{
+	pg_bitmap_scan(bmp, BITMAP_SCAN_1, pg_bitmap_dump_scan_fn, bmp);
 }
