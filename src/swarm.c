@@ -90,6 +90,7 @@ pg_peerswarm_request_find_fn(uint64_t start, uint64_t end, bool value __unused, 
 		ht_add(&prc->ps->requests, i, prc);
 	}
 
+
 	return (state->collected <= state->budget);
 }
 
@@ -130,7 +131,7 @@ pg_peerswarm_request(struct pg_peer_swarm *ps)
 		state.collected = 0;
 		state.budget = 4;
 
-		if (ps->acked >= 4) {
+		if (ps->acked >= state.budget) {
 			pg_bitmap_scan(ps->want_bitmap, BITMAP_SCAN_0, pg_peerswarm_request_find_fn,
 				       &state);
 			pg_buffer_enqueue(ps->buffer);
@@ -221,7 +222,6 @@ pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
 		/* Normally pg_send_have would do that, but we don't send it */
 		pg_buffer_enqueue(ps->buffer);
 	}
-	pg_peerswarm_request(ps);
 
 	event.ctx = peer->context;
 	event.peer = peer;
@@ -229,7 +229,7 @@ pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
 	event.type = EVENT_PEER_JOINED_SWARM;
 	pg_emit_event(&event);
 
-	pg_eventloop_add_timer(ps->peer->context->eventloop, 10, pg_peerswarm_timer, ps);
+	pg_eventloop_add_timer(ps->peer->context->eventloop, 100, pg_peerswarm_timer, ps);
 
 	return (ps);
 }

@@ -170,7 +170,6 @@ struct pg_peer_swarm
 struct pg_context
 {
 	int sock_fd;
-	int sock_fd_write;
 	struct sockaddr_storage addr;
 	struct pg_context_options options;
 	struct pg_eventloop *eventloop;
@@ -182,8 +181,6 @@ struct pg_context
 	SLIST_HEAD(, pg_file) files;
 	LIST_HEAD(, pg_download) downloads;
 	TAILQ_HEAD(, pg_block) io;
-	TAILQ_HEAD(, pg_buffer) tx_queue;
-	TAILQ_HEAD(, pg_buffer) tx_data_queue;
 };
 
 enum chunk_state
@@ -229,14 +226,24 @@ struct node
 struct pg_bitmap *pg_bitmap_create(uint64_t size);
 void pg_bitmap_grow(struct pg_bitmap *bmp, uint64_t new_size);
 void pg_bitmap_free(struct pg_bitmap *bmp);
-void pg_bitmap_set(struct pg_bitmap *bmp, uint64_t position);
 void pg_bitmap_set_range(struct pg_bitmap *bmp, uint64_t start, uint64_t end, bool value);
 void pg_bitmap_clear(struct pg_bitmap *bmp, uint64_t position);
 void pg_bitmap_fill(struct pg_bitmap *bmp, bool value);
 bool pg_bitmap_is_filled(struct pg_bitmap *bmp, bool value);
-bool pg_bitmap_get(struct pg_bitmap *bmp, uint64_t position);
 void pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
     pg_bitmap_scan_func_t fn, void *arg);
+
+static inline bool
+pg_bitmap_get(struct pg_bitmap *bmp, uint64_t position)
+{
+	return (bmp->data[position / 8] & (1 << (position % 8)));
+}
+
+static inline void
+pg_bitmap_set(struct pg_bitmap *bmp, uint64_t position)
+{
+	bmp->data[position / 8] |= (1 << (position % 8));
+}
 
 ssize_t pg_handle_message(struct pg_peer *peer, uint32_t chid, struct msg *msg,
     size_t datagram_left);
@@ -289,7 +296,6 @@ const char *pg_hexdump(const uint8_t *buf, size_t len);
 uint32_t pg_new_channel_id(void);
 
 void pg_socket_enqueue_tx(struct pg_context *ctx, struct pg_buffer *block);
-void pg_socket_suspend_tx(struct pg_context *ctx);
 
 struct pg_buffer *pg_buffer_create(struct pg_peer *peer, uint32_t channel_id);
 void pg_buffer_free(struct pg_buffer *buffer);

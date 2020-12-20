@@ -44,7 +44,6 @@
 #define FRAME_LENGTH	1500
 
 static bool pg_handle_fd_read(void *arg);
-static bool pg_handle_fd_write(void *arg);
 
 static struct pg_peer *
 pg_find_peer(struct pg_context *ctx, const struct sockaddr *saddr)
@@ -104,8 +103,6 @@ pg_context_create(struct pg_context_options *options, struct pg_context **ctxp)
 		return (-1);
 	}
 
-	ctx->sock_fd_write = dup(ctx->sock_fd);
-
 	/* Add the initial socket in read mode */
 	pg_eventloop_add_fd(ctx->eventloop, ctx->sock_fd, pg_handle_fd_read,
 	    EVENTLOOP_FD_READABLE, ctx);
@@ -114,8 +111,6 @@ pg_context_create(struct pg_context_options *options, struct pg_context **ctxp)
 	LIST_INIT(&ctx->downloads);
 	SLIST_INIT(&ctx->files);
 	TAILQ_INIT(&ctx->io);
-	TAILQ_INIT(&ctx->tx_queue);
-
 	*ctxp = ctx;
 	return (0);
 }
@@ -143,40 +138,18 @@ pg_socket_enqueue_tx(struct pg_context *ctx, struct pg_buffer *buffer)
 {
 	DEBUG("enqueue_tx: peer=%s length=%d", pg_peer_to_str(buffer->peer), buffer->used);
 
-	TAILQ_INSERT_TAIL(&ctx->tx_queue, buffer, entry);
-
-#if 0
-	pg_handle_fd_write(ctx);
-	return;
-#endif
-
-	if (!ctx->tx_active) {
-		ctx->tx_active = true;
-		ctx->can_send = true;
-		pg_eventloop_add_fd(ctx->eventloop, ctx->sock_fd_write, pg_handle_fd_write,
-		    EVENTLOOP_FD_WRITEABLE, ctx);
+	if (sendto(ctx->sock_fd, buffer->storage, buffer->used, 0,
+	    (struct sockaddr *)&buffer->peer->addr, sizeof(struct sockaddr_in)) < 0) {
+		ERROR("sendto: peer=%s error=%s", pg_peer_to_str(buffer->peer),
+		      strerror(errno));
 	}
-}
-
-void
-pg_socket_enqueue_tx_data(struct pg_context *ctx, struct pg_buffer *buffer)
-{
-	TAILQ_INSERT_TAIL(&ctx->tx_data_queue, buffer, entry);
-}
-
-void
-pg_socket_suspend_tx(struct pg_context *ctx)
-{
-	ctx->tx_active = false;
 }
 
 int
 pg_context_destroy(struct pg_context *ctx)
 {
 	struct pg_peer *peer;
-	struct pg_download *download;
 	struct pg_file *file;
-	struct pg_buffer *buffer;
 
 	LIST_FOREACH(peer, &ctx->peers, entry) {
 		LIST_REMOVE(peer, entry);
@@ -187,11 +160,6 @@ pg_context_destroy(struct pg_context *ctx)
 		file = SLIST_FIRST(&ctx->files);
 		SLIST_REMOVE_HEAD(&ctx->files, entry);
 		free(file);
-	}
-
-	TAILQ_FOREACH(buffer, &ctx->tx_queue, entry) {
-		TAILQ_REMOVE(&ctx->tx_queue, buffer, entry);
-		pg_buffer_free(buffer);
 	}
 
 	return (0);
@@ -254,41 +222,6 @@ pg_handle_fd_read(void *arg)
 
 		peregrine_handle_frame(ctx, (struct sockaddr *)&client_addr, frame, ret);
 	}
-}
-
-static bool
-pg_handle_fd_write(void *arg)
-{
-	struct pg_context *ctx = arg;
-	struct pg_buffer *buffer;
-	int i = 0;
-
-	DEBUG("ctx=%p fd=%d", ctx, ctx->sock_fd);
-
-	for (;;) {
-		buffer = TAILQ_FIRST(&ctx->tx_queue);
-		if (buffer == NULL) {
-			pg_socket_suspend_tx(ctx);
-			return (false);
-		}
-
-		if (sendto(ctx->sock_fd, buffer->storage, buffer->used, MSG_DONTWAIT,
-		    (struct sockaddr *)&buffer->peer->addr, sizeof(struct sockaddr_in)) < 0) {
-			if (errno == EAGAIN)
-				break;
-
-			/* XXX */
-			ERROR("sendto: peer=%s error=%s", pg_peer_to_str(buffer->peer),
-			    strerror(errno));
-			break;
-		}
-
-		DEBUG("sent buffer %p with %d bytes", buffer, buffer->used);
-		TAILQ_REMOVE(&ctx->tx_queue, buffer, entry);
-		pg_buffer_free(buffer);
-	}
-
-	return (true);
 }
 
 void

@@ -68,12 +68,6 @@ pg_bitmap_free(struct pg_bitmap *bmp)
 }
 
 void
-pg_bitmap_set(struct pg_bitmap *bmp, uint64_t position)
-{
-	bmp->data[position / 8] |= (1 << (position % 8));
-}
-
-void
 pg_bitmap_set_range(struct pg_bitmap *bmp, uint64_t start, uint64_t end, bool value)
 {
 	uint64_t i;
@@ -120,12 +114,7 @@ pg_bitmap_is_filled(struct pg_bitmap *bmp, bool value)
 	return (true);
 }
 
-bool
-pg_bitmap_get(struct pg_bitmap *bmp, uint64_t position)
-{
 
-	return (bmp->data[position / 8] & (1 << (position % 8)));
-}
 
 void
 pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
