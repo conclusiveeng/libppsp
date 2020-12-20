@@ -68,6 +68,12 @@ struct pg_bitmap
 	uint8_t *data;
 };
 
+struct pg_bitmap_scan_result
+{
+	size_t start;
+	size_t count;
+};
+
 struct pg_buffer
 {
 	struct pg_peer *peer;
@@ -230,8 +236,13 @@ void pg_bitmap_set_range(struct pg_bitmap *bmp, uint64_t start, uint64_t end, bo
 void pg_bitmap_clear(struct pg_bitmap *bmp, uint64_t position);
 void pg_bitmap_fill(struct pg_bitmap *bmp, bool value);
 bool pg_bitmap_is_filled(struct pg_bitmap *bmp, bool value);
-void pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
+bool pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
     pg_bitmap_scan_func_t fn, void *arg);
+bool pg_bitmap_scan_range_limit(struct pg_bitmap *bmp, size_t start, size_t end,
+    size_t limit, enum pg_bitmap_scan_mode mode, pg_bitmap_scan_func_t fn,
+    void *arg);
+void pg_bitmap_find_first(struct pg_bitmap *bmp, size_t limit,
+    enum pg_bitmap_scan_mode mode, uint64_t *start, uint64_t *count);
 
 static inline bool
 pg_bitmap_get(struct pg_bitmap *bmp, uint64_t position)

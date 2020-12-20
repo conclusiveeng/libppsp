@@ -116,31 +116,122 @@ pg_bitmap_is_filled(struct pg_bitmap *bmp, bool value)
 
 
 
-void
+bool
 pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
     pg_bitmap_scan_func_t fn, void *arg)
 {
-	uint64_t start = 0;
-	bool old_val;
-	bool new_val = pg_bitmap_get(bmp, start);
 
-	for (uint64_t i = 0; i < bmp->size; i++) {
+	return(pg_bitmap_scan_range_limit(bmp, 0, bmp->size - 1, 0, mode, fn, arg));
+}
+
+bool
+pg_bitmap_find_first_fn(uint64_t start, uint64_t end, bool __unused value, void *arg)
+{
+	struct pg_bitmap_scan_result *res = arg;
+
+	res->start = start;
+	res->count = end - start + 1;
+
+	return (false);
+}
+
+void
+pg_bitmap_find_first(struct pg_bitmap *bmp, size_t limit,
+    enum pg_bitmap_scan_mode mode, uint64_t *start, uint64_t *count)
+{
+	struct pg_bitmap_scan_result res;
+
+	res.count = 0;
+	res.start = 0;
+
+	pg_bitmap_scan_range_limit(bmp, 0, bmp->size - 1, limit, mode,
+	    pg_bitmap_find_first_fn, &res);
+
+	*start = res.start;
+	*count = res.count;
+}
+
+bool
+pg_bitmap_scan_range_limit(struct pg_bitmap *bmp, size_t start, size_t end,
+    size_t limit, enum pg_bitmap_scan_mode mode, pg_bitmap_scan_func_t fn,
+    void *arg)
+{
+	size_t range_start = start;
+	size_t range_size = 0;
+	bool old_val;
+	bool new_val = pg_bitmap_get(bmp, range_start);
+	bool cb_called = false;
+
+	for (uint64_t i = range_start; i <= end; i++) {
+		if (i % 64 == 0 && i + 64 < end) {
+			uint64_t cmp_val;
+
+			if (new_val)
+				cmp_val = 0xffffffffffffffff;
+			else
+				cmp_val = 0x0000000000000000;
+
+			if (((uint64_t *)bmp->data)[i / 64] == cmp_val) {
+				i += 63;
+				range_size += 64;
+				continue;
+			}
+		}
+
 		old_val = new_val;
 		new_val = pg_bitmap_get(bmp, i);
 
-		if (new_val == old_val)
+		if (limit != 0) {
+			bool call = false;
+			if (range_size >= limit) {
+				switch (mode) {
+				case BITMAP_SCAN_0:
+					if (!old_val) {
+						range_size = 0;
+						call = true;
+					}
+					break;
+				case BITMAP_SCAN_1:
+					if (old_val) {
+						range_size = 0;
+						call = true;
+					}
+					break;
+				case BITMAP_SCAN_BOTH:
+				default:
+					range_size = 0;
+					call = true;
+					break;
+				}
+			}
+
+			if (call) {
+				cb_called = true;
+				if (!fn(range_start, range_start + limit - 1, old_val, arg))
+					return (cb_called);
+
+				i = range_size + limit - 1;
+				continue;
+			}
+		}
+
+		if (new_val == old_val) {
+			range_size++;
 			continue;
+		}
 
 		switch (mode) {
 		case BITMAP_SCAN_0:
 			if (old_val) {
-				start = i;
+				range_start = i;
+				range_size = 1;
 				continue;
 			}
 			break;
 		case BITMAP_SCAN_1:
 			if (!old_val) {
-				start = i;
+				range_start = i;
+				range_size = 1;
 				continue;
 			}
 			break;
@@ -149,30 +240,35 @@ pg_bitmap_scan(struct pg_bitmap *bmp, enum pg_bitmap_scan_mode mode,
 			break;
 		}
 
-		if (!fn(start, i - 1, old_val, arg))
-			return;
+		cb_called = true;
+		if (!fn(range_start, i - 1, old_val, arg))
+			return (cb_called);
 
-		if (mode == BITMAP_SCAN_BOTH)
-			start = i;
+		if (mode == BITMAP_SCAN_BOTH) {
+			range_start = i;
+			range_size = 1;
+		}
 	}
 
-	if (start == bmp->size - 1 && old_val == new_val)
-		return;
+	if (range_start == end && old_val == new_val)
+		return (cb_called);
 
 	switch (mode) {
 	case BITMAP_SCAN_0:
-		if (!new_val)
-			fn(start, bmp->size - 1, new_val, arg);
+		if (new_val)
+			return (cb_called);
 		break;
 	case BITMAP_SCAN_1:
-		if (new_val)
-			fn(start, bmp->size - 1, new_val, arg);
+		if (!new_val)
+			return (cb_called);
 		break;
 	case BITMAP_SCAN_BOTH:
 	default:
-		fn(start, bmp->size - 1, new_val, arg);
 		break;
 	}
+
+	fn(range_start, end, new_val, arg);
+	return (true);
 }
 
 static bool
