@@ -529,6 +529,7 @@ static ssize_t
 pg_handle_have(struct pg_peer *peer, uint32_t chid, struct msg *msg,
     size_t datagram_left)
 {
+	struct pg_peer_swarm *otherps;
 	struct pg_peer_swarm *ps;
 	uint32_t start = be32toh(msg->have.start_chunk);
 	uint32_t end = be32toh(msg->have.end_chunk);
@@ -545,8 +546,11 @@ pg_handle_have(struct pg_peer *peer, uint32_t chid, struct msg *msg,
 		DEBUG("have: updating swarm size to %u blocks", end + 1);
 		ps->swarm->nc = end + 1;
 		ps->swarm->file->nc = end + 1;
+
+		LIST_FOREACH(otherps, &ps->swarm->peers, swarm_entry)
+			pg_bitmap_grow(otherps->have_bitmap, end + 1);
+
 		pg_bitmap_grow(ps->swarm->have_bitmap, end + 1);
-		pg_bitmap_grow(ps->have_bitmap, end + 1);
 	}
 
 	pg_bitmap_set_range(ps->have_bitmap, start, end, true);
