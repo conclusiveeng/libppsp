@@ -60,7 +60,7 @@ pg_buffer_advance(struct pg_buffer *buffer, size_t len)
 {
 	void *ret;
 
-	if (buffer->allocated - buffer->used - len <= 0)
+	if (buffer->used + len >= buffer->allocated)
 		pg_buffer_enqueue(buffer);
 
 	ret = buffer->storage + buffer->used;
