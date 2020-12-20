@@ -70,34 +70,31 @@ pg_find_peerswarm_by_channel(struct pg_peer *peer, uint32_t channel_id)
 }
 
 static bool
-pg_peerswarm_request_find_fn(uint64_t start, uint64_t end, bool value __unused, void *arg)
+pg_peerswarm_request_range(struct pg_peer_swarm *ps, uint64_t start, uint64_t count)
 {
-	struct pg_swarm_scan_state *state = arg;
-	uint64_t count = MIN(end - start + 1, state->budget);
 	uint64_t i;
 
 	DEBUG("requesting %d blocks @ %d", count, start);
 
-	state->collected += count;
-	pg_bitmap_set_range(state->ps->want_bitmap, start, start + count - 1, true);
-	pack_request(state->ps->buffer, start, start + count - 1);
+	pg_bitmap_set_range(ps->want_bitmap, start, start + count - 1, true);
+	pack_request(ps->buffer, start, start + count - 1);
 
 	for (i = start; i < start + count; i++) {
 		struct pg_requested_chunk *prc = xcalloc(1, sizeof(*prc));
 		prc->timestamp = pg_get_timestamp();
-		prc->ps = state->ps;
+		prc->ps = ps;
 		prc->chunk = (uint32_t)i;
 		ht_add(&prc->ps->requests, i, prc);
 	}
 
-
-	return (state->collected <= state->budget);
 }
 
 void
 pg_peerswarm_request(struct pg_peer_swarm *ps)
 {
 	struct pg_swarm_scan_state state;
+	uint64_t start;
+	uint64_t count;
 
 	switch (ps->state) {
 	case PEERSWARM_WAIT_HAVE:
@@ -120,7 +117,7 @@ pg_peerswarm_request(struct pg_peer_swarm *ps)
 
 	case PEERSWARM_WAIT_FIRST_DATA:
 		DEBUG("waiting for first block from peer %s in swarm %s",
-		      pg_peer_to_str(ps->peer), pg_swarm_to_str(ps->swarm));
+		    pg_peer_to_str(ps->peer), pg_swarm_to_str(ps->swarm));
 		break;
 
 	case PEERSWARM_READY:
@@ -132,8 +129,9 @@ pg_peerswarm_request(struct pg_peer_swarm *ps)
 		state.budget = 4;
 
 		if (ps->acked >= state.budget) {
-			pg_bitmap_scan(ps->want_bitmap, BITMAP_SCAN_0, pg_peerswarm_request_find_fn,
-				       &state);
+			pg_bitmap_find_first(ps->want_bitmap, state.budget, BITMAP_SCAN_0,
+			    &start, &count);
+			pg_peerswarm_request_range(ps, start, count);
 			pg_buffer_enqueue(ps->buffer);
 			ps->acked = 0;
 		}
@@ -286,7 +284,7 @@ pg_swarm_create(struct pg_context *ctx, struct pg_file *file)
 {
 	struct pg_peer *peer;
 	struct pg_swarm *swarm;
-	struct pg_protocol_options options = { .chunk_size = 1024 };
+	struct pg_protocol_options options = { .chunk_size = ctx->options.chunk_size };
 
 	swarm = calloc(1, sizeof(*swarm));
 	swarm->context = ctx;

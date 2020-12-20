@@ -118,6 +118,8 @@ enum pg_event_type
 	EVENT_PEER_REMOVED,		/**< Peer was removed  */
 	EVENT_PEER_JOINED_SWARM, 	/**< Peer joined swarm  */
 	EVENT_PEER_LEFT_SWARM,		/**< Peer left the swarm  */
+	EVENT_SWARM_ADDED,		/**< New swarm was added */
+	EVENT_SWARM_REMOVED,		/**< Swarm was removed */
 	EVENT_SWARM_FINISHED,		/**< Finished swarm download activities */
 	EVENT_SWARM_FINISHED_ALL	/**< Finished all download activities */
 };
@@ -151,6 +153,7 @@ struct pg_context_options
 	enum pg_content_protection_method content_protection_method;	/**< PPSPP selected content protection method */
 	enum pg_merkle_hash_func merkle_hash_func;			/**< PPSPP selected merkle tree hash protection function  */
 	enum pg_chunk_addressing_method chunk_addressing_method;	/**< PPSPP chunk addressing method  */
+	int chunk_size;
 };
 
 /**

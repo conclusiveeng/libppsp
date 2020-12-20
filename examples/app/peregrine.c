@@ -267,13 +267,13 @@ main(int argc, char *const argv[])
 	struct peregrine_file *file;
 	struct peregrine_directory *dir;
 	struct peregrine_peer *peer;
+	struct pg_context_options options;
 	int local_port = 0;
+	int chunk_size = 1024;
 	int remain = 0;
 	bool summary = 0;
 	int ch;
 	int ret;
-
-	struct pg_context_options options;
 
 	TAILQ_INIT(&files);
 	TAILQ_INIT(&directories);
@@ -284,11 +284,15 @@ main(int argc, char *const argv[])
 		exit(EX_USAGE);
 	}
 
-	while ((ch = getopt(argc, argv, "hl:p:f:d:hs")) != -1) {
+	while ((ch = getopt(argc, argv, "hl:p:f:d:c:hs")) != -1) {
 		switch (ch) {
 		case 'h':
 			usage(argv[0]);
 			exit(EX_USAGE);
+
+		case 'c':
+			chunk_size = strtol(optarg, NULL, 10);
+			break;
 
 		case 'l':
 			local_port = strtol(optarg, NULL, 10);
@@ -328,6 +332,7 @@ main(int argc, char *const argv[])
 	options.listen_addr_len = sizeof(struct sockaddr_in);
 	options.event_fn = print_event;
 	options.fn_arg = NULL;
+	options.chunk_size = chunk_size;
 
 	if (pg_context_create(&options, &context) != 0) {
 		fprintf(stderr, "cannot create context: %s\n", strerror(errno));

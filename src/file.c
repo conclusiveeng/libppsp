@@ -177,7 +177,7 @@ pg_file_add_file(struct pg_context *context, const uint8_t *sha1, const char *pa
 	file->fd = fd;
 	file->path = strdup(path);
 	file->file_size = stat.st_size;
-	file->chunk_size = 1024;
+	file->chunk_size = context->options.chunk_size;
 	file->nc = 1; /* We assume the file has at least one chunk */
 	SLIST_INSERT_HEAD(&context->files, file, entry);
 
@@ -237,7 +237,7 @@ pg_file_write_chunks(struct pg_file *file, uint64_t chunk, size_t len, void *buf
 	ssize_t ret;
 
 	ret = pwrite(file->fd, buf, len, file->chunk_size * chunk);
-	if (ret != len)
+	if (ret != (ssize_t)len)
 		return (-1);
 
 	return (0);

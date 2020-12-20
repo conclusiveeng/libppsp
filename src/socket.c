@@ -240,7 +240,7 @@ pg_add_peer(struct pg_context *ctx, struct sockaddr *sa, struct pg_peer **peerp)
 {
 	struct pg_peer *peer;
 	struct pg_swarm *swarm;
-	struct pg_protocol_options options = { .chunk_size = 1024 };
+	struct pg_protocol_options options = { .chunk_size = ctx->options.chunk_size };
 
 	DEBUG("add peer %s into context %p", pg_sockaddr_to_str(sa), ctx);
 
