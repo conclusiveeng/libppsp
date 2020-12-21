@@ -440,7 +440,7 @@ done:
 
 	/* Closing handshake */
 	if (msg->handshake.src_channel_id == 0) {
-		pg_peerswarm_destroy(ps);
+		pg_peerswarm_disconnect(ps);
 		return (MSG_LENGTH(msg_handshake) + pos);
 	}
 

@@ -204,6 +204,13 @@ print_event(struct pg_event *ev, void *arg __attribute__((unused)))
 		event_printf("Peer %s joined swarm %s\n", pg_peer_to_str(ev->peer),
 		    pg_swarm_to_str(ev->swarm));
 		break;
+	case EVENT_SWARM_ADDED:
+                event_printf("Swarm %s was created\n", pg_swarm_to_str(ev->swarm));
+                break;
+
+        case EVENT_SWARM_REMOVED:
+                event_printf("Swarm was removed\n");
+                break;
 
 	case EVENT_SWARM_FINISHED:
 		event_printf("Finished downloading %s\n", pg_swarm_to_str(ev->swarm));

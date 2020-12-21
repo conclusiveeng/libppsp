@@ -275,7 +275,7 @@ int pg_send_closing_handshake(struct pg_peer_swarm *ps);
 
 struct pg_peer_swarm *pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
     struct pg_protocol_options *options, uint32_t src_channel_id, uint32_t dst_channel_id);
-void pg_peerswarm_destroy(struct pg_peer_swarm *ps);
+void pg_peerswarm_disconnect(struct pg_peer_swarm *ps);
 struct pg_rx_range_timeout *pg_peerswarm_create_range_timeout(size_t start_chunk,
     size_t end_chunk);
 void pg_peerswarm_request(struct pg_peer_swarm *ps);

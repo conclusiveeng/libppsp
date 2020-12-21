@@ -267,7 +267,30 @@ pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
 }
 
 void
-pg_peerswarm_destroy(struct pg_peer_swarm *ps)
+pg_peerswarm_free(struct pg_peer_swarm *ps) {
+        struct pg_event ev;
+
+        pg_bitmap_free(ps->have_bitmap);
+        pg_bitmap_free(ps->request_bitmap);
+        pg_bitmap_free(ps->want_bitmap);
+        pg_bitmap_free(ps->sent_bitmap);
+        pg_buffer_free(ps->buffer);
+
+        while (ps->timeout_queue.tqh_first != NULL) {
+		TAILQ_REMOVE(&ps->timeout_queue, ps->timeout_queue.tqh_first, entry);
+	}
+
+        free(ps);
+	
+        ev.ctx = NULL;
+        ev.peer = NULL;
+        ev.swarm = NULL;
+        ev.type = EVENT_SWARM_REMOVED;
+        pg_emit_event(&ev);
+}
+
+void
+pg_peerswarm_disconnect(struct pg_peer_swarm *ps)
 {
 	struct pg_event ev;
 
@@ -318,6 +341,7 @@ pg_swarm_create(struct pg_context *ctx, struct pg_file *file)
 {
 	struct pg_peer *peer;
 	struct pg_swarm *swarm;
+        struct pg_event ev;
 	struct pg_protocol_options options = { .chunk_size = ctx->options.chunk_size };
 
 	swarm = calloc(1, sizeof(*swarm));
@@ -338,6 +362,12 @@ pg_swarm_create(struct pg_context *ctx, struct pg_file *file)
 	LIST_FOREACH(peer, &ctx->peers, entry) {
 		pg_peerswarm_create(peer, swarm, &options, pg_new_channel_id(), 0);
 	}
+
+        ev.ctx = ctx;
+        ev.type = EVENT_SWARM_ADDED;
+        ev.swarm = swarm;
+        ev.peer = NULL;
+        pg_emit_event(&ev);
 
 	return (swarm);
 }
