@@ -80,15 +80,16 @@ endif()
 
 # Build dynamic libary by default, provide option for static
 if (BUILD_STATIC)
-    add_library(peregrine STATIC ${MAIN_SOURCES} ${EVENTLOOP_SOURCES})
+    add_library(libperegrine STATIC ${MAIN_SOURCES} ${EVENTLOOP_SOURCES})
 else()
-    add_library(peregrine SHARED ${MAIN_SOURCES} ${EVENTLOOP_SOURCES})
+    add_library(libperegrine SHARED ${MAIN_SOURCES} ${EVENTLOOP_SOURCES})
 endif()
-target_link_libraries(peregrine m ${CMAKE_THREAD_LIBS_INIT})
+set_target_properties(libperegrine PROPERTIES PREFIX "")
+target_link_libraries(libperegrine m ${CMAKE_THREAD_LIBS_INIT})
 
 # Prepare library
 configure_file(libperegrine.pc.in ${CMAKE_BINARY_DIR}/libperegrine.pc @ONLY)
-install(TARGETS peregrine DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS libperegrine DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
 # Handle build for Linux/FreeBSD
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
