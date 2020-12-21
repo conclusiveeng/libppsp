@@ -42,6 +42,7 @@ struct pg_context;
 struct pg_swarm;
 struct pg_peer;
 struct pg_peer_swarm;
+struct pg_rx_range_timeout;
 
 typedef bool (*pg_bitmap_scan_func_t)(uint64_t start, uint64_t end, bool value,
     void *arg);
@@ -151,6 +152,14 @@ struct pg_swarm
 	LIST_ENTRY(pg_swarm) entry;
 };
 
+struct pg_rx_range_timeout
+{
+	size_t start;
+	size_t end;
+	uint64_t requested_at;
+	TAILQ_ENTRY(pg_rx_range_timeout) entry;
+};
+
 struct pg_peer_swarm
 {
 	struct pg_peer *peer;
@@ -161,7 +170,6 @@ struct pg_peer_swarm
 	struct pg_bitmap *want_bitmap;
 	struct pg_bitmap *sent_bitmap;
 	struct pg_buffer *buffer;
-	struct ht requests;
 	enum pg_peer_swarm_state state;
 	bool choked;
 	uint32_t dst_channel_id;
@@ -170,6 +178,7 @@ struct pg_peer_swarm
 
 	LIST_ENTRY(pg_peer_swarm) peer_entry;
 	LIST_ENTRY(pg_peer_swarm) swarm_entry;
+	TAILQ_HEAD(, pg_rx_range_timeout) timeout_queue;
 };
 
 /* instance */
@@ -267,6 +276,8 @@ int pg_send_closing_handshake(struct pg_peer_swarm *ps);
 struct pg_peer_swarm *pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
     struct pg_protocol_options *options, uint32_t src_channel_id, uint32_t dst_channel_id);
 void pg_peerswarm_destroy(struct pg_peer_swarm *ps);
+struct pg_rx_range_timeout *pg_peerswarm_create_range_timeout(size_t start_chunk,
+    size_t end_chunk);
 void pg_peerswarm_request(struct pg_peer_swarm *ps);
 struct pg_swarm *pg_swarm_create(struct pg_context *ctx, struct pg_file *file);
 void pg_swarm_finished(struct pg_swarm *swarm);

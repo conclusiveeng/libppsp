@@ -181,11 +181,9 @@ pg_send_have(struct pg_peer_swarm *ps)
 static int
 pg_ack(struct pg_peer_swarm *ps, uint64_t start, uint64_t end, uint64_t remote_ts)
 {
-	struct pg_requested_chunk *prc;
 	uint64_t count = end - start + 1;
 	uint64_t local_ts;
 	uint64_t diff_ts;
-	uint64_t i;
 
 	local_ts = pg_get_timestamp();
 	diff_ts = local_ts - remote_ts;
@@ -196,16 +194,6 @@ pg_ack(struct pg_peer_swarm *ps, uint64_t start, uint64_t end, uint64_t remote_t
 
 	pack_ack(ps->buffer, start, end, diff_ts);
 	pg_buffer_enqueue(ps->buffer);
-
-	for (i = start; i <= end; i++) {
-		prc = ht_find(&ps->requests, i);
-		if (prc == NULL) {
-			WARN("spurious ack for chunk %" PRIu64, i);
-			continue;
-		}
-
-		ht_remove(&ps->requests, i);
-	}
 
 	if (pg_bitmap_is_filled(ps->swarm->have_bitmap, true))
 		pg_swarm_finished(ps->swarm);

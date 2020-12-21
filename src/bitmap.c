@@ -211,6 +211,7 @@ pg_bitmap_scan_range_limit(struct pg_bitmap *bmp, size_t start, size_t end,
 					return (cb_called);
 
 				i = range_size + limit - 1;
+				range_start = i;
 				continue;
 			}
 		}

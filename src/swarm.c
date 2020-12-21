@@ -24,11 +24,8 @@
  */
 
 #include <sys/param.h>
-#include <sys/types.h>
-#include <endian.h>
 #include <inttypes.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
 #include "internal.h"
 #include "proto.h"
@@ -69,30 +66,38 @@ pg_find_peerswarm_by_channel(struct pg_peer *peer, uint32_t channel_id)
 	return (NULL);
 }
 
-static bool
+static void
 pg_peerswarm_request_range(struct pg_peer_swarm *ps, uint64_t start, uint64_t count)
 {
-	uint64_t i;
+	struct pg_rx_range_timeout *range;
 
 	DEBUG("requesting %d blocks @ %d", count, start);
 
 	pg_bitmap_set_range(ps->want_bitmap, start, start + count - 1, true);
+	range = pg_peerswarm_create_range_timeout(start, start + count - 1);
+	TAILQ_INSERT_TAIL(&ps->timeout_queue, range, entry);
 	pack_request(ps->buffer, start, start + count - 1);
 
-	for (i = start; i < start + count; i++) {
-		struct pg_requested_chunk *prc = xcalloc(1, sizeof(*prc));
-		prc->timestamp = pg_get_timestamp();
-		prc->ps = ps;
-		prc->chunk = (uint32_t)i;
-		ht_add(&prc->ps->requests, i, prc);
-	}
+}
 
+struct pg_rx_range_timeout *
+pg_peerswarm_create_range_timeout(size_t start_chunk, size_t end_chunk)
+{
+	struct pg_rx_range_timeout *range;
+
+	range = calloc(1, sizeof(*range));
+	range->start = start_chunk;
+	range->end = end_chunk;
+	range->requested_at = pg_get_timestamp();
+
+	return (range);
 }
 
 void
 pg_peerswarm_request(struct pg_peer_swarm *ps)
 {
 	struct pg_swarm_scan_state state;
+	struct pg_rx_range_timeout *range;
 	uint64_t start;
 	uint64_t count;
 
@@ -109,6 +114,9 @@ pg_peerswarm_request(struct pg_peer_swarm *ps)
 
 		pg_bitmap_set(ps->want_bitmap, 0);
 		pack_request(ps->buffer, 0, 0);
+		range = pg_peerswarm_create_range_timeout(0, 0);
+		TAILQ_INSERT_TAIL(&ps->timeout_queue, range, entry);
+
 		/* Here we could send PEX_Req */
 		pg_buffer_enqueue(ps->buffer);
 		ps->state = PEERSWARM_WAIT_FIRST_DATA;
@@ -131,6 +139,9 @@ pg_peerswarm_request(struct pg_peer_swarm *ps)
 		if (ps->acked >= state.budget) {
 			pg_bitmap_find_first(ps->want_bitmap, state.budget, BITMAP_SCAN_0,
 			    &start, &count);
+			if (count == 0)
+				return;
+
 			pg_peerswarm_request_range(ps, start, count);
 			pg_buffer_enqueue(ps->buffer);
 			ps->acked = 0;
@@ -161,28 +172,50 @@ pg_peerswarm_timer_scan_fn(uint64_t start, uint64_t end, bool value __unused, vo
 static bool
 pg_peerswarm_timer(void *arg)
 {
-	struct pg_requested_chunk *prc;
 	struct pg_peer_swarm *ps = arg;
-	struct ht_iter iter;
-	uint64_t now = pg_get_timestamp();
-	int nrequests = 0;
-
-#if 0
-	/* If leeching, go through outstanding request to see if we need retransmission */
-	ht_iter(&ps->requests, &iter);
-	while ((prc = ht_next(&iter)) != NULL) {
-		if (prc->timestamp + 500000 < now) {
-			INFO("request for chunk %" PRIu64 " timed out, retrying", prc->chunk);
-			pack_request(ps->buffer, prc->chunk, prc->chunk);
-			nrequests++;
-		}
-	}
-
-	if (nrequests)
-		pg_buffer_enqueue(ps->buffer);
-#endif
 
 	pg_bitmap_scan(ps->request_bitmap, BITMAP_SCAN_1, pg_peerswarm_timer_scan_fn, ps);
+	return (true);
+}
+
+static bool
+pg_peerswarm_rx_req_timer_scan_fn(uint64_t start, uint64_t end,
+    bool value __unused, void *arg)
+{
+	struct pg_peer_swarm *ps = arg;
+
+	pg_bitmap_set_range(ps->want_bitmap, start, end, false);
+	return (true);
+}
+
+static bool
+pg_peerswarm_rx_req_timer(void *arg)
+{
+	struct pg_peer_swarm *ps = arg;
+	struct pg_rx_range_timeout *range;
+	uint64_t now;
+	uint64_t elapsed_us;
+	uint64_t req_timeout_us = 1000000;
+	bool want_cleared = false;
+
+	now = pg_get_timestamp();
+
+	while (!TAILQ_EMPTY(&ps->timeout_queue)) {
+		range = TAILQ_FIRST(&ps->timeout_queue);
+		elapsed_us = now - range->requested_at;
+
+		if (elapsed_us >= req_timeout_us) {
+			want_cleared |= pg_bitmap_scan_range_limit(ps->have_bitmap,
+			    range->start, range->end, 0, BITMAP_SCAN_0,
+			    pg_peerswarm_rx_req_timer_scan_fn, ps);
+			TAILQ_REMOVE(&ps->timeout_queue, range, entry);
+		} else
+			return (true);
+	}
+
+	if (want_cleared)
+		pg_peerswarm_request(ps);
+
 	return (true);
 }
 
@@ -208,7 +241,7 @@ pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
 	ps->sent_bitmap = pg_bitmap_create(swarm->file->nl * 2);
 	ps->options = *options;
 	ps->buffer = pg_buffer_create(peer, ps->dst_channel_id);
-	ht_init(&ps->requests, 128);
+	TAILQ_INIT(&ps->timeout_queue);
 	LIST_INSERT_HEAD(&peer->swarms, ps, peer_entry);
 	LIST_INSERT_HEAD(&swarm->peers, ps, swarm_entry);
 
@@ -228,6 +261,7 @@ pg_peerswarm_create(struct pg_peer *peer, struct pg_swarm *swarm,
 	pg_emit_event(&event);
 
 	pg_eventloop_add_timer(ps->peer->context->eventloop, 100, pg_peerswarm_timer, ps);
+	pg_eventloop_add_timer(ps->peer->context->eventloop, 1000, pg_peerswarm_rx_req_timer, ps);
 
 	return (ps);
 }
