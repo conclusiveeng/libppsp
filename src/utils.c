@@ -81,12 +81,19 @@ pg_sockaddr_to_str(struct sockaddr *sa)
 	struct sockaddr_in *sin;
 	struct sockaddr_in6 *sin6;
 	static char storage[64];
+        char ip_addr[INET6_ADDRSTRLEN];
 
 	switch (sa->sa_family) {
 	case AF_INET:
 		sin = (struct sockaddr_in *)sa;
-		sprintf(storage, "%s:%d", inet_ntoa(sin->sin_addr), ntohs(sin->sin_port));
+                inet_ntop(AF_INET, &sin->sin_addr, ip_addr, INET6_ADDRSTRLEN);
+		sprintf(storage, "%s:%d", ip_addr, ntohs(sin->sin_port));
 		return (storage);
+	case AF_INET6:
+		sin6 = (struct sockaddr_in6 *)sa;
+                inet_ntop(AF_INET6, &sin6->sin6_addr, ip_addr, INET6_ADDRSTRLEN);
+                sprintf(storage, "%s:%d", ip_addr, ntohs(sin6->sin6_port));
+                return (storage);
 	}
 
 	errno = EINVAL;

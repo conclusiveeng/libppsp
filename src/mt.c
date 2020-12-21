@@ -341,7 +341,7 @@ pg_tree_show(struct node *tree)
 	size_t height;
 	int first_idx;
 	size_t center;
-	int sp;
+	unsigned int sp;
 	struct node *min;
 	struct node *max;
 	struct node *root;
@@ -359,7 +359,7 @@ pg_tree_show(struct node *tree)
 	/* justification */
 	center = (n_leaves * (2 + 2)) / 2;
 	for (level = height; level >= 1; level--) {
-		int is = 1 << level;            /* how many spaces has to be inserted between values on
+		unsigned int is = 1 << level;            /* how many spaces has to be inserted between values on
 		                               given level */
 		int iw = 1 << (height - level);      /* number of nodes to print on given level */
 		int m = iw * (2 + is) - is; /*  */
