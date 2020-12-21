@@ -147,6 +147,10 @@ pg_peerswarm_request(struct pg_peer_swarm *ps)
 			ps->acked = 0;
 		}
 		break;
+	case PEERSWARM_CREATED:
+	case PEERSWARM_HANDSHAKE:
+	default:
+		break;
 	}
 
 
