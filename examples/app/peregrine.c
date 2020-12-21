@@ -34,25 +34,23 @@
  * 
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <unistd.h>
+#include <arpa/inet.h>
 #include <err.h>
 #include <errno.h>
+#include <evutil.h>
 #include <getopt.h>
-#include <poll.h>
-#include <string.h>
 #include <inttypes.h>
-#include <sysexits.h>
-#include <inttypes.h>
-#include <sys/poll.h>
-#include <sys/socket.h>
-#include <sys/queue.h>
-#include <sys/param.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
 #include <peregrine/peregrine.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/param.h>
+#include <sys/poll.h>
+#include <sys/queue.h>
+#include <sys/socket.h>
+#include <sysexits.h>
 
 /**
  * @brief Maximum length of SHA1 in HEX string
@@ -103,7 +101,7 @@ usage(const char *argv0)
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "-h	show this help message \n");
 	fprintf(stderr, "-l	local port 	(eg. -l <port>) \n");
-	fprintf(stderr, "-p	peer address	(eg. -p <host>:<port>) \n");
+	fprintf(stderr, "-p	peer address	(eg. -p <ip addr>:<port> OR -p <hostname>:<port>) \n");
 	fprintf(stderr, "-f	file, sha1 	(eg. -f <filename> or -f <filename>:<sha1> ) \n");
 	fprintf(stderr, "-d	directory 	(eg. -d <path/to/directory> ) \n");
 	fprintf(stderr, "-s	enable showing summary (if disabled only callbacks will be used ) \n");
@@ -160,27 +158,65 @@ add_directory(const char *dirspec)
 }
 
 static int
+add_peer_check_addr(struct sockaddr_in *addr) {
+        struct peregrine_peer *existing_peer;
+        struct sockaddr_in *other_addr;
+        struct sockaddr_in zero_addr;
+
+        inet_aton("0.0.0.0", &zero_addr.sin_addr);
+        if (memcmp((void *)&zero_addr.sin_addr, (void *)&addr->sin_addr, sizeof (zero_addr.sin_addr)) == 0)
+		return -1;
+
+        TAILQ_FOREACH(existing_peer, &peers, entry) {
+		other_addr = (struct sockaddr_in *)&existing_peer->sa;
+		if (memcmp((void *)&other_addr->sin_addr, (void *)&addr->sin_addr, sizeof (other_addr->sin_addr)) == 0)
+			return -1;
+	}
+
+	return 0;
+}
+
+static int
 add_peer(const char *peerspec)
 {
 	struct peregrine_peer *peer;
 	struct sockaddr_in *sin;
+        struct addrinfo hints;
+	struct addrinfo *result;
+        struct addrinfo* res;
 	char addr[NAME_MAX];
 	uint16_t port;
-
-	peer = calloc(1, sizeof(*peer));
-	sin = (struct sockaddr_in *)&peer->sa;
+	int ret;
 
 	if (sscanf(peerspec, "%[^:]:%hd", addr, &port) < 2) {
 		fprintf(stderr, "Cannot parse peer spec: %s", peerspec);
 		return (-1);
 	}
 
-	sin->sin_family = AF_INET;
-	sin->sin_port = htons(port);
-	inet_aton(addr, &sin->sin_addr);
+        memset(&hints, 0, sizeof(struct addrinfo));
+        hints.ai_family = AF_INET;
+        hints.ai_protocol = SOCK_DGRAM;
+	ret = getaddrinfo(addr, NULL, &hints, &result);
+        if (ret != 0) {
+                fprintf(stderr, "getaddrinfo error: %s \n", gai_strerror(ret));
+                exit(EX_OSERR);
+        }
 
-	TAILQ_INSERT_TAIL(&peers, peer, entry);
-	return (0);
+        for (res = result; res != NULL; res = res->ai_next) {
+                if ( res->ai_family == AF_INET ) {
+                        if (add_peer_check_addr((struct sockaddr_in *)res->ai_addr) == 0) {
+                                peer = calloc(1, sizeof(*peer));
+                                sin = (struct sockaddr_in *)&peer->sa;
+                                sin->sin_family = AF_INET;
+                                sin->sin_port = htons(port);
+                                sin->sin_addr = ((struct sockaddr_in *)res->ai_addr)->sin_addr;
+			        TAILQ_INSERT_TAIL(&peers, peer, entry);
+                        }
+		}
+	}
+
+        freeaddrinfo(result);
+        return (0);
 }
 
 static void

@@ -41,11 +41,13 @@ Usage: examples/app/peregrine -lhpfds
 Options:
 -h      show this help message 
 -l      local port      (eg. -l <port>) 
--p      peer address    (eg. -p <host>:<port>) 
+-p      peer address    (eg. -p <ip addr>:<port> OR -p <hostname>:<port>) 
 -f      file, sha1      (eg. -f <filename> or -f <filename>:<sha1> ) 
 -d      directory       (eg. -d <path/to/directory> ) 
 -s      enable showing summary (if disabled only callbacks will be used )
 ```
+
+`<hostname>:<port>` - can be used to pass hostname, then DNS A entries will be used as list of IPv4 peers
 
 Seeder mode (directory):
 
