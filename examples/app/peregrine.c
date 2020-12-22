@@ -37,7 +37,6 @@
 #include <arpa/inet.h>
 #include <err.h>
 #include <errno.h>
-#include <evutil.h>
 #include <getopt.h>
 #include <inttypes.h>
 #include <netinet/in.h>
