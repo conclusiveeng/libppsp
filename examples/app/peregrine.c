@@ -313,6 +313,7 @@ main(int argc, char *const argv[])
 	struct pg_context_options options;
 	int local_port = 0;
 	int chunk_size = 1024;
+	int remain = 0;
 	bool summary = 0;
 	int ch;
 	int ret;
