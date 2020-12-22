@@ -55,7 +55,6 @@ ht_destroy(struct ht *h)
 {
 	struct ht_entry *he;
 	struct ht_item *item;
-	struct ht_item *tmp;
 	ssize_t i;
 
 	for (i = 0; i < h->ht_nentries; i++) {
@@ -144,14 +143,12 @@ ht_remove_locked(struct ht *h, uint32_t hash)
 {
 	struct ht_entry *entry;
 	struct ht_item *item;
-	struct ht_item *found = NULL;
 	ssize_t slot = hash % h->ht_nentries;
 
 	entry = &h->ht_entries[slot];
 
 	TAILQ_FOREACH(item, &entry->hte_items, hti_link) {
 		if (item->hti_hash == hash) {
-			found = item;
 			break;
 		}
 	}

@@ -95,6 +95,7 @@ void
 pg_eventloop_destroy(struct pg_eventloop *loop)
 {
 
+	free(loop);
 }
 
 void *

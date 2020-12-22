@@ -273,7 +273,7 @@ pg_bitmap_scan_range_limit(struct pg_bitmap *bmp, size_t start, size_t end,
 }
 
 static bool
-pg_bitmap_dump_scan_fn(uint64_t start, uint64_t end, bool value, void *arg)
+pg_bitmap_dump_scan_fn(uint64_t start, uint64_t end, bool __unused value, void *arg)
 {
 	DEBUG("%p: %" PRIu64 "-%" PRIu64, arg, start, end);
 	return (true);
