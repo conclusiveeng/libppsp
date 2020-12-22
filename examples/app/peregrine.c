@@ -51,6 +51,7 @@
 #include <sys/queue.h>
 #include <sys/socket.h>
 #include <sysexits.h>
+#include <sys/timerfd.h>
 
 /**
  * @brief Maximum length of SHA1 in HEX string
@@ -91,19 +92,21 @@ static TAILQ_HEAD(, peregrine_file) files;
 static TAILQ_HEAD(, peregrine_directory) directories;
 static TAILQ_HEAD(, peregrine_peer) peers;
 static struct pg_context *context;
-static bool finished = false;
 static bool print_events = false;
+int remain = 0;
+int remain_timerfd = -1;
 
 static void
 usage(const char *argv0)
 {
-	fprintf(stderr, "Usage: %s -lhpfds \n", argv0);
+	fprintf(stderr, "Usage: %s -lhpfdrs \n", argv0);
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "-h	show this help message \n");
 	fprintf(stderr, "-l	local port 	(eg. -l <port>) \n");
 	fprintf(stderr, "-p	peer address	(eg. -p <ip addr>:<port> OR -p <hostname>:<port>) \n");
 	fprintf(stderr, "-f	file, sha1 	(eg. -f <filename> or -f <filename>:<sha1> ) \n");
 	fprintf(stderr, "-d	directory 	(eg. -d <path/to/directory> ) \n");
+        fprintf(stderr, "-r	remain minutes 	(eg. -r 15 ) \n");
 	fprintf(stderr, "-s	enable showing summary (if disabled only callbacks will be used ) \n");
 }
 
@@ -219,6 +222,33 @@ add_peer(const char *peerspec)
         return (0);
 }
 
+void
+add_remain_timer(int remain_min, int *timer_fd)
+{
+        struct itimerspec ts;
+
+	if (remain_min < 0) {
+                fprintf(stderr, "Wrong remain_min time value.");
+		return;
+	}
+
+	if (*timer_fd == -1) {
+                *timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC);
+                if (*timer_fd < 0) {
+                        fprintf(stderr, "Cannot setup timer.");
+                        exit(EX_OSERR);
+                }
+        }
+
+        ts.it_interval.tv_sec = remain_min * 60;
+        ts.it_interval.tv_nsec = 0;
+        ts.it_value.tv_sec = ts.it_interval.tv_sec;
+        ts.it_value.tv_nsec = ts.it_interval.tv_nsec;
+
+        if (timerfd_settime(*timer_fd, 0, &ts, NULL) != 0)
+                fprintf(stderr, "Cannot set remain_min timer \n");
+}
+
 static void
 print_event(struct pg_event *ev, void *arg __attribute__((unused)))
 {
@@ -254,8 +284,12 @@ print_event(struct pg_event *ev, void *arg __attribute__((unused)))
 
 	case EVENT_SWARM_FINISHED_ALL:
 		event_printf("Finished all downloads\n");
-		finished = true;
-		exit(0);
+                if (remain > 0) {
+                        event_printf("Setup remain timer for: %d minutes \n", remain);
+                        add_remain_timer(remain, &remain_timerfd);
+                } else {
+			exit(EXIT_SUCCESS);
+		}
 		break;
 
 	case EVENT_UNKNOWN:
@@ -306,14 +340,13 @@ int
 main(int argc, char *const argv[])
 {
 	struct sockaddr_in sin;
-	struct pollfd pfd;
+	struct pollfd pfd[2];
 	struct peregrine_file *file;
 	struct peregrine_directory *dir;
 	struct peregrine_peer *peer;
 	struct pg_context_options options;
 	int local_port = 0;
 	int chunk_size = 1024;
-	int remain = 0;
 	bool summary = 0;
 	int ch;
 	int ret;
@@ -327,7 +360,7 @@ main(int argc, char *const argv[])
 		exit(EX_USAGE);
 	}
 
-	while ((ch = getopt(argc, argv, "hl:p:f:d:c:hs")) != -1) {
+	while ((ch = getopt(argc, argv, "hl:p:f:d:c:r:hs")) != -1) {
 		switch (ch) {
 		case 'h':
 			usage(argv[0]);
@@ -355,6 +388,7 @@ main(int argc, char *const argv[])
 
 		case 'r':
 			remain = strtol(optarg, NULL, 10);
+                        add_remain_timer(0, &remain_timerfd);
 			break;
 
 		case 's':
@@ -406,12 +440,18 @@ main(int argc, char *const argv[])
 	pg_file_generate_sha1(context);
 	pg_file_list_sha1(context);
 
-	pfd.fd = pg_context_get_fd(context);
-	pfd.events = POLLIN;
-	pfd.revents = 0;
+	pfd[0].fd = pg_context_get_fd(context);
+	pfd[0].events = POLLIN;
+	pfd[0].revents = 0;
+
+	if (remain_timerfd > 0) {
+                pfd[1].fd = remain_timerfd;
+                pfd[1].events = POLLIN;
+                pfd[1].revents = 0;
+        }
 
 	for (;;) {
-		ret = poll(&pfd, 1, summary ? 500 : -1);
+		ret = poll(pfd, (remain_timerfd > 0) ? 2 : 1, summary ? 500 : -1);
 		if (ret < 0) {
 			if (errno == EINTR) {
 				check_signals();
@@ -421,12 +461,17 @@ main(int argc, char *const argv[])
 			err(1, "epoll_wait");
 		}
 
-		if (pfd.revents & POLLIN) {
+		if (pfd[0].revents & POLLIN) {
 			if (pg_context_step(context) != 0)
 				break;
 		}
 
-		if (summary) {
+		if (pfd[1].revents & POLLIN) {
+			exit(EXIT_SUCCESS);
+                }
+
+
+                if (summary) {
 			printf("\033[2J\033[H");
 			print_summary(context);
 		}
@@ -434,3 +479,4 @@ main(int argc, char *const argv[])
 
 	return (0);
 }
+
