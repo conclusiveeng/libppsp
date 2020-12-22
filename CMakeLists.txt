@@ -10,7 +10,6 @@ option(PACKAGE_DEB "Generate DEB package" OFF)
 option(BUILD_DOCS "Generate docs using Doxygen" OFF)
 option(BUILD_STATIC "Build static libary and example app" OFF)
 
-
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11")
 add_compile_options(-O0 -Wall -Wextra -g -D_DEFAULT_SOURCE)
