@@ -27,6 +27,7 @@ set(PKGCONFIG_C_FLAGS ${CMAKE_C_FLAGS})
 set(PKGCONFIG_VERSION ${CMAKE_PROJECT_VERSION})
 
 get_filename_component(PARENT_DIR .. REALPATH DIRECTORY)
+include(GNUInstallDirs)
 
 include_directories(include)
 set(MAIN_SOURCES
