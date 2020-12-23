@@ -146,15 +146,18 @@ pg_file_add_file(struct pg_context *context, const uint8_t *sha1, const char *pa
 {
 	struct pg_file *file;
 	struct stat stat;
+	mode_t omode;
 	int oflag = 0;
 	int fd;
 
 	if (sha1 != NULL) {
 		/* Leecher mode */
 		oflag = O_WRONLY | O_CREAT | O_TRUNC;
+		omode = 0660;
 	} else {
 		/* Seeder mode */
 		oflag = O_RDONLY;
+		omode = 0440;
 	}
 
 	if (sha1 != NULL && path == NULL) {
@@ -162,7 +165,7 @@ pg_file_add_file(struct pg_context *context, const uint8_t *sha1, const char *pa
 		path = strdup(pg_hexdump(sha1, 20));
 	}
 
-	fd = open(path, oflag, 0660);
+	fd = open(path, oflag, omode);
 	if (fd < 0) {
 		WARN("cannot open or create %s: %s", path, strerror(errno));
 		return (NULL);
