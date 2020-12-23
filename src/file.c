@@ -141,6 +141,17 @@ pg_file_generate_sha1(struct pg_context *context)
 	}
 }
 
+struct pg_file * pg_file_find_by_path(struct pg_context *context, const char *path) {
+	struct pg_file *file;
+
+	SLIST_FOREACH(file, &context->files, entry) {
+		if (strcmp(file->path, path) == 0)
+			return file;
+	}
+
+	return NULL;
+}
+
 struct pg_file *
 pg_file_add_file(struct pg_context *context, const uint8_t *sha1, const char *path)
 {
@@ -149,6 +160,10 @@ pg_file_add_file(struct pg_context *context, const uint8_t *sha1, const char *pa
 	mode_t omode;
 	int oflag = 0;
 	int fd;
+
+	file = pg_file_find_by_path(context, path);
+	if (file != NULL)
+		return file;
 
 	if (sha1 != NULL) {
 		/* Leecher mode */

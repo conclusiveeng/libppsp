@@ -133,9 +133,10 @@ event_printf(const char *fmt, ...)
 }
 
 static void
-handle_signal(int signal_fd, unsigned int signal_id, struct pg_context *ctx)
+handle_signal(struct pg_context *ctx, int signal_fd, unsigned int signal_id)
 {
 	int ret;
+        struct peregrine_directory *dir;
         struct signalfd_siginfo sig_fd_info;
 
         ret = read(signal_fd, &sig_fd_info, sizeof(sig_fd_info));
@@ -144,9 +145,14 @@ handle_signal(int signal_fd, unsigned int signal_id, struct pg_context *ctx)
 		return;
 	}
 
-	if (sig_fd_info.ssi_signo == signal_id)
-                printf("Got signal %d \n", signal_id);
-
+	if (sig_fd_info.ssi_signo == signal_id) {
+                TAILQ_FOREACH(dir, &directories, entry) {
+                        if (pg_file_add_directory(ctx, dir->path, NULL) != 0) {
+                                fprintf(stderr, "cannot add directory %s: %s\n", dir->path, strerror(errno));
+                        }
+                }
+	}
+        pg_file_generate_sha1(context);
 }
 
 static int
@@ -512,7 +518,7 @@ main(int argc, char *const argv[])
 		}
 
                 if (pfd[FD_SIGNALFD].revents & POLLIN) {
-                        handle_signal(pfd[FD_SIGNALFD].fd, signal_refresh, context);
+                        handle_signal(context, pfd[FD_SIGNALFD].fd, signal_refresh);
                 }
 
 		if (pfd[FD_TIMER].revents & POLLIN) {
