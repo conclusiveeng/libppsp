@@ -49,9 +49,12 @@
 #include <sys/poll.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
+#include <sys/signalfd.h>
 #include <netdb.h>
 #include <sysexits.h>
 #include <sys/timerfd.h>
+#include <signal.h>
+#include <unistd.h>
 
 /**
  * @brief Maximum length of SHA1 in HEX string
@@ -95,6 +98,13 @@ static struct pg_context *context;
 static bool print_events = false;
 int remain = 0;
 int remain_timerfd = -1;
+unsigned int signal_refresh = SIGUSR1;
+
+enum {
+        FD_PEREGRINE = 0,
+        FD_SIGNALFD,
+        FD_TIMER
+};
 
 static void
 usage(const char *argv0)
@@ -123,8 +133,19 @@ event_printf(const char *fmt, ...)
 }
 
 static void
-check_signals(void)
+handle_signal(int signal_fd, unsigned int signal_id, struct pg_context *ctx)
 {
+	int ret;
+        struct signalfd_siginfo sig_fd_info;
+
+        ret = read(signal_fd, &sig_fd_info, sizeof(sig_fd_info));
+        if (ret != sizeof(sig_fd_info)) {
+		fprintf(stderr, "Error while reading signal_fd\n");
+		return;
+	}
+
+	if (sig_fd_info.ssi_signo == signal_id)
+                printf("Got signal %d \n", signal_id);
 
 }
 
@@ -249,6 +270,22 @@ add_remain_timer(int remain_min, int *timer_fd)
                 fprintf(stderr, "Cannot set remain_min timer \n");
 }
 
+int add_signal_handler(int signal_id) {
+	int sig_fd = -1;
+        sigset_t sig_mask;
+
+        sigemptyset(&sig_mask);
+        sigaddset(&sig_mask, signal_id);
+        if (sigprocmask(SIG_BLOCK, &sig_mask, NULL) == -1)
+                fprintf(stderr, "Cannot set signal handling sig_mask\n");
+
+        sig_fd = signalfd(-1, &sig_mask, 0);
+        if (sig_fd == -1)
+                fprintf(stderr, "Cannot create signal FD\n");
+
+	return sig_fd;
+}
+
 static void
 print_event(struct pg_event *ev, void *arg __attribute__((unused)))
 {
@@ -340,7 +377,7 @@ int
 main(int argc, char *const argv[])
 {
 	struct sockaddr_in sin;
-	struct pollfd pfd[2];
+	struct pollfd pfd[3];
 	struct peregrine_file *file;
 	struct peregrine_directory *dir;
 	struct peregrine_peer *peer;
@@ -350,6 +387,7 @@ main(int argc, char *const argv[])
 	bool summary = 0;
 	int ch;
 	int ret;
+	int pfd_size = 0;
 
 	TAILQ_INIT(&files);
 	TAILQ_INIT(&directories);
@@ -402,7 +440,7 @@ main(int argc, char *const argv[])
 		exit(EX_USAGE);
 	}
 
-	sin.sin_family = AF_INET;
+        sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = INADDR_ANY;
 	sin.sin_port = htons(local_port);
 	options.listen_addr = (struct sockaddr *)&sin;
@@ -440,36 +478,46 @@ main(int argc, char *const argv[])
 	pg_file_generate_sha1(context);
 	pg_file_list_sha1(context);
 
-	pfd[0].fd = pg_context_get_fd(context);
-	pfd[0].events = POLLIN;
-	pfd[0].revents = 0;
+	pfd[FD_PEREGRINE].fd = pg_context_get_fd(context);
+	pfd[FD_PEREGRINE].events = POLLIN;
+	pfd[FD_PEREGRINE].revents = 0;
+        pfd_size++;
+
+        pfd[FD_SIGNALFD].fd = add_signal_handler(signal_refresh);
+        pfd[FD_SIGNALFD].events = POLLIN;
+        pfd[FD_SIGNALFD].revents = 0;
+        pfd_size++;
 
 	if (remain_timerfd > 0) {
-                pfd[1].fd = remain_timerfd;
-                pfd[1].events = POLLIN;
-                pfd[1].revents = 0;
+                pfd[FD_TIMER].fd = remain_timerfd;
+                pfd[FD_TIMER].events = POLLIN;
+                pfd[FD_TIMER].revents = 0;
+                pfd_size++;
         }
 
 	for (;;) {
-		ret = poll(pfd, (remain_timerfd > 0) ? 2 : 1, summary ? 500 : -1);
+		ret = poll(pfd, pfd_size, summary ? 500 : -1);
 		if (ret < 0) {
 			if (errno == EINTR) {
-				check_signals();
+				fprintf(stderr, "Got unhandled signal!\n");
 				continue;
 			}
 
 			err(1, "epoll_wait");
 		}
 
-		if (pfd[0].revents & POLLIN) {
+		if (pfd[FD_PEREGRINE].revents & POLLIN) {
 			if (pg_context_step(context) != 0)
 				break;
 		}
 
-		if (pfd[1].revents & POLLIN) {
-			exit(EXIT_SUCCESS);
+                if (pfd[FD_SIGNALFD].revents & POLLIN) {
+                        handle_signal(pfd[FD_SIGNALFD].fd, signal_refresh, context);
                 }
 
+		if (pfd[FD_TIMER].revents & POLLIN) {
+			exit(EXIT_SUCCESS);
+                }
 
                 if (summary) {
 			printf("\033[2J\033[H");
